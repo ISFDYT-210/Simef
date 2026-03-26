@@ -1,0 +1,357 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Constancia de Estudios - {{ usuario.nombre_completo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Botones de acción -->
+    <div class="d-flex justify-content-between mb-3 no-print">
+        <a href="/user_list/" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver al Listado
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="fas fa-print"></i> Imprimir / Descargar PDF
+        </button>
+    </div>
+
+    <!-- Contenido del reporte -->
+    <div id="reporte-content" class="bg-white p-5 border">
+        <!-- Encabezado institucional -->
+        <div class="text-center mb-5">
+            <div class="row align-items-center">
+                <div class="col-2">
+                    <!-- Logo institucional -->
+                    <img src="{% static 'imagenes/logo.png' %}" alt="Logo" class="img-fluid" style="max-height: 80px;">
+                </div>
+                <div class="col-8">
+                    {% if instituto %}
+                        <h4 class="mb-1 text-uppercase fw-bold">{{ instituto.nombre_instituto }}</h4>
+                    {% else %}
+                        <h4 class="mb-1 text-uppercase fw-bold">Instituto Superior de Formación Docente y Técnica N° 210</h4>
+                    {% endif %}
+                    <p class="mb-0 text-muted">Ministerio de Educación - Provincia de Buenos Aires</p>
+                </div>
+                <div class="col-2">
+                    <!-- Espacio para sellos oficiales -->
+                </div>
+            </div>
+            <hr class="my-4">
+            <h3 class="text-uppercase fw-bold text-primary">CONSTANCIA DE ESTUDIOS</h3>
+            {% if carrera %}
+                <h5 class="text-uppercase">{{ carrera.nombre_carrera }}</h5>
+                {% if carrera.num_resolucion %}
+                    <p class="text-muted">Resolución Ministerial N° {{ carrera.num_resolucion }}</p>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Información del estudiante -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-user"></i> DATOS DEL ESTUDIANTE</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Apellido y Nombre:</strong> {{ usuario.nombre_completo|upper }}</p>
+                                <p><strong>Documento Nacional de Identidad:</strong> {{ usuario.dni }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Correo Electrónico:</strong> {{ usuario.email }}</p>
+                                <p><strong>Fecha de Emisión:</strong> {{ fecha|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen académico -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-chart-pie"></i> RESUMEN ACADÉMICO</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="border p-3 rounded">
+                                    <h4 class="text-success fw-bold">{{ materias_aprobadas }}</h4>
+                                    <small>Materias Aprobadas</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border p-3 rounded">
+                                    <h4 class="text-primary fw-bold">{{ total_materias }}</h4>
+                                    <small>Total de Materias</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border p-3 rounded">
+                                    <h4 class="text-info fw-bold">{{ porcentaje_aprobado }}%</h4>
+                                    <small>Porcentaje de Avance</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border p-3 rounded">
+                                    <h4 class="text-warning fw-bold">{{ total_materias|add:"-"|add:materias_aprobadas }}</h4>
+                                    <small>Materias Pendientes</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalle de materias por año -->
+        {% if materias_primero %}
+        <div class="mb-4">
+            <h5 class="bg-light p-2 text-center fw-bold">PRIMER AÑO</h5>
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="10%">Código</th>
+                        <th width="50%">Asignatura</th>
+                        <th width="15%">Nota Numérica</th>
+                        <th width="25%">Nota en Letras</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in materias_primero %}
+                    <tr class="{% if item.nota_final != '-' and item.nota_final >= 4 %}table-success{% else %}table-light{% endif %}">
+                        <td class="text-center">{{ item.materia.id|stringformat:"03d" }}</td>
+                        <td>{{ item.materia.nombre_materia }}</td>
+                        <td class="text-center fw-bold">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">Sin Calificar</span>
+                            {% else %}
+                                {{ item.nota_final }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">-</span>
+                            {% else %}
+                                {{ item.nota_texto|capfirst }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if materias_segundo %}
+        <div class="mb-4">
+            <h5 class="bg-light p-2 text-center fw-bold">SEGUNDO AÑO</h5>
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="10%">Código</th>
+                        <th width="50%">Asignatura</th>
+                        <th width="15%">Nota Numérica</th>
+                        <th width="25%">Nota en Letras</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in materias_segundo %}
+                    <tr class="{% if item.nota_final != '-' and item.nota_final >= 4 %}table-success{% else %}table-light{% endif %}">
+                        <td class="text-center">{{ item.materia.id|stringformat:"03d" }}</td>
+                        <td>{{ item.materia.nombre_materia }}</td>
+                        <td class="text-center fw-bold">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">Sin Calificar</span>
+                            {% else %}
+                                {{ item.nota_final }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">-</span>
+                            {% else %}
+                                {{ item.nota_texto|capfirst }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if materias_tercero %}
+        <div class="mb-4">
+            <h5 class="bg-light p-2 text-center fw-bold">TERCER AÑO</h5>
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="10%">Código</th>
+                        <th width="50%">Asignatura</th>
+                        <th width="15%">Nota Numérica</th>
+                        <th width="25%">Nota en Letras</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in materias_tercero %}
+                    <tr class="{% if item.nota_final != '-' and item.nota_final >= 4 %}table-success{% else %}table-light{% endif %}">
+                        <td class="text-center">{{ item.materia.id|stringformat:"03d" }}</td>
+                        <td>{{ item.materia.nombre_materia }}</td>
+                        <td class="text-center fw-bold">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">Sin Calificar</span>
+                            {% else %}
+                                {{ item.nota_final }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">-</span>
+                            {% else %}
+                                {{ item.nota_texto|capfirst }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if materias_cuarto %}
+        <div class="mb-4">
+            <h5 class="bg-light p-2 text-center fw-bold">CUARTO AÑO</h5>
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="10%">Código</th>
+                        <th width="50%">Asignatura</th>
+                        <th width="15%">Nota Numérica</th>
+                        <th width="25%">Nota en Letras</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in materias_cuarto %}
+                    <tr class="{% if item.nota_final != '-' and item.nota_final >= 4 %}table-success{% else %}table-light{% endif %}">
+                        <td class="text-center">{{ item.materia.id|stringformat:"03d" }}</td>
+                        <td>{{ item.materia.nombre_materia }}</td>
+                        <td class="text-center fw-bold">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">Sin Calificar</span>
+                            {% else %}
+                                {{ item.nota_final }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.nota_final == '-' %}
+                                <span class="text-muted">-</span>
+                            {% else %}
+                                {{ item.nota_texto|capfirst }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Pie del documento -->
+        <div class="mt-5 pt-4 border-top">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="small text-muted">
+                        <strong>Observaciones:</strong><br>
+                        • Las calificaciones van de 1 a 10, siendo 4 la nota mínima de aprobación.<br>
+                        • Este documento es válido únicamente con firma y sello oficial.<br>
+                        • Para consultas, dirigirse a la Secretaría Académica.
+                    </p>
+                </div>
+                <div class="col-md-6 text-center">
+                    <div class="mt-4 pt-4">
+                        <p>____________________________</p>
+                        <p class="small">
+                            <strong>Secretario/a Académico/a</strong><br>
+                            Firma y Sello
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-3">
+                <small class="text-muted">
+                    Documento generado automáticamente el {{ fecha|date:"d/m/Y" }} a las {{ fecha|time:"H:i" }} hs.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        font-size: 11px !important;
+        line-height: 1.3 !important;
+    }
+    
+    #reporte-content {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        border: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        page-break-inside: avoid;
+    }
+    
+    .table {
+        font-size: 10px !important;
+    }
+    
+    .table th {
+        background-color: #f8f9fa !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    
+    .table-success {
+        background-color: #d4edda !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    
+    .bg-primary {
+        background-color: #0d6efd !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    
+    .bg-success {
+        background-color: #198754 !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    
+    .text-white {
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    
+    @page {
+        size: A4;
+        margin: 1.5cm;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cargar Usuarios</title>
+</head>
+<body>
+    <h2>Cargar Usuarios</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ formulario.as_p }}
+        <button type="submit">Cargar Usuarios</button>
+    </form>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!-- editar_materia.html -->
+{% extends 'base/base.html' %}
+{% block title %}Editar Materia{% endblock %}
+{% block content %}
+{% load static %}
+    <div id="crear-materia"> 
+        <form method="POST" class="form" style="margin-top: 75px;">
+            <div class="edit-rectangulo1">
+                {% csrf_token %}
+                <p class = "text-center reg-title">
+                    Editar Materia
+                <br>
+                </p>
+                <p class="text-left form-items">
+                    <label for="id_nombreDeMateria">Nombre de materia:</label>
+                    <br>  
+                    {{ form.nombre_materia }}
+                </p>
+                <p class="text-left form-items">
+                    <label for="id_carrera">Carrera:</label>
+                    <br>  
+                    {{ form.carrera }}
+                </p>
+                <p class="text-left form-items">
+                    <label for="id_profesor">Profesor:</label>
+                    <br>  
+                    {{ form.profesor }}
+                </p>
+                <p class="form-left-horario form-items">
+                    <label for="id_Año">Año:</label>
+                    {{ form.anio }}
+                </p>
+                <p class="form-left-horario form-items">
+                    <label for="id_horario">Horario:</label>
+                    {{ form.Horario}}
+                </p>
+                    
+                </p><br>
+            </div>
+        <div class="cp-rectangulo2" style="margin-top: -155px;">
+            <div class="logo-registracion only-lt">
+                <img src="/static/imagenes/SIMEF.png" style="height: 50%;">
+            </div>
+            <div class="botones-edituser" style="margin-top:-200px">
+                <button type="submit" class="btn btn-blue" >Guardar</button> 
+                
+                <div id="volver_materias">
+                    <a href= "/lista_materias_admin" style="font-size: 20px; text-decoration: none"> Volver </a>
+                </div>
+            </div>
+        </div>
+    </div>
+<style>
+    html {
+        overflow: hidden;
+    }
+</style>
+
+
+<script>
+    nocorresponde = findElementByInnerHTML('No corresponde')
+    if (nocorresponde != null)
+        {
+            nocorresponde.remove()
+        }
+</script>
+{% endblock %}

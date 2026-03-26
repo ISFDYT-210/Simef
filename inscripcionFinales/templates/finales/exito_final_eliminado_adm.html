@@ -1,0 +1,37 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Exito borrado de final{% endblock %}
+
+{% block content %}
+<div>        
+        <!-- Modal -->
+        <div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="alertModalLabel">Notificación</h5>
+                    </div>
+                    <div class="text-center">
+                        <h5>¡La inscripcion al final ha sido eliminada correctamente!</h5>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="/listaFinalesAdm/"><button type="button" class="btn btn-primary">Volver</button></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Scripts Bootstrap -->
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    
+        <!-- Mostrar modal usando JavaScript -->
+        <script>
+            $(document).ready(function() {
+                $('#alertModal').modal('show');
+            });
+        </script>
+    
+</div>
+{% endblock %}

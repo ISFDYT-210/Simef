@@ -1,0 +1,10 @@
+.vscode
+.idea
+*.pyc
+media/
+inscripcionFinales/migrations/*
+!inscripcionFinales/migrations/0001_initial.py
+db.sqlite3
+debug.log
+gestioninstituto_models_*.png
+env/

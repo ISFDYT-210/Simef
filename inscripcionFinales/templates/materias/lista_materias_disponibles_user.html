@@ -1,0 +1,68 @@
+<!-- lista_materias_user.html -->
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Materias{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-headers" style="border-radius: 5px;">
+     <h4 class="card-title" style="text-align: center;margin-bottom: 25px;">Lista de Materias</h4>
+    </div>
+        <div class="card-body"> 
+             {% if materias %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="h5">Nombre</th>
+                        <th class="h5">Año</th>
+                        <th class="h5">Carrera</th>
+                        <th class="h5">Profesor</th>
+                        <th class="h5">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                        {% for materia in materias %}
+                            <tr>
+                                <td class="h6">{{materia.nombre_materia}}</td>
+                                <td class="h6">{{materia.anio}}</td>
+                                <td class="h6">{{materia.carrera.nombre_carrera}}</td>
+                                <td class="h6">{{materia.profesor.nombres}}</td>
+                                <td>
+                                    <a name="" id="{{materia.id}}inscribirse" class="btn btn-primary" onclick="mostrarBotones({{materia.id}})" role="button">Inscribirme</a>
+                                    <a name="" id="{{materia.id}}regular" class="btn btn-primary" href="/inscribirse_materia/{{materia.id}}/01" role="button" hidden>Regular</a>
+                                    <a name="" id="{{materia.id}}libre" class="btn btn-primary" href="/inscribirse_materia/{{materia.id}}/02" role="button" hidden>Libre</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-danger" style="font-size: 20px;"> No hay materias disponibles.</div>
+        {% endif %}
+        </div>
+    </div>
+<script>    
+        function mostrarBotones(materia) {
+            if (typeof boton_inscribirse !== 'undefined' && typeof boton_regular !== 'undefined' && typeof boton_libre !== 'undefined')
+            {
+                boton_inscribirse.hidden=false
+                boton_regular.hidden=true
+                boton_libre.hidden=true 
+            }
+            boton_inscribirse=document.getElementById(materia+"inscribirse")
+            boton_regular=document.getElementById(materia+"regular")
+            boton_libre=document.getElementById(materia+"libre")
+            if (boton_inscribirse.parentElement.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.innerHTML.toLowerCase().substring(0, 5) == 'pract' || boton_inscribirse.parentElement.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.innerHTML.toLowerCase().substring(0, 5) == 'práct' )
+            {
+                boton_inscribirse.hidden=true
+                boton_regular.hidden=false
+            }
+            else
+            {
+                boton_inscribirse.hidden=true
+                boton_regular.hidden=false
+                boton_libre.hidden=false
+            }
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Inscripcion exitosa{% endblock %}
+
+{% block content %}
+{%if user.is_authenticated and not user.is_staff%}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inscripción Exitosa</title>
+</head>
+<body>
+    <h1>Inscripción Exitosa</h1>
+    <p class="fs-3">¡Te has inscripto correctamente para la mesa final!</p>
+</body>
+</html>
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+
+{% endif %}
+{% endblock %}

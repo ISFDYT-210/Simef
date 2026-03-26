@@ -1,0 +1,15 @@
+{% extends 'base/base.html' %}
+{% block title %}Alta de Materia{% endblock %}
+{% block content %}
+
+    <div class="container">
+        <h2>Importar Materias</h2>
+        <form method="post"enctype="multipart/form-data">
+            {% csrf_token %}
+            <strong>{{ form.as_p }}</strong>
+            <div>
+                <br> <button type="submit" class="btn btn-primary">Carga Masiva</button> <br>
+            </div>
+    </div>
+{% endblock %}
+

@@ -1,0 +1,65 @@
+{% extends 'base/base.html' %}
+{% block title %}Alta de Materia{% endblock %}
+{% block content %}
+{% load static %}
+<div id="crear-materia"> 
+    <form method="POST" class="form">
+        <div class="edit-rectangulo1" style="margin-top: 50px;">
+            {% csrf_token %}
+            <p class="text-center reg-titles">
+                Completar los siguientes campos:
+                <br>
+            </p>
+            <p class="text-left form-items">
+                <label for="id_nombreDeMateria">Nombre de materia:</label>
+                {{ form.nombre_materia }}
+            </p>
+            <p class="text-left form-items">
+                <label for="id_carrera">Carrera:</label>
+                {{ form.carrera }}
+            </p>
+            <p class="text-left form-items">
+                <label for="id_profesor">Profesor:</label>
+                {{ form.profesor }}
+            </p>
+            <p class="form-left-horario form-items">
+                <label for="id_anio">Año:</label>
+                {{ form.anio }}
+            </p>
+            <p class="form-left-horario form-items">
+                <label for="id_dia">Día:</label>
+                {{ form.dia }}
+            </p>
+            <p class="form-left-horario form-items">
+                <label for="id_horario">Horario:</label>
+                {{ form.Horario }}
+            </p>
+
+            <br>
+        </div>
+        <div class="cp-rectangulo2">
+            <div class="logo-registracion only-lt">
+                <img src="/static/imagenes/SIMEF.png" class="logo-reg only-lt" style="width: 300px;height: 320px;">
+            </div>
+            <div class="botones-edituser">
+                <button type="submit" class="btn btn-blue" style="transition: 0.6s">Guardar</button>
+    
+                <div id="volver_materias">
+                    <a href='/' style="font-size: 20px; text-decoration: none"> Volver </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<script>
+    function findElementByInnerHTML(innerHTML) {
+        const allElements = document.querySelectorAll('*');
+        return Array.from(allElements).find(element => element.innerHTML.trim() === innerHTML.trim());
+    }
+    nocorresponde = findElementByInnerHTML('No corresponde')
+    if (nocorresponde != null)
+    {
+        nocorresponde.remove()
+    }
+</script>
+{% endblock %}

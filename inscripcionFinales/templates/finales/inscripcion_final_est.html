@@ -1,0 +1,46 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Inscripcion Final{% endblock %}
+
+{% block content %}
+{%if user.is_authenticated and not user.is_staff%}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inscripción Final</title>
+</head>
+<body>
+    <p id="numero_usuario" hidden>{{request.user.id}}</p>
+    <h1>Inscripción Final</h1>
+    <form method="post" style="font-size: 1.5em;">
+        {% csrf_token %}
+        {{form.llamado}}
+        <br>
+        <button class="btn btn-primary" type="submit">Inscribirse</button>
+    </form>
+    {% else %}
+
+    <div class="text-center">
+        <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+      <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+    </div>
+    
+    {% endif %}
+    <script>
+        var nombreUsuario = document.getElementById('numero_usuario').innerText;
+        var dropdownUsuarios = document.getElementById('id_usuario');
+        for (var i = 0; i < dropdownUsuarios.options.length; i++) {   
+            if (dropdownUsuarios.options[i].value === nombreUsuario.toLowerCase()) {
+                dropdownUsuarios.options[i].selected = true;
+                document.getElementById('id_usuario').hidden=true;
+                document.getElementById("id_usuario").previousElementSibling.hidden=true;
+                break;
+            }
+        }
+        document.getElementById("id_aprobada").hidden=true
+        document.getElementById("id_aprobada").previousElementSibling.hidden=true
+    </script>
+    {%endblock%}
+</body>
+
+</html>

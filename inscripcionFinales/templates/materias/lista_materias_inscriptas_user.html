@@ -1,0 +1,63 @@
+<!-- lista_materias_user.html -->
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Materias{% endblock %}
+
+{% block content %}
+<div class="card-body" style="margin-top: 50px; margin-bottom: 50px;">
+    <div class="card">
+    <div class="card-headers rounded-top">
+        <h4 class="card-title">Lista de Materias</h4>
+        </div>
+        <div class="card-body">
+            {% if materias %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="h5">Nombre</th>
+                        <th class="h5">Modalidad</th>
+                        <th class="h5">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                        {% for materia in materias %}
+                            <tr>
+                                <td class="h6">{{materia.materia}}</td>
+                                <td id='modalidad{{materia.id}}'class="h6">{{materia.get_modalidad_display}}</td>
+                                <td>
+                                    {%if materia.nota_cursada < 7 or materia.nota_cursada is none%}
+                                    <a name="" id="" class="btn btn-danger" href="/eliminar_inscripcion_materia/{{materia.id}}" role="button">Dar de baja</a>
+                                    {%elif materia.nota_cursada >= 7 and materia.nota_final < 4 or materia.nota_cursada >= 7 and materia.nota_final is none %}
+                                    <h6>Cursada aprobada</h6>
+                                    {%elif materia.nota_final >= 4%}
+                                    <h6>Final aprobado: {{materia.nota_final}}</h6>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-danger" style="font-size: 20px;"> No hay materias disponibles.</div>
+        {% endif %}
+        </div>  
+    </div>
+</div>   
+<script>
+{%for materia in materias%}
+    modalidad=document.getElementById("modalidad{{materia.id}}")
+        if (modalidad.innerHTML=='1')
+        {
+            modalidad.innerHTML='Regular'
+        }
+        else if(modalidad.innerHTML=='2')
+        {
+            modalidad.innerHTML='Libre'
+        }
+        else if(modalidad.innerHTML=='3')
+        {
+            modalidad.innerHTML='Condicional'
+        }
+{%endfor%}      
+</script>
+{% endblock %}

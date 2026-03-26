@@ -1,0 +1,15 @@
+{% extends 'base/base.html' %}
+{% block title %}Alta de Materia{% endblock %}
+{% block content %}
+<!-- en tu aplicación (app) templates/inscribir_mesa_final.html -->
+<h1>Inscribirse en Mesa Final</h1>
+<form method="post" action="">
+    {% csrf_token %}
+    {{ filtro_form.as_p }}
+    <button type="submit">Filtrar</button>
+</form>
+{% for mesa_final in mesas_finales %}
+    <p>{{ mesa_final.materia }} - {{ mesa_final.llamado }}</p>
+    <a href="{% url 'inscribir_mesa_final' %}">Inscribirse</a>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base/base.html' %}
+{% block title %}Eliminar Mesa{% endblock %}
+{% block content %}
+
+{% load inscripcionfinales_extras %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+    <h3>Eliminar Mesa</h3>
+    <form method="POST" class="">
+    {% csrf_token %}
+    <!-- <if> -->
+    <h3>¿Estás seguro que deseas eliminar esta mesa?</h3> 
+    <button class="btn btn-danger" type="submit">Si, eliminar</button>
+    <a class="btn btn-defualt" href="/mesas_lista/">Cancelar</a>
+    </div>
+    </form>
+{% else %}
+  <div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+    <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+  </div>
+  </form>
+{% endif %}
+{% endblock %}

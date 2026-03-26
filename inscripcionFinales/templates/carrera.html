@@ -1,0 +1,6 @@
+<html>Registro Carrera</html>
+<form method="POST" class="">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-success">Guardar</button>
+</form>

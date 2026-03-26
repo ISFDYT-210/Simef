@@ -1,0 +1,182 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Editar Cursada{% endblock %}
+
+{% block content %}
+{% load inscripcionfinales_extras %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+<div id="edit-inscr"> 
+  <form method="POST" class="form" id="formCargarNotas">
+      <div class="edit-rectangulo1">
+          {% csrf_token %}
+          <h2>Cargar Notas</h2>
+          <p>Estudiante: {{ usuarios_materia.usuario }}</p>
+          <p>Materia: {{ usuarios_materia.materia }}</p>
+          <p id="modalidadAlumno" data-modalidad="{{ usuarios_materia.modalidad }}">Modalidad: {{ usuarios_materia.get_modalidad_display }}</p>
+          
+          <!-- Campo nota de cursada (se oculta para oyentes) -->
+          <div id="div_nota_cursada">
+            <label for="{{ form.nota_cursada.id_for_label }}">{{ form.nota_cursada.label }}:</label>
+            {{ form.nota_cursada }}
+            {% if form.nota_cursada.errors %}
+              <div class="text-danger">{{ form.nota_cursada.errors }}</div>
+            {% endif %}
+          </div>
+          
+          <!-- Campo nota final (siempre visible) -->
+          <div id="div_nota_final">
+            <label for="{{ form.nota_final.id_for_label }}">{{ form.nota_final.label }}:</label>
+            {{ form.nota_final }}
+            {% if form.nota_final.errors %}
+              <div class="text-danger">{{ form.nota_final.errors }}</div>
+            {% endif %}
+          </div>
+          
+          <!-- Otros campos del formulario si existen -->
+          {% for field in form %}
+            {% if field.name != 'nota_cursada' and field.name != 'nota_final' %}
+              <div class="mb-3">
+                {{ field.label_tag }}
+                {{ field }}
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="edit-rectangulo2">
+          <div class="logo-edit-user only-lt">
+            <img src="/static/imagenes/SIMEF.png" style="width: 70%; height: 100%;">
+          </div>
+          <div class="botones-edituser">
+            <button type="submit" class="btn btn-blue" style="transition: 0.6s">Cargar nota</button>
+
+            <div id="volver_usuario">
+              <a href="/listaMateriasAdm/" style="font-size: 20px; text-decoration: none">Volver a Lista de Inscripciones</a>
+            </div>
+          </div>
+        </div>
+    </form>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Actualizar nombre de usuario si existe
+    const nombreUsuarioElement = document.getElementById('nombreUsuario');
+    const usuarioSelect = document.getElementById('id_usuario');
+    if (nombreUsuarioElement && usuarioSelect) {
+      nombreUsuarioElement.innerHTML = usuarioSelect.options[usuarioSelect.selectedIndex].innerHTML;
+    }
+
+    // Obtener elementos del formulario
+    const form = document.getElementById('formCargarNotas');
+    const notaCursadaDiv = document.getElementById('div_nota_cursada');
+    const notaCursadaInput = document.getElementById('id_nota_cursada');
+    const notaFinalInput = document.getElementById('id_nota_final');
+    const modalidadElement = document.getElementById('modalidadAlumno');
+
+    // Determinar si es oyente usando el código '01' para Oyente
+    let esOyente = false;
+    if (modalidadElement) {
+      const modalidad = modalidadElement.getAttribute('data-modalidad');
+      esOyente = modalidad === '01'; // '01' corresponde a 'Oyente' según choices.py
+      console.log('Modalidad detectada:', modalidad, 'Es oyente:', esOyente);
+    }
+
+    // Si es oyente, ocultar y deshabilitar el campo de nota de cursada
+    if (esOyente && notaCursadaDiv && notaCursadaInput) {
+      notaCursadaDiv.style.display = 'none';
+      notaCursadaInput.disabled = true;
+      notaCursadaInput.required = false;
+      notaCursadaInput.value = ''; // Limpiar valor
+      
+      // Habilitar nota final para oyentes
+      if (notaFinalInput) {
+        notaFinalInput.disabled = false;
+        notaFinalInput.required = false;
+      }
+    }
+
+    // Validación del formulario
+    if (form && notaCursadaInput && notaFinalInput) {
+      form.addEventListener('submit', function(e) {
+        const notaCursada = notaCursadaInput.value.trim();
+        const notaFinal = notaFinalInput.value.trim();
+
+        // Si NO es oyente, validar que no se pueda cargar nota final sin nota de cursada
+        if (!esOyente) {
+          if (notaFinal !== '' && notaCursada === '') {
+            e.preventDefault();
+            alert('No se puede cargar una Nota Final sin haber cargado primero la Nota de Cursada.');
+            notaFinalInput.focus();
+            return false;
+          }
+
+          // Validar nota de cursada
+          if (notaCursada !== '' && (parseFloat(notaCursada) < 0 || parseFloat(notaCursada) > 10)) {
+            e.preventDefault();
+            alert('La Nota de Cursada debe estar entre 0 y 10.');
+            notaCursadaInput.focus();
+            return false;
+          }
+        }
+
+        // Validar nota final (aplica para todos)
+        if (notaFinal !== '' && (parseFloat(notaFinal) < 0 || parseFloat(notaFinal) > 10)) {
+          e.preventDefault();
+          alert('La Nota Final debe estar entre 0 y 10.');
+          notaFinalInput.focus();
+          return false;
+        }
+
+        // Para oyentes, validar que al menos haya nota final
+        if (esOyente && notaFinal === '') {
+          e.preventDefault();
+          alert('Debe cargar la Nota Final para el alumno Oyente.');
+          notaFinalInput.focus();
+          return false;
+        }
+      });
+
+      // Lógica para alumnos regulares: limpiar nota final si se borra la nota de cursada
+      if (!esOyente) {
+        notaCursadaInput.addEventListener('input', function() {
+          if (this.value.trim() === '') {
+            notaFinalInput.value = '';
+            notaFinalInput.disabled = true;
+          } else {
+            notaFinalInput.disabled = false;
+          }
+        });
+
+        // Deshabilitar nota final si no hay nota de cursada al cargar la página
+        if (notaCursadaInput.value.trim() === '') {
+          notaFinalInput.disabled = true;
+        }
+      }
+    }
+  });
+</script>
+
+<style>
+  @media only screen and (max-width: 600px) {
+    .edit-rectangulo1 {
+      width: 70%;
+    }
+    .edit-rectangulo2 {
+      margin-top: 50%;
+      margin-right: 10%;
+    }
+  }
+</style>
+
+{%else%}
+<div class="text-center">
+  <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+{%endif%}
+
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Registro de usuario{% endblock %}
+
+{% block content %}
+
+
+    <h1>Informe de Usuarios Materia</h1>
+    
+    <table border="1">
+        <tr>
+            <th>Materia</th>
+            <th>Usuario</th>
+            <th>Nota de Cursada</th>
+            <th>Nota Final</th>
+            <th>Aprobada</th>
+            <th>Modalidad</th>
+            <th>Ciclo Lectivo</th>
+            <th>Puede Inscribirse</th>
+        </tr>
+    
+        {% for usuario_materia in usuarios_materia_data %}
+        <tr>
+            <td>{{ usuario_materia.materia }}</td>
+            <td>{{ usuario_materia.usuario }}</td>
+            <td>{{ usuario_materia.nota_cursada }}</td>
+            <td>{{ usuario_materia.nota_final }}</td>
+            <td>{{ usuario_materia.aprobada }}</td>
+            <td>{{ usuario_materia.modalidad }}</td>
+            <td>{{ usuario_materia.ciclo_lectivo }}</td>
+            <td>{{ usuario_materia.puede_inscribirse_en_mesa_final }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
+   
+
+{% endblock %}

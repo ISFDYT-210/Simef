@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constancia de Porcentaje Aprobado</title>
+    <style>
+        body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+    }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        font-size: 18px;
+    }
+    .header img {
+        width: 150px;
+    }
+    .header-text {
+        text-align: center;
+        line-height: 1.2; 
+    }
+    .header-text h4 {
+        margin: 0;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    th, td {
+        border: 1px solid black;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+        text-align: center;
+    }
+    
+    .center {
+        text-align: center;
+    }
+    .signature {
+        margin-top: 50px;
+    }
+    .signature div {
+        display: inline-block;
+        width: 45%;
+        text-align: center;
+    }
+</style>
+</head>
+
+<body>
+<div class="header">
+    <div class="logo">
+        <img src="/static/imagenes/Logo_cultura_educacion.png" alt="Logo Educación">
+        <h4>SUBSECRETARÍA DE EDUCACIÓN</h4>
+    </div>
+    <div class="header-text">
+        <h4>DIRECCIÓN DE EDUCACIÓN SUPERIOR</h4>
+        <h4>INSTITUTO SUPERIOR DE FORMACIÓN</h4>
+        <h4>DOCENTE Y TÉCNICA Nº 210</h4>
+    </div>
+</div>
+
+<h4 style="text-align: center;"><small>CONSTANCIA DEL PORCENTAJE DE PERSPECTIVAS, ESPACIOS Y ÁREAS APROBADAS</small></h4>
+<p style="text-indent: 40px;">
+    Se deja constancia de que <strong> {{ usuario.nombre_completo }} </strong> DNI <strong>Nº {{ usuario.dni }}</strong> es alumno regular de este establecimiento en la especialidad 
+    
+    <strong>
+        {% for carrera in usuario.carrera.all %}
+            {{ carrera.nombre_carrera|upper }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+    </strong>
+    Resolución 
+    <strong>
+        {% for carrera in usuario.carrera.all %}
+            {{ carrera.num_resolucion }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+    </strong>
+     y ha acreditado las Perspectivas, Espacios o Áreas del plan de estudio, cuyo detalle figura al pie, que totalizan el <strong>{{ porcentaje_aprobado }}%</strong>, de la carrera aprobada.
+</p>        
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="2" style="text-align: center;">Curso</th>
+                <th rowspan="2">Asignatura</th>
+                <th colspan="2" style="text-align: center;">Calificación</th> 
+                <th rowspan="2" style="text-align: center;">Fecha</th>
+            </tr>
+            <tr>
+                <th style="text-align: center;">En N°</th> 
+                <th style="text-align: center;">En Letras</th> 
+            </tr>
+        </thead>
+        <tbody>   
+
+            {% for anio, cursos in materias.items %}
+            <tr>
+                <td rowspan="{{ cursos|length }}" style="text-align: center;">{{ anio }}</td>
+                {% for curso in cursos %}
+                    {% if forloop.first %}
+                        <td>{{ curso.nombre }}</td>
+                        <td class="center">{{ curso.calificacion_num }}</td>
+                        <td class="center">{{ curso.calificacion_letra }}</td>
+                        <td class="center">{{ curso.fecha }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td>{{ curso.nombre }}</td>
+                        <td class="center">{{ curso.calificacion_num }}</td>
+                        <td class="center">{{ curso.calificacion_letra }}</td>
+                        <td class="center">{{ curso.fecha }}</td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+            {% endfor %}    
+        </tbody>  
+
+    </table>
+    
+
+</body>
+</html>

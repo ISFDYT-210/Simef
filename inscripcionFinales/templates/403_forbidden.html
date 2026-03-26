@@ -1,0 +1,26 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Acceso Denegado{% endblock %}
+
+{% block content %}
+<div class="container text-center mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <img src="/static/imagenes/error403.jpg" class="img-fluid rounded mb-4" alt="Error 403">
+            <h2 class="text-danger">Acceso Denegado</h2>
+            <p class="lead">No tienes permisos para realizar esta acción.</p>
+            {% if error_message %}
+                <div class="alert alert-danger">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-home"></i> Volver al Inicio
+            </a>
+            <a href="/user_list/" class="btn btn-secondary">
+                <i class="fas fa-users"></i> Lista de Usuarios
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

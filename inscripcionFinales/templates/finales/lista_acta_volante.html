@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Actas Volante{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+    <h1>Hay varias actas volante para esta mesa</h1>
+    <h2>Click en el siguiente botón para mostrarlas</h2>
+    <button id="openAllPages">Mostrar actas</button>
+
+<script>
+    document.getElementById('openAllPages').addEventListener('click', function() {
+        var pages = JSON.parse('{{ pages_json|escapejs }}');
+        
+        pages.forEach(function(page) {
+            var newTab = window.open('', '_blank');
+            if (newTab) {
+                newTab.document.write(`
+                    <html>
+                    <head>
+                        <title>${page.title}</title>
+                    </head>
+                    <body>
+                        <div>${page.content}</div>
+                    </body>
+                    </html>
+                `);
+                newTab.document.close();
+            }
+        });
+    
+        if (!newTab) {
+            alert('No se pudieron abrir las pestañas. Por favor, permite las ventanas emergentes para este sitio.');
+        }
+    });
+</script>
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+{% endif %}
+{% endblock %}

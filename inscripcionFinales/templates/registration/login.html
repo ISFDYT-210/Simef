@@ -1,0 +1,101 @@
+{% extends 'base/base.html' %}
+{% include 'base/header.html' %}
+
+{% block title %}Inicio de sesion{% endblock %}
+
+{% block content %}
+
+<!-- Mensajes -->
+{% if form.errors %}
+  <div id="login-error">
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <p class="fs-5">El email o la contraseña son incorrecto. Intentelo nuevamente por favor.</p>
+    </div>
+  </div>
+{% endif %}
+<!-- Fin mensajes -->
+
+<div class="container-fluid login-screen align-center">
+  <div class="card login-card bg-trans no-border">
+    <div class="row g-0 bg-trans">
+      <div class="card-l border-rad40-l white-bg">
+        <div class="card-body card-body-login">
+          <h5 class="card-title">Inicio de sesión</h5>
+          <form method="post" class="login-form">   
+            {% csrf_token %}
+            <div class="form-fields">
+              <p class="fs-5"> 
+                <label for="id_username" class="fs-4">Email:</label>
+                {{ form.username }}
+              </p>
+              <p class="fs-5">
+                <label for="id_password" class="fs-4">Password:</label>
+                {{ form.password }}
+              </p>
+            </div>
+            <div class="recordarme">  
+              <input type="checkbox" id="recordarme" name="recordarme" value="recordarme" style="width:20px;height:20px;">
+              <label for="recordarme" class="fs-4" style="margin-left: -5px">Recordarme</label>
+            </div>
+            <div> 
+              <input type="checkbox" onclick="myFunction()" style="width:20px;height:20px; margin-left: 19px"><span style="font-size: 23px; margin-left: 12px">Mostrar Contraseña</span>
+            </div>
+            <div class="center-content">
+              <div>
+                <button type="submit" class="btn btn-blue">Ingresar</button>
+              </div>
+              <a href="/recuperar_pass/" class="fs-4" style="text-decoration: none">Olvidaste tu contraseña?</a>
+            </div>
+          </form>
+
+        </div>
+      </div>
+      
+      <div class="card-r border-rad40-r purple-bg">
+        <h3 class="text-center sime-titulo"></h3>
+        <img src="/static/imagenes/SIMEF.png" class="logo-login" style="height: 80%; width: 60%;">
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+  @media (max-width: 768px) {
+    #id_password {
+        font-size: fs-5; /* Tamaño de fuente más grande en pantallas más pequeñas */
+    }
+    .main-bar {
+      height: 70px;
+      font-size: 5px;
+    }
+    .titulo {
+      font-size: 18px;
+    }
+}
+@media (max-width: 768px) {
+  .card login-card bg-trans no-border {
+      width: 80px;
+      height 100px;
+  }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous">
+</script>
+
+<script>
+  function myFunction() {
+    var x = document.getElementById("id_password");
+    if (x.type === "password") {
+      x.type = "text";
+    } else {
+      x.type = "password";
+    }
+  }
+
+</script>
+
+{% endblock %}
+{% include 'base/footer.html' %}

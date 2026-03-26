@@ -1,0 +1,86 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Perfil de usuario{% endblock %}
+
+{% block content %}
+<h1 style="margin-top: -50px">Perfil de {{ object.email }}</h1>
+<div style="margin-top: -170px">
+  <div class="card p-5 mb-2 bg-light">
+    <div class="card-body p-3 mb-2">
+      <div class="position-absolute top-50 start-50 translate-middle"></div>
+      
+      <p class="h6 fw-semibold">
+        Nombre de Usuario: {{ object.username }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Email: {{ object.email }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Nombre completo: {{ object.nombre_completo }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Rol: {{ object.get_rol_display }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Fecha de Nacimiento: {{ object.fecha_nac }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        DNI: {{ object.dni }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Dirección: {{ object.direccion }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Localidad: {{ object.localidad }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Ciudad: {{ object.ciudad }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Nacionalidad: {{ object.nacionalidad }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Teléfono 1: {{ object.telefono_1 }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Teléfono 2: {{ object.telefono_2 }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Estado Civil: {{ object.estado_civil }}
+      </p>
+      
+      <p class="h6 fw-semibold">
+        Sexo: {{ object.sexo }}
+      </p>
+
+      {% if object.carrera.all %}
+      <p class="h6 fw-semibold">
+        Carreras: 
+        {% for carrera in object.carrera.all %}
+          {{ carrera.nombre_carrera }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </p>
+      {% endif %}
+
+    </div>
+
+    <p>
+      <a style='margin-left:300px' title="Volver" class="btn btn-danger" href="/user_list/" role="button">
+        <img src="/static/imagenes/back.png" height="20px" width="20px">
+      </a>                                                      
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constancia de Porcentaje Aprobado</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.4;
+            color: #000;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #333;
+        }
+
+        .header .logo {
+            text-align: center;
+        }
+
+        .header .logo img {
+            width: 120px;
+            height: auto;
+        }
+
+        .header .logo h4 {
+            margin: 5px 0 0 0;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .header .header-text {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .header .header-text h4 {
+            margin: 2px 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .document-title {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .intro-text {
+            text-indent: 40px;
+            text-align: justify;
+            margin: 20px 0;
+            font-size: 13px;
+        }
+
+        .intro-text strong {
+            font-weight: bold;
+        }
+
+        .materias-container {
+            margin: 20px 0;
+        }
+
+        .year-section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .year-title {
+            background-color: #f0f0f0;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            border: 1px solid #000;
+            margin-bottom: 0;
+        }
+
+        .materias-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+        }
+
+        .materias-table th,
+        .materias-table td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 12px;
+        }
+
+        .materias-table th {
+            background-color: #f8f8f8;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .materias-table .materia-name {
+            width: 40%;
+        }
+
+        .materias-table .nota-numero {
+            width: 15%;
+            text-align: center;
+        }
+
+        .materias-table .nota-letras {
+            width: 30%;
+            text-align: center;
+        }
+
+        .materias-table .fecha {
+            width: 15%;
+            text-align: center;
+        }
+
+        .no-materias {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            padding: 15px;
+        }
+
+        .footer-text {
+            text-align: center;
+            margin: 30px 0;
+            font-size: 13px;
+        }
+
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            padding-top: 20px;
+        }
+
+        .signature-box {
+            width: 45%;
+            text-align: center;
+            border-top: 2px solid #000;
+            padding-top: 10px;
+        }
+
+        .signature-box h4 {
+            margin: 0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .statistics {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .statistics .stat-item {
+            display: inline-block;
+            margin: 0 20px;
+            font-size: 14px;
+        }
+
+        .statistics .stat-number {
+            font-weight: bold;
+            color: #2c5aa0;
+            font-size: 18px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                font-size: 12px;
+            }
+            
+            .year-section {
+                page-break-inside: avoid;
+            }
+            
+            .header {
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <img src="/static/imagenes/Logo-Cultura.png" alt="Logo Educación">
+            <h4>SUBSECRETARÍA DE EDUCACIÓN</h4>
+        </div>
+        <div class="header-text">
+            <h4>DIRECCIÓN DE EDUCACIÓN SUPERIOR</h4>
+            <h4>INSTITUTO SUPERIOR DE FORMACIÓN</h4>
+            <h4>DOCENTE Y TÉCNICA Nº 210</h4>
+            {% if instituto %}
+                <h4>{{ instituto.nombre_instituto|upper }}</h4>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Document Title -->
+    <div class="document-title">
+        Constancia del Porcentaje de Perspectivas, Espacios y Áreas Aprobadas
+    </div>
+
+    <!-- Introduction Text -->
+    <div class="intro-text">
+        Se deja constancia de que <strong>{{ usuario.nombre_completo|upper }}</strong> 
+        DNI <strong>Nº {{ usuario.dni }}</strong> es alumno regular de este establecimiento 
+        en la especialidad <strong>{{ carrera.nombre_carrera|upper }}</strong> 
+        {% if carrera.num_resolucion %}
+            Resolución <strong>{{ carrera.num_resolucion }}</strong>
+        {% endif %}
+        y ha acreditado las Perspectivas, Espacios o Áreas del plan de estudio, cuyo detalle 
+        figura al pie, que totalizan el <strong>{{ porcentaje_aprobado }}%</strong> de la carrera aprobada.
+    </div>
+
+    <!-- Statistics Box -->
+    <div class="statistics">
+        <div class="stat-item">
+            <div class="stat-number">{{ materias_aprobadas }}</div>
+            <div>Materias Aprobadas</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ total_materias }}</div>
+            <div>Total de Materias</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ porcentaje_aprobado }}%</div>
+            <div>Porcentaje Completado</div>
+        </div>
+    </div>
+
+    <!-- Materias Container -->
+    <div class="materias-container">
+        <!-- 1er Año -->
+        {% if materias_primero %}
+            <div class="year-section">
+                <div class="year-title">PRIMER AÑO</div>
+                <table class="materias-table">
+                    <thead>
+                        <tr>
+                            <th class="materia-name">Asignatura</th>
+                            <th class="nota-numero">Calificación</th>
+                            <th class="nota-letras">En Letras</th>
+                            <th class="fecha">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for materia in materias_primero %}
+                            <tr>
+                                <td class="materia-name">{{ materia.materia.nombre_materia }}</td>
+                                <td class="nota-numero">
+                                    {% if materia.nota_final and materia.nota_final != "-" %}
+                                        {{ materia.nota_final }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="nota-letras">
+                                    {% if materia.nota_texto and materia.nota_texto != "-" %}
+                                        {{ materia.nota_texto|title }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="fecha">-</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        <!-- 2do Año -->
+        {% if materias_segundo %}
+            <div class="year-section">
+                <div class="year-title">SEGUNDO AÑO</div>
+                <table class="materias-table">
+                    <thead>
+                        <tr>
+                            <th class="materia-name">Asignatura</th>
+                            <th class="nota-numero">Calificación</th>
+                            <th class="nota-letras">En Letras</th>
+                            <th class="fecha">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for materia in materias_segundo %}
+                            <tr>
+                                <td class="materia-name">{{ materia.materia.nombre_materia }}</td>
+                                <td class="nota-numero">
+                                    {% if materia.nota_final and materia.nota_final != "-" %}
+                                        {{ materia.nota_final }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="nota-letras">
+                                    {% if materia.nota_texto and materia.nota_texto != "-" %}
+                                        {{ materia.nota_texto|title }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="fecha">-</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        <!-- 3er Año -->
+        {% if materias_tercero %}
+            <div class="year-section">
+                <div class="year-title">TERCER AÑO</div>
+                <table class="materias-table">
+                    <thead>
+                        <tr>
+                            <th class="materia-name">Asignatura</th>
+                            <th class="nota-numero">Calificación</th>
+                            <th class="nota-letras">En Letras</th>
+                            <th class="fecha">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for materia in materias_tercero %}
+                            <tr>
+                                <td class="materia-name">{{ materia.materia.nombre_materia }}</td>
+                                <td class="nota-numero">
+                                    {% if materia.nota_final and materia.nota_final != "-" %}
+                                        {{ materia.nota_final }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="nota-letras">
+                                    {% if materia.nota_texto and materia.nota_texto != "-" %}
+                                        {{ materia.nota_texto|title }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="fecha">-</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        <!-- 4to Año (si existe) -->
+        {% if materias_cuarto %}
+            <div class="year-section">
+                <div class="year-title">CUARTO AÑO</div>
+                <table class="materias-table">
+                    <thead>
+                        <tr>
+                            <th class="materia-name">Asignatura</th>
+                            <th class="nota-numero">Calificación</th>
+                            <th class="nota-letras">En Letras</th>
+                            <th class="fecha">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for materia in materias_cuarto %}
+                            <tr>
+                                <td class="materia-name">{{ materia.materia.nombre_materia }}</td>
+                                <td class="nota-numero">
+                                    {% if materia.nota_final and materia.nota_final != "-" %}
+                                        {{ materia.nota_final }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="nota-letras">
+                                    {% if materia.nota_texto and materia.nota_texto != "-" %}
+                                        {{ materia.nota_texto|title }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="fecha">-</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer Text -->
+    <div class="footer-text">
+        A pedido del interesado y al solo efecto de ser presentado ante las autoridades que estime corresponder, 
+        se extiende la presente constancia, en la ciudad de La Plata a 
+        <span id="los">los</span> <span id="dia_numero">{{ fecha|date:"d" }}</span> 
+        <span id="dias">días</span> del mes de 
+        <span id="mes_texto">{{ fecha|date:"F"|upper }}</span> del año {{ fecha|date:"Y" }}.
+    </div>
+
+    <!-- Signatures -->
+    <div class="signatures">
+        <div class="signature-box">
+            <h4>Sello del Establecimiento</h4>
+        </div>
+        <div class="signature-box">
+            <h4>Firma y Sello Aclaratorio</h4>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ajustar texto para día singular
+            const diaNumero = document.getElementById("dia_numero").textContent.trim();
+            if (diaNumero === "1" || diaNumero === "01") {
+                document.getElementById("los").textContent = "";
+                document.getElementById("dias").textContent = "día";
+            }
+
+            // Convertir mes a español si no está ya convertido
+            const mesElement = document.getElementById("mes_texto");
+            const mesTexto = mesElement.textContent.trim();
+            
+            const meses = {
+                'JANUARY': 'ENERO',
+                'FEBRUARY': 'FEBRERO',
+                'MARCH': 'MARZO',
+                'APRIL': 'ABRIL',
+                'MAY': 'MAYO',
+                'JUNE': 'JUNIO',
+                'JULY': 'JULIO',
+                'AUGUST': 'AGOSTO',
+                'SEPTEMBER': 'SEPTIEMBRE',
+                'OCTOBER': 'OCTUBRE',
+                'NOVEMBER': 'NOVIEMBRE',
+                'DECEMBER': 'DICIEMBRE'
+            };
+
+            if (meses[mesTexto]) {
+                mesElement.textContent = meses[mesTexto];
+            }
+
+            // Limpiar valores None
+            document.querySelectorAll('*').forEach(function(element) {
+                if (element.textContent.trim() === 'None') {
+                    element.textContent = '-';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

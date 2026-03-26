@@ -1,0 +1,5 @@
+{% for curso in curso %}
+    <h2>{{ curso.titulo }}</h2>
+    <p>{{ curso.descripcion }}</p>
+    <a href="{% url 'curso_detail' curso.id %}">Ver detalles</a>
+{% endfor %}

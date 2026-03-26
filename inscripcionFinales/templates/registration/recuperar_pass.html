@@ -1,0 +1,49 @@
+{% extends 'base/base.html' %}
+{% include 'base/header.html' %}
+
+{% block title %}Recuperar contraseña{% endblock %}
+
+{% block content %}
+
+
+
+
+<div class="container-fluid login-screen align-center">
+  <div class="card login-card bg-trans no-border">
+    <div class="row g-0 bg-trans">
+      <div class="card-l border-rad40-l white-bg">
+        <div class="card-body card-body-login">
+          <h5 class="card-title">Recuperar contraseña</h5>
+          <form action='{% url "password_reset" %}' method="post" class="login-form">
+            {% csrf_token %}
+            <div class="form-fields">
+              <p class="fs-5">
+                <label for="id_username">Email:</label>
+                {{ form.email }}
+              </p>       
+            </div>
+            
+      
+            <div  class="center-content">
+              <div>
+                <button type="submit" class="btn btn-blue btn-pr">Enviar</button>
+              </div>
+              <a href="/accounts/login/" style="text-decoration: none; font-size: 20px;">Volver al Inicio de Sesión</a>
+            </div>
+          </form>
+
+        </div>
+      </div>
+      
+      <div class="card-r border-rad40-r purple-bg">
+        <img src="/static/imagenes/SIMEF.png" class="logo-login" style="width: 50%; height: 85%;padding-top: 80px;">
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% include 'base/footer.html' %}
+
+

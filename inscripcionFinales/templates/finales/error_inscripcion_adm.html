@@ -1,0 +1,25 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Error: Inscripcion a final{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error: Inscripcion a final</title>
+</head>
+<body>
+    <h1>Error al inscribirse a la mesa</h1>
+    <p class="fs-3">¡El usuario ya se encuentra inscripto a una mesa de esa materia! <a href="/listaFinalesAdm/">Elimine la inscripcion existente</a> e intente nuevamente.</p>
+</body>
+</html>
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+
+{% endif %}
+{% endblock %}

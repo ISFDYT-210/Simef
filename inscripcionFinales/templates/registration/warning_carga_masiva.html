@@ -1,0 +1,13 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Registro de usuario{% endblock %}
+
+{% block content %}
+    <h1>Carga Masiva Finalizada</h1>
+    <p style="font-size: 25px;">La carga masiva finalizó, aunque se encontraron usuarios duplicados o con datos faltantes.
+    </p>
+    <p style="font-size: 25px;">Por favor, revise los usuarios cargados en la lista de usuarios.
+    </p>
+    <button type="button" class="btn btn-primary"><a class="dropdown-item" href="/user_list/">Volver a la lista de usuarios</button></a>
+
+{% endblock %}

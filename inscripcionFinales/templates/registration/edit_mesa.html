@@ -1,0 +1,465 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Editar Mesa Final{% endblock %}
+
+{% block content %}
+{% load inscripcionfinales_extras %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-xl-6 col-lg-8 col-md-10">
+            <!-- Header Section -->
+            <div class="text-center mb-5">
+                <div class="mb-4">
+                    <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <i class="fas fa-edit text-white" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+                <h1 class="display-5 fw-bold text-dark mb-3">Editar Mesa Final</h1>
+                <p class="lead text-muted">Modifique los datos de la mesa de examen final</p>
+            </div>
+
+            <!-- Form Card -->
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <form id="formulario" method="POST" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Materia Field (Read Only) -->
+                        <div class="mb-5">
+                            <label class="form-label fw-bold text-dark mb-3 fs-5">
+                                <i class="fas fa-book me-3 text-primary"></i>Materia
+                            </label>
+                            <div class="alert alert-light border-2" style="border-color: #e9ecef;">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        <i class="fas fa-graduation-cap text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-semibold" id="nombreMateria">{{ form.materia.value }}</h6>
+                                        <small class="text-muted">Esta materia no se puede modificar</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: none;">{{ form.materia }}</div>
+                        </div>
+
+                      <!-- Fecha y Hora Field -->
+                        <div class="mb-5">
+                            <label for="{{ form.llamado.id_for_label }}" class="form-label fw-bold text-dark mb-3 fs-5">
+                                <i class="fas fa-calendar-alt me-3 text-primary"></i>Fecha y Hora del Llamado
+                            </label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-primary text-white border-0">
+                                    <i class="fas fa-clock"></i>
+                                </span>
+                                {{ form.llamado }}
+                            </div>
+                            {% if form.llamado.errors %}
+                                <div class="text-danger mt-2 fw-semibold">
+                                    {{ form.llamado.errors|first }}
+                                </div>
+                            {% endif %}
+                            <div id="llamado-error" class="text-danger mt-2 fw-semibold" style="display: none;"></div>
+                            <div class="alert alert-info mt-3 border-0" style="background-color: #e3f2fd;">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Importante:</strong> La fecha del llamado debe ser posterior al día de hoy
+                            </div>
+                        </div>
+
+                        <!-- Inscripción Abierta Field -->
+                        <div class="mb-5">
+                            <label class="form-label fw-bold text-dark mb-3 fs-5">
+                                <i class="fas fa-door-open me-3 text-primary"></i>Estado de Inscripción
+                            </label>
+                            <div class="d-flex align-items-center p-4 border rounded-3" style="background-color: #f8f9fa;">
+                                <div class="form-check form-switch me-3">
+                                    {{ form.inscripcionAbierta }}
+                                </div>
+                                <div>
+                                    <h6 class="mb-1" id="estadoTexto">Inscripción Cerrada</h6>
+                                    <small class="text-muted" id="estadoDescripcion">Los estudiantes no pueden inscribirse</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-3">
+                            <button type="submit" class="btn btn-primary btn-lg py-3" id="btnGuardar" style="font-size: 1.2rem;">
+                                <span class="btn-text">
+                                    <i class="fas fa-save me-3"></i>Guardar Cambios
+                                </span>
+                                <span class="spinner-border spinner-border-sm me-3" style="display: none;" id="loadingSpinner"></span>
+                            </button>
+                            <a href="/mesas_lista/" class="btn btn-outline-secondary btn-lg py-3" style="font-size: 1.1rem;">
+                                <i class="fas fa-arrow-left me-3"></i>Volver a Mesas
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title" id="successModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>Mesa Actualizada
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                </div>
+                <h6 class="mb-3">Los cambios se han guardado correctamente</h6>
+                <p class="text-muted mb-0">Será redirigido a la lista de mesas finales</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-success px-4" onclick="redirectToList()">
+                    <i class="fas fa-list me-2"></i>Ver Lista de Mesas
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="errorModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Error al Guardar
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                </div>
+                <h6 class="mb-3" id="errorMessage">Error al actualizar la mesa final</h6>
+                <p class="text-muted mb-0">Por favor, corrija los errores e intente nuevamente</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-danger px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+
+<div class="container py-5">
+    <div class="text-center">
+        <div class="mb-4">
+            <i class="fas fa-exclamation-triangle text-warning" style="font-size: 5rem;"></i>
+        </div>
+        <h3 class="mb-3">Acceso Restringido</h3>
+        <p class="text-muted mb-4">No tiene permisos para acceder a esta sección.</p>
+        <a href="/" class="btn btn-primary btn-lg">
+            <i class="fas fa-home me-2"></i>Volver al Inicio
+        </a>
+    </div>
+</div>
+
+{% endif %}
+
+<style>
+/* Custom Styles */
+.form-control, .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    background-color: #fff;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    background-color: #fff;
+}
+
+.input-group-text {
+    border: 2px solid #e9ecef;
+    border-right: none;
+    border-radius: 12px 0 0 12px;
+    padding: 1rem 1.25rem;
+    font-size: 1.1rem;
+}
+
+.input-group .form-control, .input-group .form-select {
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+}
+
+.btn-lg {
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border-width: 2px;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(13, 110, 253, 0.3);
+}
+
+.btn-outline-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(108, 117, 125, 0.2);
+}
+
+.card {
+    border: none;
+    border-radius: 20px;
+    background-color: #fff;
+}
+
+.modal-content {
+    border-radius: 20px;
+}
+
+.form-label {
+    margin-bottom: 0.75rem;
+}
+
+.alert {
+    border-radius: 12px;
+    font-size: 0.95rem;
+}
+
+.form-check-input {
+    transform: scale(1.5);
+    margin-right: 1rem;
+}
+
+/* Loading state for button */
+.btn-loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* Animation for error states */
+.shake {
+    animation: shake 0.6s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-5 {
+        font-size: 2rem;
+    }
+    
+    .card-body {
+        padding: 2rem !important;
+    }
+    
+    .input-group-lg .form-control,
+    .input-group-lg .form-select,
+    .input-group-lg .input-group-text {
+        padding: 0.875rem 1rem;
+        font-size: 1rem;
+    }
+}
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Obtener el valor inicial del llamado (ya debe estar en formato datetime-local gracias al widget)
+    const llamadoField = $('#id_llamado');
+    console.log('Valor inicial del campo llamado:', llamadoField.val());
+
+    // Obtener el nombre de la materia para mostrar
+    const selectMateria = document.getElementById('id_materia');
+    if (selectMateria) {
+        let nombreMateria = '';
+        if (selectMateria.selectedIndex >= 0) {
+            nombreMateria = selectMateria.options[selectMateria.selectedIndex].text;
+        } else if (selectMateria.value) {
+            // Si no hay opciones pero hay un valor, buscar el texto
+            const option = selectMateria.querySelector(`option[value="${selectMateria.value}"]`);
+            if (option) {
+                nombreMateria = option.text;
+            }
+        }
+        
+        if (nombreMateria) {
+            $('#nombreMateria').text(nombreMateria);
+        }
+    }
+
+    // Manejar el estado del switch de inscripción
+    const inscripcionSwitch = $('#id_inscripcionAbierta');
+    
+    function updateInscripcionEstado() {
+        if (inscripcionSwitch.is(':checked')) {
+            $('#estadoTexto').text('Inscripción Abierta').removeClass('text-muted').addClass('text-success');
+            $('#estadoDescripcion').text('Los estudiantes pueden inscribirse a esta mesa');
+        } else {
+            $('#estadoTexto').text('Inscripción Cerrada').removeClass('text-success').addClass('text-muted');
+            $('#estadoDescripcion').text('Los estudiantes no pueden inscribirse');
+        }
+    }
+
+    // Inicializar estado del switch
+    updateInscripcionEstado();
+    
+    // Evento de cambio del switch
+    inscripcionSwitch.change(updateInscripcionEstado);
+
+    // Establecer fecha mínima (ahora + 1 hora para dar margen)
+    const minDate = new Date();
+    minDate.setHours(minDate.getHours() + 1);
+    const minDateString = minDate.toISOString().slice(0, 16);
+    llamadoField.attr('min', minDateString);
+
+    // Validación en tiempo real del campo de fecha
+    llamadoField.on('change blur input', function() {
+        validateDateTime();
+    });
+
+    function validateDateTime() {
+        const datetimeValue = llamadoField.val();
+        
+        if (!datetimeValue) {
+            showFieldError(llamadoField, 'llamado-error', 'Debe seleccionar una fecha y hora');
+            return false;
+        }
+        
+        const selectedDate = new Date(datetimeValue);
+        const now = new Date();
+        
+        if (isNaN(selectedDate.getTime())) {
+            showFieldError(llamadoField, 'llamado-error', 'Formato de fecha inválido');
+            return false;
+        }
+        
+        if (selectedDate <= now) {
+            showFieldError(llamadoField, 'llamado-error', 'La fecha debe ser posterior al momento actual');
+            return false;
+        }
+        
+        hideFieldError(llamadoField, 'llamado-error');
+        return true;
+    }
+
+    // Envío del formulario
+    $('#formulario').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Prevenir envíos múltiples
+        if ($(this).data('submitting')) {
+            return false;
+        }
+        
+        // Validar formulario
+        if (!validateForm()) {
+            return false;
+        }
+
+        // Marcar como enviando
+        $(this).data('submitting', true);
+        showLoading();
+
+        // El campo ya está en el formato correcto para Django
+        console.log('Enviando formulario con fecha:', llamadoField.val());
+
+        // Enviar usando el método tradicional de Django (no AJAX)
+        setTimeout(() => {
+            this.submit();
+        }, 100);
+    });
+
+    function validateForm() {
+        let isValid = true;
+        
+        // Validar fecha y hora
+        if (!validateDateTime()) {
+            isValid = false;
+        }
+        
+        // Validar que la materia esté seleccionada
+        const materia = $('#id_materia').val();
+        if (!materia) {
+            showFieldError($('#id_materia'), 'materia-error', 'Debe seleccionar una materia');
+            isValid = false;
+        }
+        
+        return isValid;
+    }
+
+    function showFieldError(field, errorId, message) {
+        field.addClass('is-invalid');
+        let errorDiv = $('#' + errorId);
+        if (errorDiv.length === 0) {
+            // Crear el div de error si no existe
+            errorDiv = $(`<div id="${errorId}" class="text-danger mt-2 fw-semibold"></div>`);
+            field.closest('.mb-5, .form-group').append(errorDiv);
+        }
+        errorDiv.text(message).show();
+        
+        // Animación de shake
+        field.addClass('shake');
+        setTimeout(() => field.removeClass('shake'), 600);
+    }
+
+    function hideFieldError(field, errorId) {
+        field.removeClass('is-invalid');
+        $('#' + errorId).hide();
+    }
+
+    function showLoading() {
+        const btn = $('#btnGuardar');
+        btn.prop('disabled', true).addClass('btn-loading');
+        $('#loadingSpinner').show();
+        $('.btn-text').text('Guardando...');
+    }
+
+    // Limpiar el estado de envío si hay errores y el usuario vuelve a la página
+    $(window).on('pageshow', function() {
+        $('#formulario').removeData('submitting');
+        hideLoading();
+    });
+
+    function hideLoading() {
+        const btn = $('#btnGuardar');
+        btn.prop('disabled', false).removeClass('btn-loading');
+        $('#loadingSpinner').hide();
+        $('.btn-text').html('<i class="fas fa-save me-3"></i>Guardar Cambios');
+    }
+});
+
+// Funciones auxiliares para mostrar modales (en caso de que se necesiten)
+function showSuccessModal() {
+    $('#successModal').modal('show');
+    setTimeout(() => {
+        redirectToList();
+    }, 3000);
+}
+
+function showErrorModal(message) {
+    $('#errorMessage').text(message || 'Error al actualizar la mesa final');
+    $('#errorModal').modal('show');
+}
+
+function redirectToList() {
+    window.location.href = '/mesas_lista/';
+}
+</script>
+
+{% endblock %}

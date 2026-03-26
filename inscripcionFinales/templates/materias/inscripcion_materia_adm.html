@@ -1,0 +1,143 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Inscripcion Materia{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inscripción Materia</title>
+    <style>
+        body {
+            overflow-y:hidden;
+        }
+    </style>
+</head>
+<body>
+    <h1>Inscripción Materia</h1>
+    <div class="card" style="background-color: #d7d1dc">
+        <div class="card-body">
+            <form method="post" style="font-size: 1.9em;">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="{{ form.usuario.id_for_label }}" class="form-label">{{ form.usuario.label }}:</label>
+                    {{ form.usuario }}
+                    {% if form.usuario.errors %}
+                        <div class="text-danger">{{ form.usuario.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.materia.id_for_label }}" class="form-label">{{ form.materia.label }}:</label>
+                    {{ form.materia }}
+                    {% if form.materia.errors %}
+                        <div class="text-danger">{{ form.materia.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.modalidad.id_for_label }}" class="form-label">{{ form.modalidad.label }}:</label>
+                    {{ form.modalidad }}
+                    {% if form.modalidad.errors %}
+                        <div class="text-danger">{{ form.modalidad.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- CAMPOS SOLO PARA MODALIDAD ITINERANTE -->
+                <div class="mb-3" id="div_institucion">
+                    <label for="{{ form.institucion.id_for_label }}" class="form-label">{{ form.institucion.label }}:</label>
+                    {{ form.institucion }}
+                    {% if form.institucion.errors %}
+                        <div class="text-danger">{{ form.institucion.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3" id="div_turno">
+                    <label for="{{ form.turno.id_for_label }}" class="form-label">{{ form.turno.label }}:</label>
+                    {{ form.turno }}
+                    {% if form.turno.errors %}
+                        <div class="text-danger">{{ form.turno.errors }}</div>
+                    {% endif %}
+                </div>
+                <!-- FIN CAMPOS ITINERANTES -->
+                
+                <script>
+                    // Ocultar campo aprobada si existe
+                    if (document.getElementById("id_aprobada")) {
+                        document.getElementById("id_aprobada").hidden = true;
+                        document.getElementById("id_aprobada").previousElementSibling.hidden = true;
+                    }
+                    
+                    // Función para mostrar/ocultar y habilitar/deshabilitar campos según modalidad
+                    function toggleCamposItinerante() {
+                        const modalidadSelect = document.getElementById('id_modalidad');
+                        const divInstitucion = document.getElementById('div_institucion');
+                        const divTurno = document.getElementById('div_turno');
+                        const institucionInput = document.getElementById('id_institucion');
+                        const turnoSelect = document.getElementById('id_turno');
+                        
+                        if (modalidadSelect && divInstitucion && divTurno) {
+                            // Obtener el texto de la opción seleccionada
+                            const modalidadSeleccionada = modalidadSelect.options[modalidadSelect.selectedIndex].text.toLowerCase();
+                            
+                            // Si la modalidad es "itinerante", mostrar y habilitar los campos
+                            if (modalidadSeleccionada.includes('itinerante')) {
+                                divInstitucion.style.display = 'block';
+                                divTurno.style.display = 'block';
+                                
+                                if (institucionInput) {
+                                    institucionInput.disabled = false;
+                                    institucionInput.required = true;
+                                }
+                                if (turnoSelect) {
+                                    turnoSelect.disabled = false;
+                                    turnoSelect.required = true;
+                                }
+                            } else {
+                                // Si no es itinerante, ocultar y deshabilitar los campos
+                                divInstitucion.style.display = 'none';
+                                divTurno.style.display = 'none';
+                                
+                                if (institucionInput) {
+                                    institucionInput.disabled = true;
+                                    institucionInput.required = false;
+                                    institucionInput.value = ''; // Limpiar el valor
+                                }
+                                if (turnoSelect) {
+                                    turnoSelect.disabled = true;
+                                    turnoSelect.required = false;
+                                    turnoSelect.value = ''; // Limpiar el valor
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Ejecutar al cargar la página
+                    document.addEventListener('DOMContentLoaded', function() {
+                        toggleCamposItinerante();
+                        
+                        // Agregar listener al cambio de modalidad
+                        const modalidadSelect = document.getElementById('id_modalidad');
+                        if (modalidadSelect) {
+                            modalidadSelect.addEventListener('change', toggleCamposItinerante);
+                        }
+                    });
+                </script>
+                
+                <br>
+                <button class="btn btn-primary" type="submit" style="margin-left: 90px;">Inscribirse</button>
+            </form>
+        </div>
+    </div>
+{% else %}
+    <div class="text-center">
+        <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+        <br>
+        <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+    </div>
+{% endif %}
+{% endblock %}
+</body>
+</html>

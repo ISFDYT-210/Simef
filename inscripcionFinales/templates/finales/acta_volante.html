@@ -1,0 +1,200 @@
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acta Volante de Exámenes</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 2px;
+            text-align: left;
+            font-size: 12px; 
+        }
+        .header {
+            text-align: center;
+        }
+        .footer {
+            margin-top: 10px;
+        }
+        p {
+            font-size: 13px; 
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h3>ACTA VOLANTE DE EXAMENES</h3>
+        <h6>I.S.F.D. y T. Nº 210</h6>
+        <h6>ESTABLECIMIENTO</h6>
+    </div>
+
+    <p id='mesa'>Exámenes de alumnos:</p>
+    <p id='carrera'>Carrera: {{final.materia.carrera}}</p>
+    <p id="asignatura">ASIGNATURA: {{final.materia}}</p>
+
+    <div style="text-align: right;">
+        FECHA
+        <table style="width: 100px; float: right;">
+            <tr>
+                <td style='text-align:center' id='dia' colspan="2">{{ final.llamado|date:"d" }}</td>
+                <td style='text-align:center' id='mes' colspan="2">{{ final.llamado|date:"m" }}</td>
+                <td style='text-align:center' id='anio'colspan="2">{{ final.llamado|date:"Y" }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="2"style='width: 15px;'>Nº DE ORDEN</th>
+                <th rowspan="2">D.N.I.</th>
+                <th rowspan="2">APELLIDO y NOMBRE</th>
+                <th colspan="3">CALIFICACIONES</th>
+            </tr>
+            <tr>
+                <th>Esc.</th>
+                <th>Oral</th>
+                <th>Prom.</th>
+            </tr>
+        </thead>
+        <tbody id="tablaBody">   
+            {% for inscripcion in finales_inscriptos %}
+                <tr id="inscripto{{ forloop.counter }}">
+                    <td>{{ forloop.counter|add:piso }}</td>
+                    <td>{{ inscripcion.usuario.dni }}</td>
+                    <td>{{ inscripcion.usuario.nombre_completo }}</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const tbody = document.getElementById('tablaBody');
+                const rows = tbody.querySelectorAll('tr');
+                
+                // Función para verificar si una fila está completa
+                function isRowComplete(row) {
+                    const cells = row.querySelectorAll('td');
+                    for (let cell of cells) {
+                        if (cell.textContent.trim() === '') {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            
+                // Encontrar la última fila completa
+                let lastCompleteRowNumber = 0;
+                for (let i = rows.length - 1; i >= 0; i--) {
+                    if (isRowComplete(rows[i])) {
+                        lastCompleteRowNumber = parseInt(rows[i].querySelector('td').textContent);
+                        break;
+                    }
+                }
+            
+                // Función para crear una nueva fila vacía
+                function createEmptyRow(rowNumber) {
+                    const newRow = document.createElement('tr');
+                    newRow.id = `inscripto${rowNumber}`;
+                    newRow.innerHTML = `
+                        <td>${rowNumber+{{piso}}}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    `;
+                    return newRow;
+                }
+            
+                // Añadir filas vacías hasta completar 25 filas en total
+                const totalRows = Math.max(25, lastCompleteRowNumber);
+                for (let i = rows.length + 1; i <= totalRows; i++) {
+                    tbody.appendChild(createEmptyRow(i));
+                }
+            });
+            </script>
+    </table>
+
+    <div class="footer">
+        <p>Presidente: </p>
+        <p>Vocal:............................ Vocal:............................</p>
+
+        <table style="width: 450px; float: right;">
+            <tr>
+                <th colspan="2">Resumen</th>
+            </tr>
+            <tr>
+                <td>Total de Alumnos</td>
+                <td style='text-align:center'>{{cant_inscriptos}}</td>
+            </tr>
+            <tr>
+                <td>Aprobados</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Aplazados</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Ausentes</td>
+                <td></td>
+            </tr>
+        </table>
+
+        <p style="clear: both;">La Plata, {{final.llamado|date:"d"}}  de <span id='mes_texto'>{{ final.llamado|date:"m" }}</span> de {{final.llamado|date:"Y" }}</p>
+    </div>
+</body>
+<script>
+    let mesElement = document.getElementById("mes_texto");
+
+if (mesElement.textContent == "1") {
+    mesElement.textContent = "Enero";
+} else if (mesElement.textContent == "2") {
+    mesElement.textContent = "Febrero";
+} else if (mesElement.textContent == "3") {
+    mesElement.textContent = "Marzo";
+} else if (mesElement.textContent == "4") {
+    mesElement.textContent = "Abril";
+} else if (mesElement.textContent == "5") {
+    mesElement.textContent = "Mayo";
+} else if (mesElement.textContent == "6") {
+    mesElement.textContent = "Junio";
+} else if (mesElement.textContent == "7") {
+    mesElement.textContent = "Julio";
+} else if (mesElement.textContent == "8") {
+    mesElement.textContent = "Agosto";
+} else if (mesElement.textContent == "9") {
+    mesElement.textContent = "Septiembre";
+} else if (mesElement.textContent == "10") {
+    mesElement.textContent = "Octubre";
+} else if (mesElement.textContent == "11") {
+    mesElement.textContent = "Noviembre";
+} else if (mesElement.textContent == "12") {
+    mesElement.textContent = "Diciembre";
+}
+</script>
+</html>
+
+
+
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Editar Inscripcion{% endblock %}
+
+{% block content %}
+{% load inscripcionfinales_extras %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+<div id="edit-inscr"> 
+  <form method="POST" class="form">
+      <div class="edit-rectangulo1">
+          {% csrf_token %}
+          <p class="text-center form-item">
+            <label for="id_Inscripcion" class="Nu" id='alumno'>Estudiante:</label>
+            <br>
+            <span hidden>
+            {{ form.usuario }}
+            </span>
+          </p>
+          <h5 id='nombreUsuario' style='text-align:center'>
+          </h5>
+          <p class="text-center form-item">
+            <label for="id_mesa">Mesa:</label>
+            <br>
+            {{ form.llamado }}
+          </p>
+        </div>
+
+        <div class = "edit-rectangulo2">
+          <div class="logo-edit-user only-lt">
+            <img src="/static/imagenes/SIMEF.png" style="height: 50%;">
+          </div>
+          <div class="botones-edituser" style="margin-top:-200px">
+            <button type="submit" class="btn btn-blue" style="transition: 0.6s">Guardar</button>
+
+          <div id="volver_usuario">
+            <a href="/inscripcion_finales_lista/" style="font-size: 20px; text-decoration: none">Volver a Inscripciones</a>
+          </div>
+        </div>
+    </form>
+</div>
+<script>
+  document.getElementById('nombreUsuario').innerHTML=document.getElementById("id_usuario").options[document.getElementById("id_usuario").selectedIndex].innerHTML
+</script>
+<style>
+  @media only screen and (max-width: 600px) {
+    .edit-rectangulo1 {
+      width: 70%;
+    }
+    .edit-rectangulo2 {
+      margin-top: 50%;
+      margin-right: 10%;
+    }
+  }
+</style>
+
+
+{%else%}
+<div class="text-center">
+  <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+<h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+{%endif%}
+
+{% endblock %}
+

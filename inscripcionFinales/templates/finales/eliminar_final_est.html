@@ -1,0 +1,24 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Eliminar Final{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-headers rounded">
+            <h4 class="card-title">Eliminar Final</h4>
+        </div>
+        <div class="card-body">
+            <h6>¿Estás seguro de que desea dar de baja la inscripcion al final de "<b>{{ final.llamado.materia }}</b>"?</h6>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Dar de baja</button>
+                {%if request.user.is_staff or request.user.is_superuser%}
+                <a href="/listaFinalesAdm" class="btn btn-primary">Cancelar</a>
+                {%else%}
+                <a href="/listaFinalesEst" class="btn btn-primary">Cancelar</a>
+                {%endif%}
+            </form>
+        </div>
+    </div>
+{% endblock %}
+

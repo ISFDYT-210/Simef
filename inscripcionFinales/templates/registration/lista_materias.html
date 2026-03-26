@@ -1,0 +1,17 @@
+<!-- lista_materias.html -->
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Materias{% endblock %}
+
+{% block content %}
+    <h1>Lista de Materias Disponibles</h1>
+        {% for materia in lista_materias %}        
+        <label> 
+        <input type="checkbox" value="{{materia.nombre_materia}}"/>
+            {{ materia.materia_id}}</label>   
+            <!--<form method="post" action="% url 'inscribirse_materia' materia.id %">
+                {% csrf_token %}
+                <button type="submit">Inscribirse</button>
+            </form>-->
+        {% endfor %}
+{% endblock %}

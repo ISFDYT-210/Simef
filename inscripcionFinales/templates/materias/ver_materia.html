@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Ver materia{% endblock %}
+
+{% block content %}
+  <div style="margin-top: -170px">
+    {% comment %} <form method="post" class="">
+      {% csrf_token %} {% endcomment %}
+    <div class="card p-3 mb-2 bg-light" style="margin-top: 150px">
+      <div class="card-body p-3 mb-2">
+        <h1 style="text-align: center;">{{ materia.nombre_materia }}</h1>
+      </div>
+    
+      <div class="position-absolute top-50 start-50 translate-middle"></div>
+      <p class="h6 fw-semibold">
+        Nombre de la materia: {{ materia.nombre_materia }}
+      </p>
+      <p class="h6 fw-semibold">
+        Carrera: {{materia.carrera.nombre_carrera}}
+      </p>
+      <p class="h6 fw-semibold">
+        Profesor: {{materia.profesor.nombres }}
+      </p>
+      <p class="h6 fw-semibold">
+        Año: {{ materia.anio }}
+      </p>
+      <p class="h6 fw-semibold">
+        Dia: {{ materia.dia }}
+      </p>
+      <p class="h6 fw-semibold">
+        Horario: {{ materia.Horario }}
+      </p>
+      <div class="text-center">
+        <div class="d-inline">
+          <a href="{% url 'editar_materia' id=materia.id %}" class="btn btn-primary me-2">Editar</a>
+        </div>
+        <div class="d-inline">
+          <a href="/lista_materias_admin/" class="btn btn-primary">Volver</a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

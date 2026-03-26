@@ -1,0 +1,145 @@
+<!-- lista_materias_user.html -->
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Inscripciones{% endblock %}
+
+{% block content %}
+<div class="card-body" style="margin-top: 50px; margin-bottom: 50px;">
+        <div class="card">
+        <div class="card-headers rounded-top">
+            <h4 class="card-title">Lista de Inscripciones</h4>
+        </div>
+        <div class="card-body">
+            {% if materias %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="h5">Nombre</th>
+                        <th class="h5">Estudiante</th>
+                        <th class="h5">Modalidad</th>
+                        <th class="h5">Nota Cursada</th>
+                        <th class="h5">Nota Final</th>
+                        <th class="h5">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                        {% for materia in materias %}
+                            <tr class="inscripcion text-center"hidden=True>
+                                <td class="h6">{{materia.materia}}</td>
+                                <td class="h6">{{materia.usuario}}</td>
+                                <td id='modalidad{{materia.id}}' class="h6">{{materia.get_modalidad_display}}</td>
+                                <td class="h6">{{materia.nota_cursada}}</td>
+                                <td class="h6">{{materia.nota_final}}</td>
+                                <td>
+                                    <a name="" id="" class="btn btn-primary" href="/cargar_nota_cursada/{{materia.id}}" role="button">Cargar nota</a>
+                                    <a name="" id="" class="btn btn-danger" href="/eliminar_inscripcion_materia/{{materia.id}}" role="button">Dar de baja</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-danger" style="font-size: 20px;"> No hay materias disponibles.</div>
+        {% endif %}
+        </div>
+        <nav aria-label="..." class="d-flex justify-content-center">
+            <ul class="pagination">
+              <li class="page-item" id='btnAnt'>
+              <button class="page-link" title="Anterior" id='btnAnt_' style="cursor: pointer;"onclick="paginaAnt()">←</button>
+              </li>
+              <li class="page-item" id='btnSig'>
+              <button class="page-link" title="Siguiente" id='btnSig_' onclick="paginaSig()">→</button>
+              </li>
+            </ul>
+          </nav>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+<script>   
+  var pagina = 1
+  if (pagina = 1)
+  {
+    document.getElementById("btnAnt").className="page.item disabled"
+  }
+  let elementos = document.querySelectorAll('.inscripcion');
+  if (elementos.length<=10)
+  {
+    document.getElementById("btnSig").className="page.item disabled"
+  }
+  for (let i = 0; i <= pagina*10-1; i++) {
+    try{elementos[i].hidden=false}
+    catch(e){console.log("Tenes que cerrar el estadio")}
+    }
+  function paginaSig()
+  {
+    let elementos = document.querySelectorAll('.inscripcion');
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=true}
+      catch(e){console.log("Anda, todo pelota.")}
+      }  
+    pagina=pagina+1
+    if (pagina>1)
+    {
+      document.getElementById("btnAnt").className="page-item active"
+    }
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=false}
+      catch(e){console.log("No hay mas usuarios")
+      document.getElementById("btnSig").className="page.item disabled"
+      }
+      }
+  } 
+  function paginaAnt()
+  {
+    document.getElementById("btnSig").className="page.item active"    
+    let elementos = document.querySelectorAll('.inscripcion');
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=true}
+      catch(e){console.log("Parmisano no mires esto")}
+      }
+    pagina=pagina-1
+    if (pagina>1)
+    {
+      document.getElementById("btnAnt").className="page-item active"
+    }
+    else{document.getElementById("btnAnt").className="page-item disabled"}
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=false} 
+      catch(e){console.log("Mission Accomplished")}
+      }
+    }
+    document.querySelectorAll('button').forEach(node => 
+    node.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+        }
+    })
+);
+
+{%for materia in materias%}
+    modalidad=document.getElementById("modalidad{{materia.id}}")
+        if (modalidad.innerHTML=='1')
+        {
+            modalidad.innerHTML='Regular'
+        }
+        else if(modalidad.innerHTML=='2')
+        {
+            modalidad.innerHTML='Libre'
+        }
+        else if(modalidad.innerHTML=='3')
+        {
+            modalidad.innerHTML='Condicional'
+        }
+{%endfor%}
+
+$(document).ready(function() {
+  // Selecciona todos los elementos y recórrelos
+  $('*').each(function() {
+      // Verifica si el innerHTML es exactamente "None"
+      if ($(this).html().trim() === "None") {
+          $(this).html("-");
+      }
+  });
+});
+</script>
+{% endblock %}

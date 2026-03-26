@@ -1,0 +1,55 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Inscripciones{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+
+<div class="card">
+    <div class="card-headers" style="border-radius: 5px;">
+        <h3 class="card-title">Inscripciones</h4>
+    </div>
+    <div class="card-body">
+        
+        <table class="table table-striped table-bordered">
+            {% load static %}
+                <tr>
+                    <th class="h5">Usuario</th>
+                    <th class="h5">Llamado</th>
+                    <th></th>
+                </tr>
+            <tbody>
+                {% if object_list %}
+                    {% for inscripciones in object_list %}
+                    <tr>
+                        <td class="h6">{{inscripciones.usuario}}</td>
+                        <td class="h6" id='inscripcion{{ inscripciones.id }}'>{{inscripciones.llamado}}</td>
+                        <td>
+                            <a name="" id="" class="btn btn-primary" href="/edit_inscr/{{ inscripciones.id }}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a>
+                            <a name="" id="" class="btn btn-danger" href="/delete_inscripcion/{{ inscripciones.id }}" role="button"><img src="/static/imagenes/eliminar.png" height="20px" width="20px"></img></a>
+                        </td>
+                    </tr>
+                    <script>
+                        var elemId = 'inscripcion{{inscripciones.id}}';
+                        var elem = document.getElementById(elemId);
+                        elem.innerHTML=elem.innerHTML.substring(0, elem.innerHTML.length - 15);  
+                    </script>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-danger"> No hay inscripciones disponibles.</div>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+    <br>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+
+{% endif %}
+
+{% endblock %}

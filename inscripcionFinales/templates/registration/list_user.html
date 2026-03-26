@@ -1,0 +1,330 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Registro de usuario{% endblock %}
+
+{% block content %}
+
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+
+    <div id="alertaNoDNI"class="alert alert-warning alert-dismissible fade show fs-6 z-n1" hidden=true role="alert" style="position: fixed; top: 0; right: 0">
+      <strong>Debe ingresar un DNI para hacer la busqueda</strong>
+      <button type="button" class="btn-close" onclick="ocultarAlerta1()" ></button>
+    </div>
+    <div id="errorDNI"class="alert alert-danger alert-dismissible fade show fs-6" hidden=true role="alert" style="position: fixed; top: 0; right: 0">
+      <strong>DNI no registrado</strong>
+      <button type="button" class="btn-close" onclick="ocultarAlerta2()" ></button>
+    </div>
+
+    <div class="card" style="margin-top: 0px;">
+      <div class="card-header rounded-top" style="background-color: #3A4481; color: #ffffff;">
+        <h3 style="text-align: center">Registro de Usuarios</h3>
+    </div>
+    
+        
+        <div class="card-body">
+          <div class="table-responsive">
+            <div class="d-flex align-items-center mb-2">
+              <a href="#" id="eliminarSeleccionados" style="width: 40px;" class="btn btn-danger me-3"><i class="fas fa-trash-alt"></i></a>
+              <div class="ms-auto">
+                  <form class="d-flex" role="search">
+                      <input class="form-control me-2" type="text" style="width: 150px; margin-top: 0;" placeholder="DNI" id="busquedaDni" aria-label="Buscar">
+                      <a class="btn btn-primary" id="buscar" onclick="busqueda()" style="margin-top: 0;"><img src="/static/imagenes/Lupita.png" height="20px" width="20px"></a>
+                  </form>
+              </div>
+          </div>
+          <form id="formEliminarTodo" method="post" action="{% url 'eliminar_usuarios_seleccionados' %}">
+            {% csrf_token %}
+              <table class="table table-striped table-bordered table-hover table-selected" id="myTable">
+                {% load static %}
+                <thead class="text-center">
+                    <tr>
+                        <th><input class="form-check-input" type="checkbox" id="checkTodos" title="Seleccionar todo" style="transform: scale(1.5);"></th>
+                        <th class="h5">Email</th>
+                        <th class="h5">Nombre completo</th>
+                        <th class="h5">DNI</th>
+                        <th class="h5">Rol</th>
+                        <th class="h5">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuarios in object_list %}
+                    <tr class="usuario text-center"hidden=True>
+                        <td><input type="checkbox" name="usuarios_ids" value="{{ usuarios.id }}"></td>
+                        <td class="h6" id='{{usuarios.dni}}'hidden>{{usuarios.id}}</td>
+                        <td class="h6">{{usuarios.email}}</td>
+                        <td class="h6">{{usuarios.nombre_completo}}</td>
+                        <td class="h6">{{usuarios.dni}}</td>
+                        <td class="h6">{{usuarios.get_rol_display}}</td>
+                        <td>
+                          <a title= "Ver" class="btn btn-primary" href="/show_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/view.png" height="20px" width="20px"></img></a>
+                          <a title= "Editar" class="btn btn-primary" href="/edit_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a> 
+                          
+                          <!-- CONDICIÓN PARA MOSTRAR REPORTE SOLO A ESTUDIANTES -->
+                          {% if usuarios.rol == 'Estudiante' %}
+                            <a title="Ver Reporte" class="btn btn-primary" href="/reporte_html/{{ usuarios.id }}" role="button"><img src="/static/imagenes/imprimir.png" height="20px" width="20px"></img></a>
+                          {% else %}
+                            <a title="Reportes solo disponibles para estudiantes" class="btn btn-secondary" onclick="mostrarAlertaReporte('{{ usuarios.get_rol_display }}')" style="cursor: pointer;">
+                              <img src="/static/imagenes/imprimir.png" height="20px" width="20px" style="opacity: 0.5;"></img>
+                            </a>
+                          {% endif %}
+                        </td>
+
+                         <!-- Modal de confirmación -->
+                         <div class="modal fade" id="confirmarEliminar" tabindex="-1" aria-labelledby="confirmarEliminarLabel" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title" id="modalTitulo"></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body text-center" id="modalMensaje"></div>
+                              <div class="modal-footer">
+                                <button type="submit" class="btn btn-danger" form="formEliminarTodo">Eliminar</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>   
+
+                        <!-- Advertencia de selección -->
+                        <div class="modal fade" id="modalSeleccionar" tabindex="-1" aria-labelledby="modalSeleccionarLabel" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title">Advertencia</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body text-center">
+                                <h6>Debe seleccionar al menos un usuario para eliminar.</h6>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal"> Cerrar</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Modal de advertencia para reportes -->
+                        <div class="modal fade" id="modalReporteNoPermitido" tabindex="-1" aria-labelledby="modalReporteNoPermitidoLabel" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title">Reporte no disponible</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body text-center">
+                                <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 2rem;"></i>
+                                <h6>Los reportes de constancia académica solo están disponibles para usuarios con rol de <strong>Estudiante</strong>.</h6>
+                                <p class="mt-2 text-muted">Este usuario tiene el rol: <strong id="rolUsuarioModal"></strong></p>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+          </form>
+        </div>
+
+          <nav aria-label="..." class="d-flex justify-content-center">
+            <ul class="pagination">
+              <li class="page-item" id='btnAnt'>
+              <button class="page-link" title="Anterior" id='btnAnt_' style="cursor: pointer;"onclick="paginaAnt()">←</button>
+              </li>
+              <li class="page-item" id='btnSig'>
+              <button class="page-link" title="Siguiente" id='btnSig_' onclick="paginaSig()">→</button>
+              </li>
+            </ul>
+          </nav>
+    </div>
+      
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+
+<script>
+  $(document).ready(function() {
+    // Seleccionar/deseleccionar todos
+    $("#checkTodos").change(function() {
+        var isChecked = $(this).prop("checked");
+        $("input[name='usuarios_ids']").each(function() {
+            $(this).prop("checked", isChecked);
+        });
+    });
+  });
+  
+  // Modal de confirmación de eliminación
+  $("#eliminarSeleccionados").click(function() {
+    var checkedBoxes = $("input[name='usuarios_ids']:checked");
+    if (checkedBoxes.length > 0) {
+        if (checkedBoxes.length === 1) {
+            var nombreUsuario = checkedBoxes.closest('tr').find('.h6:nth-child(5)').text().trim();
+            $("#modalTitulo").text("Advertencia");
+            $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar al usuario "${nombreUsuario}"?</h6>`);
+        } else {
+            $("#modalTitulo").text("Advertencia");
+            $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar a los ${checkedBoxes.length} usuarios seleccionados?</h6>`);
+        }
+        $("#confirmarEliminar").modal("show");
+    } else {
+        $("#modalSeleccionar").modal("show");
+    }
+});
+
+  var pagina = 1
+  if (pagina = 1)
+  {
+    document.getElementById("btnAnt").className="page.item disabled"
+  }
+  let elementos = document.querySelectorAll('.usuario');
+  if (elementos.length<=10)
+  {
+    document.getElementById("btnSig").className="page.item disabled"
+  }
+  for (let i = 0; i <= pagina*10-1; i++) {
+    try{elementos[i].hidden=false}
+    catch(e){console.log("Tenes que cerrar el estadio")}
+    }
+  function paginaSig()
+  {
+    let elementos = document.querySelectorAll('.usuario');
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=true}
+      catch(e){console.log("Anda, todo pelota.")}
+      }  
+    pagina=pagina+1
+    if (pagina>1)
+    {
+      document.getElementById("btnAnt").className="page-item active"
+    }
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=false}
+      catch(e){console.log("No hay mas usuarios")
+      document.getElementById("btnSig").className="page.item disabled"
+      }
+      }
+  } 
+  function paginaAnt()
+  {
+    document.getElementById("btnSig").className="page.item active"    
+    let elementos = document.querySelectorAll('.usuario');
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=true}
+      catch(e){console.log("Parmisano no mires esto")}
+      }
+    pagina=pagina-1
+    if (pagina>1)
+    {
+      document.getElementById("btnAnt").className="page-item active"
+    }
+    else{document.getElementById("btnAnt").className="page-item disabled"}
+    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
+      try{elementos[i].hidden=false} 
+      catch(e){console.log("Mission Accomplished")}
+      }
+    }   
+
+    function ocultarAlerta1()
+    {document.getElementById("alertaNoDNI").hidden=true}
+    function ocultarAlerta2()
+    {document.getElementById("errorDNI").hidden=true}
+    function busqueda()
+    {
+      if(document.getElementById("busquedaDni").value && document.getElementById("busquedaDni").value != 'None' )
+      {
+        var dni_usuario = document.getElementById("busquedaDni").value
+        if(document.getElementById(dni_usuario))
+        {
+          var id_usuario = document.getElementById(dni_usuario).innerHTML
+          location.href ="/show_user/"+id_usuario;
+        }
+        else{console.log("DNI no registrado");
+        document.getElementById("errorDNI").hidden=false;}
+      }
+      else{console.log("Ingrese un DNI");
+      document.getElementById("alertaNoDNI").hidden=false;
+    }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      // Para los campos de texto
+      document.querySelectorAll('input[type=text]').forEach(node => 
+          node.addEventListener('keydown', e => {
+              if (e.key === 'Enter') {
+                  e.preventDefault();
+                  document.getElementById("buscar").click();
+              }
+          })
+      );
+  
+      // Para los botones
+      document.querySelectorAll('button').forEach(node => 
+          node.addEventListener('keydown', e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+              }
+          })
+      );
+  });  
+$(document).ready(function() {
+    // Selecciona todos los elementos y recórrelos
+    $('*').each(function() {
+        // Verifica si el innerHTML es exactamente "None"
+        if ($(this).html().trim() === "None") {
+            $(this).html("-");
+        }
+    });
+});
+
+function descargarPDF(usuarioId) {
+    // Método 1: Usar fetch para forzar descarga
+    fetch(`/reporte/${usuarioId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al descargar el archivo');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Crear URL temporal del blob
+            const url = window.URL.createObjectURL(blob);
+            
+            // Crear enlace temporal
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `constancia_usuario_${usuarioId}.pdf`;
+            
+            // Agregar al DOM temporalmente
+            document.body.appendChild(link);
+            
+            // Hacer click para descargar
+            link.click();
+            
+            // Limpiar
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Fallback: abrir en nueva ventana
+            window.open(`/reporte/${usuarioId}`, '_blank');
+        });
+}
+
+function mostrarAlertaReporte(rolUsuario) {
+    document.getElementById('rolUsuarioModal').textContent = rolUsuario;
+    $('#modalReporteNoPermitido').modal('show');
+}
+</script>  
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+
+{% endif %}
+
+
+{% endblock %}

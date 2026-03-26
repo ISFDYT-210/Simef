@@ -1,0 +1,25 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Error: Inscripcion a final{% endblock %}
+
+{% block content %}
+{%if user.is_authenticated and not user.is_staff%}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error: Inscripcion a final</title>
+</head>
+<body>
+    <h1>Error al inscribirse a la mesa</h1>
+    <p class="fs-3">¡Ya estas inscripto a esta mesa! Si queres anular la inscripcion, comunicate con administración.</p>
+</body>
+</html>
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+
+{% endif %}
+{% endblock %}

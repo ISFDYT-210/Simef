@@ -1,0 +1,41 @@
+<!-- lista_finales_user.html -->
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de finales{% endblock %}
+
+{% block content %}
+<div class="card-body" style="margin-top: 50px; margin-bottom: 50px;">
+        <div class="card">
+        <div class="card-headers rounded-top">
+            <h4 class="card-title">Lista de Finales</h4>
+        </div>
+        <div class="card-body">
+            {% if finales %} 
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="h5">Materia</th>
+                        <th class="h5">Llamado</th>
+                        <th class="h5">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                        {% for final in finales %}
+                            <tr>
+                                <td class="h6">{{final.llamado.materia}}</td>
+                                <td class="h6">{{final.llamado.llamado}}</td>
+                                <td>
+                                    <a name="" id="" class="btn btn-danger" href="/eliminar_inscripcion_final/{{final.id}}" role="button">Dar de baja</a>
+                                </td>
+                            </tr>
+                        {% endfor %} 
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-danger" style= "font-size: 20px;"> No hay finales disponibles.</div>
+        {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

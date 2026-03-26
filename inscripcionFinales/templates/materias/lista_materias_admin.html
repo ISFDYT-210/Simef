@@ -1,0 +1,355 @@
+<!-- lista_materias_admin.html -->
+
+
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Materias{% endblock %}
+
+
+{% block content %}
+
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+
+<div class="card-body" style="margin-top: 50px; margin-bottom: 50px;">
+    <div class="card">
+        <div class="card-headers"  style="border-radius: 5px;">
+            <h3 class="card-title">Listado de Materias</h3> 
+            <form class="d-flex" role="search-input" style="position: absolute; right: 10px; top: 55px;">
+            <form class="d-flex" role="search-input" style="position: absolute; right: 10px; top: 0;">
+                <div style="display: flex; align-items: flex-end;">
+                    <select name="carrera" id="carrera-select" class="form-control" onchange="mostrarAnio()" style="width: 160px; margin-right: 5px">
+                        <option value="">Filtrar por carrera</option>
+                        {% for carrera in carreras %}
+                        <option value="{{ carrera.id }}" data-duracion="{{ carrera.duracion_carrera }}">{{ carrera.nombre_carrera }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <select name="anio" id="anio-select" class="form-control" onchange="inscripciones()" style="width: 160px; margin-right: 5px" disabled>
+                        <option value="">Seleccione carrera</option>
+                    </select>
+                    <!---<input class="form-control me-2" type="text" name="carrera" placeholder="Buscar por carrera" aria-label="Buscar">-->
+                        <button class="btn btn-primary" type="submit" title="Buscar" style="margin-right:40px;margin-top: 10px"><img src="/static/imagenes/Lupita.png" height="20px" width="20px"></img></button>
+                        <a href="#" id="eliminarSeleccionados" class="btn btn-danger" style="margin-right:3px;margin-top: 10px"><i class="fas fa-trash-alt"></i></a>
+                        <a href="#" id="abrirSeleccionados" class="btn btn-info" style="margin-right:3px;margin-top: 10px"><img src="/static/imagenes/abrir_inscripcion.png" height="20px" width="20px"></img></a>
+                        <a href="#" id="cerrarSeleccionados" class="btn btn-danger" style="margin-right:3px;margin-top: 10px"><img src="/static/imagenes/cerrar_inscripcion.png" height="20px" width="20px"></img></a>                
+                </div>
+            </form> 
+            
+        </div>
+
+        <div class="card-body" style="padding-top: 55px; padding-left: 10px; padding-right: 10px;"> 
+            <form id="formMaterias" method="post" action="">
+                {% csrf_token %}
+            <table class="table table-striped table-bordered">
+                {% load static %}
+                    <tr>
+                        <th><input class="form-check-input" type="checkbox" id="checkTodos" title="Seleccionar todo" style="transform: scale(1.5);"></th>
+                        <th class="h5">Nombre</th>
+                        <th class="h5">Año</th>
+                        <th class="h5">Inscripcion Abierta</th>
+                        <th class="h5">Carrera</th>
+                        <th class="h5">Profesor</th>
+                        <th class="h5">Día</th>
+                        <th class="h5">Horario</th>
+                        <th class="h5">Acciones</th>
+                    </tr>
+                <tbody>
+                    {% if materias %}
+                        {% for materia in materias %}
+                            <tr>
+                                <td><input type="checkbox" name="materia_ids" value="{{ materia.id }}"></td>
+                                <td class="h6">{{materia.nombre_materia}}</td>
+                                <td class="h6">{{materia.anio}}</td>
+                                <td id="inscripcion{{materia.id}}" class="h6">{{materia.inscripcionAbierta}}</td>
+                                <td class="h6">{{materia.carrera.nombre_carrera}}</td>
+                                <td class="h6">{{materia.profesor.nombre_completo}}</td>
+                                <td class="h6">{{materia.dia}}</td>
+                                <td class="h6">{{materia.Horario}}</td>
+
+                                <td>
+                                    <a title= "Ver"name="" id="" class="btn btn-primary" href="{% url 'ver_materias' id=materia.id %}" role="button"><img src="/static/imagenes/view.png" height="20px" width="20px"></img></a>
+                                    <a title= "Editar"name="" id="" class="btn btn-primary" href="{% url 'editar_materia' id=materia.id %}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a>
+                                </td>
+                            </tr>
+                            <!-- Modal de confirmación-->
+                            <div class="modal fade" id="confirmarModal" tabindex="-1" aria-labelledby="modalTitulo" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title-custom" id="modalTitulo">Confirmar apertura de inscripciones</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-center">
+                                            <h6 class "modal-pregunta-custom text-center" id="modalMensaje"></h6>
+                                        </div>
+                                        <div class="modal-footer modal-rederigir-custom">
+                                            <form id="formMaterias" method="post" action="{% url 'abrir_materias_seleccionadas' %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-danger" type="submit">Confirmar</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>  
+                            <!-- Modal de Éxito -->
+                            <div class="modal fade" onclick="recargar()" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="alertModalLabel">Notificación</h5>
+                                        </div>
+                                        <div class="text-center">
+                                            <h6 id="mensajeExito"></h6>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <a href="/lista_materias_admin" class="btn btn-primary">Volver</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Advertencia de selección -->
+                            <div class="modal fade" id="modalSeleccionar" tabindex="-1" aria-labelledby="modalSeleccionarLabel" aria-hidden="true">
+                                <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Advertencia</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body text-center">
+                                        <h6>Debe seleccionar al menos una materia.</h6>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal"> Cerrar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                          <tr>
+                            <td colspan="9">
+                                <div class="alert alert-danger text-center">No hay materias disponibles.</div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+          
+        </div>
+        <div class="card-footer">
+            <nav aria-label="...">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if not materias.has_previous %}disabled{% endif %}">
+                        <a class="page-link" href="{% if materias.has_previous %}?page={{ materias.previous_page_number }}{% else %}javascript:void(0);{% endif %}" aria-label="Anterior">
+                            <span aria-hidden="true">&lsaquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item {% if not materias.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{% if materias.has_next %}?page={{ materias.next_page_number }}{% else %}javascript:void(0);{% endif %}" aria-label="Siguiente">
+                            <span aria-hidden="true">&rsaquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% else %}
+
+        <div class="text-center">
+            <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+            <br>
+          <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+        </div>
+        </div>
+        </div>   
+        {% endif %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Selecciona todos los elementos y recórrelos
+        $('*').each(function() {
+            // Verifica si el innerHTML es exactamente "None"
+            if ($(this).html().trim() === "None") {
+                $(this).html("-");
+            }
+        });
+      });
+{%for materia in materias%}
+    inscripcion=document.getElementById("inscripcion{{materia.id}}")
+        if (inscripcion.innerHTML=='True')
+        {
+            inscripcion.innerHTML='Si'
+        }
+        else if(inscripcion.innerHTML=='False')
+        {
+            inscripcion.innerHTML='No'
+        }
+{%endfor%}
+function findElementByInnerHTML(innerHTML) {
+    const allElements = document.querySelectorAll('*');
+    return Array.from(allElements).find(element => element.innerHTML.trim() === innerHTML.trim());
+}
+nocorresponde = findElementByInnerHTML('No corresponde')
+if (nocorresponde != null)
+    {
+        nocorresponde.remove()
+    }
+function mostrarAnio() {
+    var carreraSelect = document.getElementById("carrera-select");
+    var anioSelect = document.getElementById("anio-select");
+    var selectedOption = carreraSelect.options[carreraSelect.selectedIndex];
+    var duracion = selectedOption.getAttribute("data-duracion");
+
+    // Limpiar opciones existentes
+    anioSelect.innerHTML = '<option value="">Filtrar por año</option>';
+
+    if (duracion) {
+        // Habilitar el select de año
+        anioSelect.disabled = false;
+
+        // Agregar opciones de año basadas en la duración de la carrera
+        for (var i = 1; i <= duracion; i++) {
+            var option = document.createElement("option");
+            option.value = i;
+            option.text = i;
+            anioSelect.add(option);
+        }
+    } else {
+        // Si no se seleccionó una carrera, deshabilitar el select de año
+        anioSelect.disabled = true;
+    }
+}
+function abrirInscripcion()
+{   
+    var carreraSelect = document.getElementById("carrera-select").value;
+    var anioSelect = document.getElementById("anio-select").value; 
+    window.location.replace("/abrir_inscripcion_materia/"+carreraSelect+"/"+anioSelect);
+}
+function cerrarInscripcion()
+{   
+    var carreraSelect = document.getElementById("carrera-select").value;
+    var anioSelect = document.getElementById("anio-select").value; 
+    window.location.replace("/cerrar_inscripcion_materia/"+carreraSelect+"/"+anioSelect);
+}
+function inscripciones()
+{
+    var carreraSelect = document.getElementById("carrera-select").value;
+    var anioSelect = document.getElementById("anio-select").value; 
+    if (carreraSelect != '' && anioSelect != '')
+    {
+        document.getElementById("abrirInscripcionBtn").disabled=false
+        document.getElementById("cerrarInscripcionBtn").disabled=false
+    }
+    else
+    {
+        document.getElementById("abrirInscripcionBtn").disabled=true
+        document.getElementById("cerrarInscripcionBtn").disabled=true
+    }
+}
+
+function quitarTildes(texto) {
+    return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+$(document).ready(function(){
+    $("#myInput").on("keyup", function() {
+        var value = quitarTildes($(this).val()); // Aplicar la función a la entrada del usuario
+        $("#myTable tbody tr").each(function() {
+            var found = false;
+            $(this).find("td").each(function() {
+                var cellText = quitarTildes($(this).text()); // Aplicar la función a cada celda de la tabla
+                if (cellText.indexOf(value) > -1) {
+                    found = true;
+                    return false; // Salir del bucle interno si se encuentra una coincidencia
+                }
+            });
+            $(this).toggle(found); // Mostrar u ocultar la fila según si se encontró una coincidencia
+        });
+        $("#myTable thead tr").css("display", "table-row");
+
+        if ($("#myTable tbody tr:visible").length === 0) {
+            $(".pagination").hide();
+        } else {
+            $(".pagination").show();
+        }
+    });
+
+    // Checkbox
+    $("#checkTodos").change(function() {
+        var isChecked = $(this).prop("checked");
+        $("input[name='materia_ids']").prop("checked", isChecked);
+    });
+
+    // Modal de confirmación de eliminación
+    $("#eliminarSeleccionados").click(function() {
+        var form = document.getElementById('formMaterias');
+        form.action = "{% url 'eliminar_materias_seleccionadas' %}";
+        var checkedBoxes = $("input[name='materia_ids']:checked");
+        if (checkedBoxes.length > 0) {
+            if (checkedBoxes.length === 1) {
+                var materiaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(2)').text().trim(); 
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar la materia "${materiaNombre}" ?</h6>`);
+            } else {
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar las ${checkedBoxes.length} materias seleccionadas? </h6>`);
+            }
+            $("#confirmarModal").modal("show");
+        } else {
+            $("#modalSeleccionar").modal("show");
+        }
+    });
+
+    //Modal de confirmación de abrir inscripciones
+    $("#abrirSeleccionados").click(function() {
+        var form = document.getElementById('formMaterias');
+        form.action = "{% url 'abrir_materias_seleccionadas' %}";
+        var checkedBoxes = $("input[name='materia_ids']:checked");
+        if (checkedBoxes.length > 0) {
+            if (checkedBoxes.length === 1) {
+                var materiaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(2)').text().trim(); 
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea abrir las inscripciones para la materia "${materiaNombre}" ?</h6>`);
+            } else {
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea abrir las inscripciones para las ${checkedBoxes.length} materias seleccionadas? </h6>`);
+            }
+            $("#confirmarModal").modal("show");
+        } else {
+            $("#modalSeleccionar").modal("show");
+        }
+    });
+
+
+    //Modal de confirmación de cerrar inscripciones
+    $("#cerrarSeleccionados").click(function() {
+        var form = document.getElementById('formMaterias');
+        form.action = "{% url 'cerrar_materias_seleccionadas' %}";
+        var checkedBoxes = $("input[name='materia_ids']:checked");
+        if (checkedBoxes.length > 0) {
+            if (checkedBoxes.length === 1) {
+                var materiaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(2)').text().trim(); 
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea cerrar las inscripciones para la materia "${materiaNombre}" ?</h6>`);
+            } else {
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea cerrar las inscripciones para las ${checkedBoxes.length} materias seleccionadas? </h6>`);
+            }
+            $("#confirmarModal").modal("show");
+        } else {
+            $("#modalSeleccionar").modal("show");
+        }
+    });
+
+    // Modal de Éxito después de eliminar
+    var cantidadEliminadas = {{ cantidad_eliminadas|default:0 }};
+    if (cantidadEliminadas > 0) {
+        var mensaje = cantidadEliminadas === 1 ? "¡La materia ha sido eliminada correctamente!" : "¡Las " + cantidadEliminadas + " materias han sido eliminadas correctamente!";
+        $("#mensajeExito").text(mensaje);
+        $('#alertModal').modal('show');
+    }
+});
+function recargar()
+{
+    window.location.href = '/lista_materias_admin'   
+}
+</script>
+{% endblock %}

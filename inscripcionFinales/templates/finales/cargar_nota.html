@@ -1,0 +1,546 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Cargar Nota Final{% endblock %}
+
+{% block content %}
+{% load inscripcionfinales_extras %}
+
+<!-- Meta tag para CSRF token -->
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-xl-8 col-lg-10 col-md-12">
+            
+            <!-- Header Section -->
+            <div class="text-center mb-5">
+                <div class="mb-4">
+                    <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <i class="fas fa-clipboard-check text-white" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+                <h1 class="display-5 fw-bold text-dark mb-3">Cargar Nota Final</h1>
+                <p class="lead text-muted">Complete la calificación del examen final</p>
+            </div>
+
+            <!-- Main Card -->
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    
+                    <!-- Student Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="info-card h-100">
+                                <div class="info-header">
+                                    <i class="fas fa-user-graduate text-primary me-2"></i>
+                                    <span class="fw-bold">Información del Estudiante</span>
+                                </div>
+                                <div class="info-content">
+                                    <p class="mb-2"><strong>Nombre:</strong> {{ inscripcion.usuario.nombre_completo }}</p>
+                                    <p class="mb-2"><strong>DNI:</strong> {{ inscripcion.usuario.dni }}</p>
+                                    <p class="mb-0"><strong>Email:</strong> {{ inscripcion.usuario.email }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="info-card h-100">
+                                <div class="info-header">
+                                    <i class="fas fa-book text-primary me-2"></i>
+                                    <span class="fw-bold">Información del Examen</span>
+                                </div>
+                                <div class="info-content">
+                                    <p class="mb-2"><strong>Materia:</strong> {{ inscripcion.llamado.materia.nombre_materia }}</p>
+                                    <p class="mb-2"><strong>Fecha:</strong> {{ inscripcion.llamado.llamado|date:"d/m/Y H:i" }}</p>
+                                    <p class="mb-0"><strong>Año:</strong> {{ inscripcion.llamado.materia.anio }}°</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Section -->
+                    <form method="POST" id="notaForm" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Current Grade Display -->
+                        {% if usuario_materia.nota_cursada %}
+                        <div class="mb-4">
+                            <div class="alert alert-info border-0" style="background-color: #e3f2fd;">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-info-circle text-primary me-3" style="font-size: 1.5rem;"></i>
+                                    <div>
+                                        <h6 class="mb-1 fw-bold">Nota de Cursada</h6>
+                                        <p class="mb-0">El estudiante tiene una calificación de cursada de <strong>{{ usuario_materia.nota_cursada }}</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Grade Input -->
+                        <div class="mb-5">
+                            <label for="id_nota_final" class="form-label fw-bold text-dark mb-3 fs-5">
+                                <i class="fas fa-star me-3 text-primary"></i>Calificación Final
+                            </label>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="input-group input-group-lg">
+                                        <span class="input-group-text bg-primary text-white border-0">
+                                            <i class="fas fa-hashtag"></i>
+                                        </span>
+                                        {{ form.nota_final }}
+                                    </div>
+                                    <div class="invalid-feedback" id="nota-error">
+                                        Por favor ingrese una nota válida (0-10).
+                                    </div>
+                                    <small class="form-text text-muted mt-2">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Ingrese una calificación del 1 al 10. Nota mínima para aprobar: 4
+                                    </small>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="grade-status-card" id="gradeStatus" style="display: none;">
+                                        <div class="grade-status-content">
+                                            <div class="status-icon" id="statusIcon">
+                                                <i class="fas fa-question"></i>
+                                            </div>
+                                            <div class="status-text">
+                                                <span class="status-label" id="statusLabel">Estado</span>
+                                                <span class="status-description" id="statusDescription">Ingrese una nota</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg py-3" id="btnGuardar">
+                                        <i class="fas fa-save me-3"></i>Guardar Calificación
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="d-grid">
+                                    <a href="/listaFinalesAdm/" class="btn btn-outline-secondary btn-lg py-3">
+                                        <i class="fas fa-arrow-left me-3"></i>Volver a Inscripciones
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="mt-4">
+                <div class="card border-0" style="background-color: #f8f9fa;">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold text-dark mb-3">
+                            <i class="fas fa-info-circle me-2 text-primary"></i>Información sobre Calificaciones
+                        </h6>
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Nota mínima para aprobar: <strong>4 (cuatro)</strong>
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Escala de calificación: <strong>1 a 10</strong>
+                            </li>
+                            <li class="mb-0">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                La calificación quedará registrada permanentemente
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title" id="successModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>Calificación Guardada
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-star text-success" style="font-size: 3rem;"></i>
+                </div>
+                <h6 class="mb-3">La calificación se ha guardado correctamente</h6>
+                <p class="text-muted mb-0">El estudiante ha sido evaluado exitosamente</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <a href="/listaFinalesAdm/" class="btn btn-success px-4">
+                    <i class="fas fa-list me-2"></i>Ver Inscripciones
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="errorModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Error al Guardar
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                </div>
+                <h6 class="mb-3" id="errorMessage">Error al guardar la calificación</h6>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-danger px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+
+<!-- Access Denied -->
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="fas fa-user-slash text-warning" style="font-size: 5rem;"></i>
+                </div>
+                <h3 class="mb-3 text-dark">Acceso Restringido</h3>
+                <p class="text-muted mb-4 lead">Solo el personal autorizado puede cargar calificaciones.</p>
+                <a href="/" class="btn btn-primary btn-lg mt-3">
+                    <i class="fas fa-home me-2"></i>Volver al Inicio
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+<style>
+/* Custom Styles */
+.form-control, .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    background-color: #fff;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    background-color: #fff;
+}
+
+.input-group-text {
+    border: 2px solid #e9ecef;
+    border-right: none;
+    border-radius: 12px 0 0 12px;
+    padding: 1rem 1.25rem;
+    font-size: 1.1rem;
+}
+
+.input-group .form-control, .input-group .form-select {
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+}
+
+.btn-lg {
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border-width: 2px;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(13, 110, 253, 0.3);
+}
+
+.btn-outline-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(108, 117, 125, 0.2);
+}
+
+.card {
+    border: none;
+    border-radius: 20px;
+    background-color: #fff;
+}
+
+.modal-content {
+    border-radius: 20px;
+}
+
+.info-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.info-header {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.info-content p {
+    color: #495057;
+    font-size: 0.95rem;
+}
+
+.grade-status-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.grade-status-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.status-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.status-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.status-label {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+}
+
+.status-description {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Grade Status States */
+.grade-status-card.approved {
+    background: linear-gradient(135deg, #d1f2eb 0%, #a3e9d4 100%);
+    border-color: #198754;
+}
+
+.grade-status-card.approved .status-icon {
+    background: #198754;
+    color: white;
+}
+
+.grade-status-card.failed {
+    background: linear-gradient(135deg, #f8d7da 0%, #f1aeb5 100%);
+    border-color: #dc3545;
+}
+
+.grade-status-card.failed .status-icon {
+    background: #dc3545;
+    color: white;
+}
+
+.grade-status-card.pending {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-color: #ffc107;
+}
+
+.grade-status-card.pending .status-icon {
+    background: #ffc107;
+    color: #212529;
+}
+
+/* Loading state for button */
+.btn-loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* Animation for error states */
+.shake {
+    animation: shake 0.6s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+/* Form validation styles */
+.was-validated .form-control:invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.15);
+}
+
+.was-validated .form-control:valid {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.15);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-5 {
+        font-size: 2rem;
+    }
+    
+    .card-body {
+        padding: 2rem !important;
+    }
+    
+    .input-group-lg .form-control,
+    .input-group-lg .form-select,
+    .input-group-lg .input-group-text {
+        padding: 0.875rem 1rem;
+        font-size: 1rem;
+    }
+    
+    .info-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .grade-status-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+}
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    const notaInput = $('#id_nota_final');
+    const gradeStatus = $('#gradeStatus');
+    const statusIcon = $('#statusIcon');
+    const statusLabel = $('#statusLabel');
+    const statusDescription = $('#statusDescription');
+    const form = $('#notaForm');
+
+    // Add Bootstrap classes to form input
+    notaInput.addClass('form-control').attr({
+        'min': '1',
+        'max': '10',
+        'step': '0.1',
+        'placeholder': 'Ej: 7.5'
+    });
+
+    // Update grade status as user types
+    notaInput.on('input', function() {
+        const nota = parseFloat($(this).val());
+        
+        if (isNaN(nota) || nota < 1 || nota > 10) {
+            gradeStatus.hide();
+            return;
+        }
+
+        gradeStatus.show();
+        gradeStatus.removeClass('approved failed pending');
+        
+        if (nota >= 4) {
+            gradeStatus.addClass('approved');
+            statusIcon.html('<i class="fas fa-check"></i>');
+            statusLabel.text('APROBADO');
+            statusDescription.text(`El estudiante aprueba con ${nota}`);
+        } else {
+            gradeStatus.addClass('failed');
+            statusIcon.html('<i class="fas fa-times"></i>');
+            statusLabel.text('DESAPROBADO');
+            statusDescription.text(`El estudiante no alcanza la nota mínima`);
+        }
+    });
+
+    // Form validation
+    form.on('submit', function(e) {
+        const nota = parseFloat(notaInput.val());
+        
+        if (isNaN(nota) || nota < 1 || nota > 10) {
+            e.preventDefault();
+            $(this).addClass('was-validated');
+            notaInput.addClass('shake');
+            $('#nota-error').show();
+            
+            setTimeout(() => {
+                notaInput.removeClass('shake');
+            }, 600);
+            
+            return false;
+        }
+
+        // Show loading state
+        const btnGuardar = $('#btnGuardar');
+        btnGuardar.addClass('btn-loading').html('<span class="spinner-border spinner-border-sm me-2"></span>Guardando...');
+        
+        // Simulate processing (remove this in production)
+        setTimeout(() => {
+            // Show success modal (in real implementation, this would be handled by the server response)
+            $('#successModal').modal('show');
+        }, 1500);
+    });
+
+    // Real-time validation feedback
+    notaInput.on('blur', function() {
+        const nota = parseFloat($(this).val());
+        
+        if ($(this).val() && (isNaN(nota) || nota < 1 || nota > 10)) {
+            $(this).addClass('is-invalid');
+            $('#nota-error').show();
+        } else if ($(this).val()) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+            $('#nota-error').hide();
+        }
+    });
+
+    // Clear validation on focus
+    notaInput.on('focus', function() {
+        $(this).removeClass('is-invalid is-valid');
+        $('#nota-error').hide();
+        form.removeClass('was-validated');
+    });
+
+    // Auto-focus on load
+    setTimeout(() => {
+        notaInput.focus();
+    }, 500);
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Carga Exitosa{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-success shadow">
+                <div class="card-header bg-success text-white text-center">
+                    <h3><i class="fas fa-check-circle me-2"></i>Carga Completada</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-users text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    
+                    <h4 class="text-success mb-3">¡Usuarios cargados exitosamente!</h4>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h2 class="text-success mb-0">{{ usuarios_creados }}</h2>
+                                    <small class="text-muted">Usuarios creados</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h2 class="text-warning mb-0">{{ usuarios_duplicados|default:0 }}</h2>
+                                    <small class="text-muted">Ya existían</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <p class="text-muted">
+                            Los usuarios han sido creados con su DNI como contraseña inicial. 
+                            Se recomienda que cambien su contraseña en el primer acceso.
+                        </p>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'list_user' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-list me-1"></i>Ver Usuarios
+                        </a>
+                        <a href="{% url 'cargaMasivaEstudiantes' %}" class="btn btn-outline-success">
+                            <i class="fas fa-plus me-1"></i>Cargar Más
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,519 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Finales{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            
+            <!-- Header Section -->
+            <div class="text-center mb-5">
+                <div class="mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: #4a5f8f; border-radius: 0;">
+                        <i class="fas fa-list-alt text-white" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+                <h1 class="display-5 fw-bold text-dark mb-3">Lista de Finales</h1>
+                <p class="lead text-muted">Gestión de inscripciones y calificaciones de exámenes finales</p>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge fs-6 px-3 py-2" style="background-color: #4a5f8f; border-radius: 0;">
+                            <i class="fas fa-users me-2"></i>
+                            Total: <span id="total-count">{{ finales|length }}</span> inscripciones
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-md-end gap-2">
+                        <button class="btn" onclick="exportarDatos()" style="background-color: white; color: #4a5f8f; border: 2px solid #4a5f8f; border-radius: 0;">
+                            <i class="fas fa-download me-2"></i>Exportar
+                        </button>
+                        <button class="btn" onclick="actualizarLista()" style="background-color: #4a5f8f; color: white; border-radius: 0;">
+                            <i class="fas fa-sync-alt me-2"></i>Actualizar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Card -->
+            <div class="card shadow-lg border-0" style="border-radius: 0;">
+                <div class="card-header text-white border-0 py-4" style="background-color: #4a5f8f; border-radius: 0;">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h4 class="card-title mb-0 fw-bold">
+                                <i class="fas fa-graduation-cap me-2"></i>
+                                Inscripciones a Exámenes Finales
+                            </h4>
+                        </div>
+                        <div class="col-auto">
+                            <div class="input-group" style="width: 300px;">
+                                <span class="input-group-text bg-white border-0" style="border-radius: 0;">
+                                    <i class="fas fa-search" style="color: #4a5f8f;"></i>
+                                </span>
+                                <input type="text" class="form-control border-0" placeholder="Buscar estudiante o materia..." id="searchInput" style="border-radius: 0;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-0">
+                    {% if finales %}
+                        <!-- Desktop Table -->
+                        <div class="table-responsive d-none d-lg-block">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="px-4 py-3 fw-bold text-dark">
+                                            <i class="fas fa-book me-2" style="color: #4a5f8f;"></i>Materia
+                                        </th>
+                                        <th class="px-4 py-3 fw-bold text-dark">
+                                            <i class="fas fa-calendar me-2" style="color: #4a5f8f;"></i>Fecha del Llamado
+                                        </th>
+                                        <th class="px-4 py-3 fw-bold text-dark">
+                                            <i class="fas fa-user-graduate me-2" style="color: #4a5f8f;"></i>Estudiante
+                                        </th>
+                                        <th class="px-4 py-3 fw-bold text-dark text-center">
+                                            <i class="fas fa-star me-2" style="color: #4a5f8f;"></i>Calificación
+                                        </th>
+                                        <th class="px-4 py-3 fw-bold text-dark text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="finales-table-body">
+                                    {% for final in finales %}
+                                    <tr class="final-row" data-search="{{ final.llamado.materia|lower }} {{ final.usuario.nombre_completo|lower }}">
+                                        <td class="px-4 py-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px; background-color: rgba(74, 95, 143, 0.1); border-radius: 0;">
+                                                    <i class="fas fa-book" style="color: #4a5f8f;"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold text-dark">{{ final.llamado.materia }}</div>
+                                                    <small class="text-muted">{{ final.llamado.materia.anio }}° Año</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-semibold text-dark">{{ final.llamado.llamado|date:"d/m/Y" }}</span>
+                                                <small class="text-muted">{{ final.llamado.llamado|date:"H:i" }}hs</small>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px; background-color: rgba(40, 167, 69, 0.1); border-radius: 0;">
+                                                    <i class="fas fa-user text-success"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-semibold text-dark">{{ final.usuario.nombre_completo }}</div>
+                                                    <small class="text-muted">DNI: {{ final.usuario.dni }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            {% for nota in final.notas %}
+                                                {% if nota.nota_final %}
+                                                    {% if nota.nota_final >= 4 %}
+                                                        <span class="badge bg-success fs-6 px-3 py-2" style="border-radius: 0;">
+                                                            <i class="fas fa-check me-1"></i>{{ nota.nota_final }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge bg-danger fs-6 px-3 py-2" style="border-radius: 0;">
+                                                            <i class="fas fa-times me-1"></i>{{ nota.nota_final }}
+                                                        </span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-warning fs-6 px-3 py-2" style="border-radius: 0;">
+                                                        <i class="fas fa-clock me-1"></i>Pendiente
+                                                    </span>
+                                                {% endif %}
+                                            {% empty %}
+                                                <span class="badge bg-warning fs-6 px-3 py-2" style="border-radius: 0;">
+                                                    <i class="fas fa-clock me-1"></i>Pendiente
+                                                </span>
+                                            {% endfor %}
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <div class="btn-group" role="group">
+                                                <a href="/cargar_nota_final/{{ final.id }}" class="btn btn-sm" title="Cargar Calificación" style="background-color: #4a5f8f; color: white; border-radius: 0;">
+                                                    <i class="fas fa-edit me-1"></i>Calificar
+                                                </a>
+                                                <a href="/eliminar_inscripcion_final/{{ final.id }}" class="btn btn-sm" title="Dar de Baja" onclick="return confirm('¿Está seguro de dar de baja esta inscripción?')" style="background-color: white; color: #dc3545; border: 2px solid #dc3545; border-radius: 0;">
+                                                    <i class="fas fa-user-minus me-1"></i>Dar de Baja
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Mobile Cards -->
+                        <div class="d-lg-none p-3" id="mobile-cards">
+                            {% for final in finales %}
+                            <div class="card mb-3 border-0 shadow-sm final-card-mobile" data-search="{{ final.llamado.materia|lower }} {{ final.usuario.nombre_completo|lower }}" style="border-radius: 0;">
+                                <div class="card-body p-4">
+                                    <div class="row">
+                                        <div class="col-8">
+                                            <h6 class="fw-bold text-dark mb-2">
+                                                <i class="fas fa-book me-2" style="color: #4a5f8f;"></i>
+                                                {{ final.llamado.materia }}
+                                            </h6>
+                                            <p class="text-muted mb-2">
+                                                <i class="fas fa-user me-2"></i>
+                                                {{ final.usuario.nombre_completo }}
+                                            </p>
+                                            <p class="text-muted mb-3">
+                                                <i class="fas fa-calendar me-2"></i>
+                                                {{ final.llamado.llamado|date:"d/m/Y H:i" }}
+                                            </p>
+                                        </div>
+                                        <div class="col-4 text-end">
+                                            {% for nota in final.notas %}
+                                                {% if nota.nota_final %}
+                                                    {% if nota.nota_final >= 4 %}
+                                                        <span class="badge bg-success mb-2 fs-6" style="border-radius: 0;">{{ nota.nota_final }}</span>
+                                                    {% else %}
+                                                        <span class="badge bg-danger mb-2 fs-6" style="border-radius: 0;">{{ nota.nota_final }}</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-warning mb-2 fs-6" style="border-radius: 0;">Pendiente</span>
+                                                {% endif %}
+                                            {% empty %}
+                                                <span class="badge bg-warning mb-2 fs-6" style="border-radius: 0;">Pendiente</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <a href="/cargar_nota_final/{{ final.id }}" class="btn btn-sm flex-fill" style="background-color: #4a5f8f; color: white; border-radius: 0;">
+                                            <i class="fas fa-edit me-1"></i>Calificar
+                                        </a>
+                                        <a href="/eliminar_inscripcion_final/{{ final.id }}" class="btn btn-sm" onclick="return confirm('¿Está seguro?')" style="background-color: white; color: #dc3545; border: 2px solid #dc3545; border-radius: 0;">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                    {% else %}
+                        <!-- Empty State -->
+                        <div class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-inbox text-muted" style="font-size: 4rem;"></i>
+                            </div>
+                            <h5 class="text-muted mb-3">No hay finales disponibles</h5>
+                            <p class="text-muted mb-4">No se encontraron inscripciones a exámenes finales en el sistema.</p>
+                            <a href="/inscripcionFinal/" class="btn" style="background-color: #4a5f8f; color: white; border-radius: 0;">
+                                <i class="fas fa-plus me-2"></i>Nueva Inscripción
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Pagination -->
+                {% if finales %}
+                <div class="card-footer bg-light border-0 py-3" style="border-radius: 0;">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <small class="text-muted">
+                                Mostrando <span id="showing-start">1</span> a <span id="showing-end">10</span> de <span id="total-items">{{ finales|length }}</span> inscripciones
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Paginación" class="d-flex justify-content-md-end justify-content-center mt-3 mt-md-0">
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item" id="btnAnt">
+                                        <button class="page-link border-0" id="btnAnt_" onclick="paginaAnt()" title="Página anterior" style="border-radius: 0;">
+                                            <i class="fas fa-chevron-left"></i>
+                                        </button>
+                                    </li>
+                                    <li class="page-item active">
+                                        <span class="page-link border-0" id="current-page" style="background-color: #4a5f8f; border-radius: 0;">1</span>
+                                    </li>
+                                    <li class="page-item" id="btnSig">
+                                        <button class="page-link border-0" id="btnSig_" onclick="paginaSig()" title="Página siguiente" style="border-radius: 0;">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 0;">
+            <div class="modal-header bg-danger text-white border-0" style="border-radius: 0;">
+                <h5 class="modal-title" id="confirmModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-user-minus text-danger" style="font-size: 3rem;"></i>
+                </div>
+                <h6 class="mb-3">¿Está seguro de dar de baja esta inscripción?</h6>
+                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center" style="border-radius: 0;">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" style="border-radius: 0;">Cancelar</button>
+                <button type="button" class="btn btn-danger px-4" id="confirmDelete" style="border-radius: 0;">Dar de Baja</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Custom Styles */
+.card {
+    border: none;
+    border-radius: 0 !important;
+    background-color: #fff;
+}
+
+.card-header {
+    border-radius: 0 !important;
+}
+
+.table > :not(caption) > * > * {
+    padding: 1rem 0.75rem;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+.btn-group .btn {
+    border-radius: 0 !important;
+    margin: 0 2px;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 0 !important;
+    font-weight: 500;
+}
+
+.final-card-mobile {
+    border-radius: 0 !important;
+    transition: all 0.3s ease;
+}
+
+.final-card-mobile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+}
+
+.badge {
+    border-radius: 0 !important;
+    font-weight: 500;
+}
+
+.form-control {
+    border-radius: 0 !important;
+    border: none;
+    background: rgba(255,255,255,0.9);
+}
+
+.form-control:focus {
+    background: white;
+    box-shadow: 0 0 0 0.25rem rgba(74, 95, 143, 0.15);
+}
+
+.input-group-text {
+    border-radius: 0 !important;
+    border: none;
+}
+
+.pagination .page-link {
+    border-radius: 0 !important;
+    margin: 0 2px;
+    border: 1px solid #dee2e6;
+    color: #495057;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #4a5f8f !important;
+    border-color: #4a5f8f !important;
+}
+
+.pagination .page-link:hover {
+    background-color: #f8f9fa;
+    border-color: #4a5f8f;
+    color: #4a5f8f;
+}
+
+/* Search highlighting */
+.highlight {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 0;
+}
+
+/* Hidden rows */
+.d-none-search {
+    display: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-5 {
+        font-size: 2rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .btn-group .btn {
+        margin: 0;
+    }
+}
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    let pagina = 1;
+    const itemsPorPagina = 10;
+    let finalesFiltrados = $('.final-row, .final-card-mobile');
+    
+    // Initialize pagination
+    actualizarPaginacion();
+    
+    // Search functionality
+    $('#searchInput').on('input', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        
+        if (searchTerm === '') {
+            // Show all items
+            $('.final-row, .final-card-mobile').removeClass('d-none-search');
+            finalesFiltrados = $('.final-row, .final-card-mobile');
+        } else {
+            // Filter items
+            $('.final-row, .final-card-mobile').each(function() {
+                const searchData = $(this).data('search');
+                if (searchData && searchData.includes(searchTerm)) {
+                    $(this).removeClass('d-none-search');
+                } else {
+                    $(this).addClass('d-none-search');
+                }
+            });
+            finalesFiltrados = $('.final-row:not(.d-none-search), .final-card-mobile:not(.d-none-search)');
+        }
+        
+        // Reset to first page and update pagination
+        pagina = 1;
+        actualizarPaginacion();
+        mostrarPagina();
+    });
+    
+    // Replace "None" with "-"
+    $('*').each(function() {
+        if ($(this).html().trim() === "None") {
+            $(this).html("-");
+        }
+    });
+    
+    function mostrarPagina() {
+        // Hide all items first
+        finalesFiltrados.hide();
+        
+        // Calculate range for current page
+        const inicio = (pagina - 1) * itemsPorPagina;
+        const fin = inicio + itemsPorPagina;
+        
+        // Show items for current page
+        finalesFiltrados.slice(inicio, fin).show();
+        
+        // Update pagination info
+        const totalItems = finalesFiltrados.length;
+        const showingStart = totalItems > 0 ? inicio + 1 : 0;
+        const showingEnd = Math.min(fin, totalItems);
+        
+        $('#showing-start').text(showingStart);
+        $('#showing-end').text(showingEnd);
+        $('#total-items').text(totalItems);
+        $('#total-count').text(totalItems);
+        $('#current-page').text(pagina);
+    }
+    
+    function actualizarPaginacion() {
+        const totalItems = finalesFiltrados.length;
+        const totalPaginas = Math.ceil(totalItems / itemsPorPagina);
+        
+        // Update button states
+        if (pagina <= 1) {
+            $('#btnAnt').addClass('disabled');
+        } else {
+            $('#btnAnt').removeClass('disabled');
+        }
+        
+        if (pagina >= totalPaginas || totalPaginas <= 1) {
+            $('#btnSig').addClass('disabled');
+        } else {
+            $('#btnSig').removeClass('disabled');
+        }
+        
+        mostrarPagina();
+    }
+    
+    // Global functions for pagination buttons
+    window.paginaSig = function() {
+        const totalItems = finalesFiltrados.length;
+        const totalPaginas = Math.ceil(totalItems / itemsPorPagina);
+        
+        if (pagina < totalPaginas) {
+            pagina++;
+            actualizarPaginacion();
+        }
+    }
+    
+    window.paginaAnt = function() {
+        if (pagina > 1) {
+            pagina--;
+            actualizarPaginacion();
+        }
+    }
+    
+    // Export functionality
+    window.exportarDatos = function() {
+        alert('Función de exportación próximamente...');
+    }
+    
+    // Refresh functionality
+    window.actualizarLista = function() {
+        location.reload();
+    }
+    
+    // Initialize page
+    mostrarPagina();
+});
+</script>
+
+{% endblock %}

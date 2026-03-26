@@ -1,0 +1,222 @@
+<nav class="navbar  navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">
+      <img class="logo-insti" src="/static/imagenes/Logo_i210_fondo_trans.png">
+    </a>
+    <div class="rotulo">
+      Instituto Superior de Formación<br>Docente y Técnica N°210
+    </div>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNavDropdown">
+      <ul class="navbar-nav" style="text-align: right;">
+        {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+          <li class="nav-item">
+            <div class="dropdown">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+                Usuarios
+              </button>
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+                <li><a class="dropdown-item" href="/user_list/">Lista de usuarios</a></li>
+                <li><a class="dropdown-item" href="/create_user/">Crear nuevo usuario</a></li>
+                <li><a class="dropdown-item" href="/cargaMasivaEstudiantes/">Carga Masiva de usuario</a></li>
+              </ul>
+            </div>
+          </li>
+        {% endif %}
+        {% if user.is_authenticated %}
+        <li class="nav-item">
+            <div class="dropdown">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+                Materias
+              </button>
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                  <li><a class="dropdown-item" href="/altaMateria/">Crear materia</a></li>
+                  <li><a class="dropdown-item" href="/lista_materias_admin/">Listado de materias</a></li>
+                  <li><a class="dropdown-item" href="/inscripcionMateria/">Inscripcion a materias</a></li>
+                  <li><a class="dropdown-item" href="/listaMateriasAdm/">Lista de inscripciones</a></li> 
+                {% endif %}
+                {% if not request.user.is_staff and not request.user.is_superuser and not request.user.admin %}
+                  <li><a class="dropdown-item" href="/inscripcionMateriaEst/">Inscripcion a materias</a></li>
+                  <li><a class="dropdown-item" href="/listaMateriasEst/">Lista de inscripciones</a></li> 
+                {% endif %}               
+              </ul>
+            </div>
+          </li>
+          {% endif %}
+        {% if user.is_authenticated %}
+        <li class="nav-item">
+            <div class="dropdown">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+                Finales
+              </button>
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                  <li><a class="dropdown-item" href="/altaMesa/">Dar alta mesa de final</a></li>
+                  <li><a class="dropdown-item" href="/mesas_lista/">Listado de mesas</a></li>
+                  <li><a class="dropdown-item" href="/inscripcionFinal/">Inscripcion a finales</a></li>
+                <li><a class="dropdown-item" href="/listaFinalesAdm/">Lista de inscripciones</a></li>  
+                {% endif %}
+                {% if not request.user.is_staff and not request.user.is_superuser and not request.user.admin %}
+                  <li><a class="dropdown-item" href="/inscripcionFinalEst/">Inscripcion a finales</a></li>
+                  <li><a class="dropdown-item" href="/listaFinalesEst/">Lista de inscripciones</a></li>      
+                {% endif %}          
+              </ul>
+            </div>
+          </li>
+          {% endif %}
+          {% if user.is_authenticated %}
+          <li class="nav-item">
+            <div class="dropdown">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+                Información
+              </button>
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+                <li><a class="dropdown-item" href="https://isfdyt210-bue.infd.edu.ar/sitio/carreras/">Carreras</a></li>
+                <li><a class="dropdown-item" href="https://isfdyt210-bue.infd.edu.ar/sitio/datos-institucionales/">Información</a></li>
+              </ul>
+            </div>
+    
+          <li class="nav-item">
+            <a class="nav-link" href="https://biblioteca210.pythonanywhere.com/" rel="noopener noreferrer" style="text-decoration: none">Biblioteca</a>
+          </li>
+  
+            {% endif %}
+        
+
+
+        <!--<li class="nav-item">
+          <a class="nav-link" href="https://isfdyt210-bue.infd.edu.ar/sitio/carreras/" style="text-decoration: none">Carreras</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="https://isfdyt210-bue.infd.edu.ar/" target="_blank" rel="noopener noreferrer" style="text-decoration: none">El Instituto</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="https://isfdyt210-bue.infd.edu.ar/sitio/ubicacion/" style="text-decoration: none">Contacto</a>
+        </li>-->
+      
+        <!--modificar el boton para que no aparezca en el login, agregar un else para que en ese archivo HTML no aparezca-->
+        {% if not user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'login' %}">
+              <img class="icono-nav" src="/static/imagenes/Login.png">
+              <span class="nav-user">Login</span>
+            </a>
+          </li>
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link only-mob" href="{% url 'logout' %}">
+              <img class="icono-nav" src="/static/imagenes/Logout.png">
+              <span class="nav-user">Cerrar sesión</span>
+            </a>
+          </li>
+          <li class="nav-item last-nav-item">
+            
+           <!-- Display only in mobile -->
+           <li class="nav-item only-mob">
+            <div class="dropdown">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButtonUser" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none; text-align: right">
+                <style> .dropdown-menu-end {--bs-dropdown-bg: #ffffff00; /* Cambia el fondo del dropdown */ background-color: #ffffff00; /* Asegúrate de que el fondo sea transparente */}</style>          
+                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                  <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
+                {% else %}
+                  {% if user.imagen %}
+                    <img class="icono-nav" src="{{ user.imagen.url }}" alt="User Image">
+                  {% else %}
+                    <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
+                  {% endif %}
+                {% endif %}
+                <span class="nav-user">{{ user.email }}</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButtonUser">
+                <li><a class="dropdown-item" href="/edit_user/9">Editar perfil</a></li>
+                <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
+                <li>
+                  <form id="logoutForm" action="/accounts/logout/" method="post">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="LGAPDiVYnrqOF3v8vlxFZ5GctEygskcDGM5wQUsYaypdBrDI48VpqIVuDCkkljMs">
+                    <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </li>
+          <li class="nav-item last-nav-item">
+
+            <!-- Display only in laptop -->
+            <div class="dropdown">
+              <table>
+                <tr>
+                  <h9 style="color:ghostwhite">{{user.email}}</h9>
+                  <button class="btn dropdown mrg-0 only-lt" type="button" data-bs-toggle="dropdown">
+                    <a class="nav-link" href="#">
+                      {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                      <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
+                    {% else %}
+                      {% if user.imagen %}
+                        <img class="icono-nav" src="{{ user.imagen.url }}" alt="User Image">
+                      {% else %}
+                        <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
+                      {% endif %}
+                    {% endif %}
+                    </a>
+                  </button>
+                </tr>
+                <tr>
+                  <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+                    <li><a class="dropdown-item" href="/edit_user/{{ request.user.id }}">Editar perfil</a></li>
+                    <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
+                    <li>
+                      <form id="logoutForm" action="{% url 'logout' %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item">
+                            <p>Cerrar Sesión</p>
+                            <span class="nav-user">Cerrar sesión</span>
+                        </button>
+                      </form>
+                    </li>
+                  </ul>
+                </tr>
+                </table>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<style>
+  @media (max-width: 768px) {
+    .rotulo {
+        font-size: 11px; /* Tamaño de fuente más grande en pantallas más pequeñas */
+    }
+    @media (max-width: 992px) { /* Para tabletas y móviles */
+      .navbar-nav {
+        flex-direction: column; /* Cambiar a columna para dispositivos más pequeños */
+        width: 100%; /* Asegurar que ocupe todo el ancho */
+      }
+    
+      .navbar-nav .nav-link, .nav-link only-mob {
+        text-align: left; /* Alinear el texto a la izquierda */
+      }
+    
+      .dropdown-menu, .navbar-nav {
+        left: 0; /* Alinear el menú desplegable a la izquierda */
+      }
+      .last-nav-item {
+        text-align: left; /* Alinear el texto a la izquierda */
+        width: 100%; /* Asegurar que ocupe todo el ancho */
+    }
+
+    .last-nav-item a {
+        display: block; /* Asegura que el enlace ocupe todo el ancho */
+        width: 100%; /* Asegurar que ocupe todo el ancho */
+} 
+    }
+</style>

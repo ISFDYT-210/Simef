@@ -1,0 +1,335 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Mesas{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+
+<div class="card">
+    <div class="card-headers" style="border-radius: 5px;">
+        <h3 class="card-title">Listado de Mesas</h3> 
+        <div class="position-relative" style="display: flex; align-items: flex-end;">
+            <div class="position-absolute top-0 end-0">
+                <!-- Nuevo botón PDF para cartel institucional -->
+                <a href="{% url 'imprimir_mesas_finales_pdf' %}" 
+                   class="btn btn-warning" 
+                   style="margin-right:3px;margin-top: 10px" 
+                   title="Generar cartel PDF para imprimir"
+                   target="_blank">
+                    <i class="fas fa-file-pdf"></i>
+                </a>
+                <a href="#" id="eliminarSeleccionados" class="btn btn-danger" style="margin-right:3px;margin-top: 10px"><i class="fas fa-trash-alt"></i></a>
+                <a href="#" id="abrirSeleccionados" class="btn btn-info" style="margin-right:3px;margin-top: 10px"><img src="/static/imagenes/abrir_inscripcion.png" height="20px" width="20px"></img></a>
+                <a href="#" id="cerrarSeleccionados" class="btn btn-danger" style="margin-right:3px;margin-top: 10px"><img src="/static/imagenes/cerrar_inscripcion.png" height="20px" width="20px"></img></a>                
+            </div>
+        </div>
+    </div>
+    <div class="card-body" style="padding-top: 55px; padding-left: 10px; padding-right: 10px;"> 
+        <form id="formMesas" method="post" action="">
+            {% csrf_token %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th><input class="form-check-input" type="checkbox" id="checkTodos" title="Seleccionar todo" style="transform: scale(1.5);"></th>
+                    <th class="h5">Materia</th>
+                    <th class="h5">Fecha</th>
+                    <th class="h5">Horario</th>
+                    <th class="h5">Inscripcion Abierta</th>
+                    <th class="h5">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for MesaFinal in object_list %}
+                <tr class="materia text-center" hidden=True>
+                    <td><input type="checkbox" name="mesa_ids" value="{{ MesaFinal.id }}"></td>
+                    <td class="h6">{{MesaFinal.materia}}</td>
+                    <td class="h6">{{MesaFinal.llamado|date:"d/m/Y"}}</td>
+                    <td class="h6">{{MesaFinal.llamado|date:"H:i"}}</td>
+                    <td id="inscripcion{{MesaFinal.id}}" class="h6">{{MesaFinal.inscripcionAbierta}}</td>
+                    <td>
+                        <a name="" id="" class="btn btn-primary" href="/edit_mesa/{{ MesaFinal.id }}" role="button" title="Editar mesa"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a>
+                        <a name="" id="" class="btn btn-success" href="/acta_volante/{{ MesaFinal.id }}" role="button" title="Acta volante individual"><img src="/static/imagenes/imprimir.png" height="20px" width="20px"></img></a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    <nav aria-label="..." class="d-flex justify-content-center">
+        <ul class="pagination">
+          <li class="page-item" id='btnAnt'>
+          <button class="page-link" title="Anterior" id='btnAnt_' style="cursor: pointer;" onclick="paginaAnt()">←</button>
+          </li>
+          <li class="page-item" id='btnSig'>
+          <button class="page-link" title="Siguiente" id='btnSig_' onclick="paginaSig()">→</button>
+          </li>
+        </ul>
+    </nav>
+</div>
+
+<!-- Modal de confirmación general -->
+<div class="modal fade" id="confirmarModal" tabindex="-1" aria-labelledby="modalTitulo" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title-custom" id="modalTitulo">Confirmar acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h6 class="modal-pregunta-custom text-center" id="modalMensaje"></h6>
+            </div>
+            <div class="modal-footer modal-rederigir-custom">
+                <form id="formMesa" method="post" action="">
+                    {% csrf_token %}
+                    <button class="btn btn-danger" type="submit">Confirmar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>  
+
+<!-- Modal de Éxito -->
+<div class="modal fade" onclick="recargar()" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="alertModalLabel">Notificación</h5>
+            </div>
+            <div class="text-center">
+                <h6 id="mensajeExito"></h6>
+            </div>
+            <div class="modal-footer">
+                <a href="/mesas_lista" class="btn btn-primary">Volver</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Advertencia de selección -->
+<div class="modal fade" id="modalSeleccionar" tabindex="-1" aria-labelledby="modalSeleccionarLabel" aria-hidden="true">
+    <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Advertencia</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body text-center">
+            <h6>Debe seleccionar al menos una mesa.</h6>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+    <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+
+{% endif %}
+
+<!-- JavaScript mejorado -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // Convertir valores booleanos a texto legible
+    {% for MesaFinal in object_list %}
+        inscripcion = document.getElementById("inscripcion{{MesaFinal.id}}")
+        if (inscripcion.innerHTML == 'True') {
+            inscripcion.innerHTML = '<span class="badge bg-success">Sí</span>'
+        } else if (inscripcion.innerHTML == 'False') {
+            inscripcion.innerHTML = '<span class="badge bg-danger">No</span>'
+        }
+    {% endfor %}
+
+    function quitarTildes(texto) {
+        return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }
+    
+    $(document).ready(function(){
+        // Funcionalidad de búsqueda (si tienes campo de búsqueda)
+        $("#myInput").on("keyup", function() {
+            var value = quitarTildes($(this).val());
+            $("#myTable tbody tr").each(function() {
+                var found = false;
+                $(this).find("td").each(function() {
+                    var cellText = quitarTildes($(this).text());
+                    if (cellText.indexOf(value) > -1) {
+                        found = true;
+                        return false;
+                    }
+                });
+                $(this).toggle(found);
+            });
+            $("#myTable thead tr").css("display", "table-row");
+
+            if ($("#myTable tbody tr:visible").length === 0) {
+                $(".pagination").hide();
+            } else {
+                $(".pagination").show();
+            }
+        });
+
+        // Checkbox para seleccionar todo
+        $("#checkTodos").change(function() {
+            var isChecked = $(this).prop("checked");
+            $("input[name='mesa_ids']").prop("checked", isChecked);
+        });
+
+        // Modal de confirmación de eliminación
+        $("#eliminarSeleccionados").click(function() {
+            var form = document.getElementById('formMesas');
+            form.action = "{% url 'eliminar_mesas_seleccionadas' %}";
+            var checkedBoxes = $("input[name='mesa_ids']:checked");
+            if (checkedBoxes.length > 0) {
+                if (checkedBoxes.length === 1) {
+                    var mesaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(2)').text().trim(); 
+                    $("#modalTitulo").text("Advertencia");
+                    $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar la mesa "${mesaNombre}"?</h6>`);
+                } else {
+                    $("#modalTitulo").text("Advertencia");
+                    $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar las ${checkedBoxes.length} mesas seleccionadas?</h6>`);
+                }
+                $("#confirmarModal").modal("show");
+            } else {
+                $("#modalSeleccionar").modal("show");
+            }
+        });
+
+        // Modal de confirmación de abrir inscripciones
+        $("#abrirSeleccionados").click(function() {
+            var form = document.getElementById('formMesas');
+            form.action = "{% url 'abrir_mesas_seleccionadas' %}";
+            var checkedBoxes = $("input[name='mesa_ids']:checked");
+            if (checkedBoxes.length > 0) {
+                if (checkedBoxes.length === 1) {
+                    var mesaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(2)').text().trim(); 
+                    $("#modalTitulo").text("Abrir Inscripciones");
+                    $("#modalMensaje").html(`<h6>¿Está seguro que desea abrir las inscripciones para la mesa "${mesaNombre}"?</h6>`);
+                } else {
+                    $("#modalTitulo").text("Abrir Inscripciones");
+                    $("#modalMensaje").html(`<h6>¿Está seguro que desea abrir las inscripciones para las ${checkedBoxes.length} mesas seleccionadas?</h6>`);
+                }
+                $("#confirmarModal").modal("show");
+            } else {
+                $("#modalSeleccionar").modal("show");
+            }
+        });
+
+        // Modal de confirmación de cerrar inscripciones
+        $("#cerrarSeleccionados").click(function() {
+            var form = document.getElementById('formMesas');
+            form.action = "{% url 'cerrar_mesas_seleccionadas' %}";
+            var checkedBoxes = $("input[name='mesa_ids']:checked");
+            if (checkedBoxes.length > 0) {
+                if (checkedBoxes.length === 1) {
+                    var mesaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(2)').text().trim(); 
+                    $("#modalTitulo").text("Cerrar Inscripciones");
+                    $("#modalMensaje").html(`<h6>¿Está seguro que desea cerrar las inscripciones para la mesa "${mesaNombre}"?</h6>`);
+                } else {
+                    $("#modalTitulo").text("Cerrar Inscripciones");
+                    $("#modalMensaje").html(`<h6>¿Está seguro que desea cerrar las inscripciones para las ${checkedBoxes.length} mesas seleccionadas?</h6>`);
+                }
+                $("#confirmarModal").modal("show");
+            } else {
+                $("#modalSeleccionar").modal("show");
+            }
+        });
+
+        // Modal de Éxito después de acciones
+        var cantidadEliminadas = {{ cantidad_eliminadas|default:0 }};
+        if (cantidadEliminadas > 0) {
+            var mensaje = cantidadEliminadas === 1 ? "¡La mesa ha sido eliminada correctamente!" : "¡Las " + cantidadEliminadas + " mesas han sido eliminadas correctamente!";
+            $("#mensajeExito").text(mensaje);
+            $('#alertModal').modal('show');
+        }
+
+        // Convertir "None" a guiones
+        $('*').each(function() {
+            if ($(this).html().trim() === "None") {
+                $(this).html("-");
+            }
+        });
+    });
+
+    // Funciones de paginación
+    var pagina = 1;
+    if (pagina == 1) {
+        document.getElementById("btnAnt").className = "page-item disabled";
+    }
+    
+    let elementos = document.querySelectorAll('.materia');
+    if (elementos.length <= 10) {
+        document.getElementById("btnSig").className = "page-item disabled";
+    }
+    
+    for (let i = 0; i <= pagina * 10 - 1; i++) {
+        try { 
+            elementos[i].hidden = false;
+        } catch(e) { 
+            console.log("Fin de elementos");
+        }
+    }
+
+    function paginaSig() {
+        let elementos = document.querySelectorAll('.materia');
+        for (let i = pagina * 10 - 10; i <= pagina * 10 - 1; i++) {
+            try { 
+                elementos[i].hidden = true;
+            } catch(e) { 
+                console.log("Elementos ocultos");
+            }
+        }  
+        pagina = pagina + 1;
+        if (pagina > 1) {
+            document.getElementById("btnAnt").className = "page-item active";
+        }
+        for (let i = pagina * 10 - 10; i <= pagina * 10 - 1; i++) {
+            try { 
+                elementos[i].hidden = false;
+            } catch(e) { 
+                console.log("No hay más elementos");
+                document.getElementById("btnSig").className = "page-item disabled";
+            }
+        }
+    } 
+
+    function paginaAnt() {
+        document.getElementById("btnSig").className = "page-item active";    
+        let elementos = document.querySelectorAll('.materia');
+        for (let i = pagina * 10 - 10; i <= pagina * 10 - 1; i++) {
+            try { 
+                elementos[i].hidden = true;
+            } catch(e) { 
+                console.log("Elementos ocultos");
+            }
+        }
+        pagina = pagina - 1;
+        if (pagina > 1) {
+            document.getElementById("btnAnt").className = "page-item active";
+        } else { 
+            document.getElementById("btnAnt").className = "page-item disabled";
+        }
+        for (let i = pagina * 10 - 10; i <= pagina * 10 - 1; i++) {
+            try { 
+                elementos[i].hidden = false;
+            } catch(e) { 
+                console.log("Página anterior completada");
+            }
+        }
+    }
+
+    // Prevenir comportamiento por defecto en botones
+    document.querySelectorAll('button').forEach(node => 
+        node.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+            }
+        })
+    );
+</script>
+{% endblock %}

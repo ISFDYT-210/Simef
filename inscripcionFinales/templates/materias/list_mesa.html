@@ -1,0 +1,203 @@
+
+{% extends 'base/base.html' %}
+
+{% block title %}Lista de Mesas{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+
+<div class="card">
+    <div class="card-headers" style="border-radius: 5px;">
+        <h4 class="card-title" style="text-align: center;">Mesas</h4>
+    </div>
+    <div style="display: flex; align-items: flex-end;">
+        <a href="#" id="eliminarSeleccionados" class="btn btn-danger" style="margin-left: 15px; margin-top: 10px;"><i class="fas fa-trash-alt"></i></a>
+    </div>
+    <div class="card-body"> 
+        <form id="formEliminarTodo" method="post" action="{% url 'eliminar_mesas_seleccionadas' %}">
+            {% csrf_token %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th><input class="form-check-input" type="checkbox" id="checkTodos" title="Seleccionar todo" style="transform: scale(1.5);"></th>
+                    <th class="h5">Materia</th>
+                    <th class="h5">Llamado</th>
+                    <th class="h5">Inscripcion Abierta</th>
+                    <th class="h5"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for MesaFinal in object_list %}
+                <tr>
+                    <td><input type="checkbox" name="mesa_ids" value="{{ MesaFinal.id }}"></td>
+                    <td class="h6">{{MesaFinal.materia}}</td>
+                    <td class="h6" id='llamado{{ MesaFinal.id }}'>{{MesaFinal.llamado}}</td>
+                    <td id="inscripcion{{MesaFinal.id}}" class="h6">{{MesaFinal.inscripcionAbierta}}</td>
+                    <td>
+                        <a name="" id="" class="btn btn-primary" href="/edit_mesa/{{ MesaFinal.id }}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a>
+                    </td>
+                </tr>
+                <script>
+                    var elemId = 'llamado{{MesaFinal.id}}';
+                    var elem = document.getElementById(elemId);
+                    elem.innerHTML=elem.innerHTML.substring(0, elem.innerHTML.length - 10);  
+                </script>
+                <div class="modal fade" id="confirmarEliminar" tabindex="-1" aria-labelledby="modalTitulo" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title-custom" id="modalTitulo">Confirmar Eliminación</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <h6 class "modal-pregunta-custom text-center" id="modalMensaje"></h6>
+                            </div>
+                            <div class="modal-footer modal-rederigir-custom">
+                                <form id="formEliminarTodo" method="post" action="{% url 'eliminar_mesas_seleccionadas' %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger" type="submit">Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Modal de Éxito -->
+                <div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="alertModalLabel">Notificación</h5>
+                            </div>
+                            <div class="text-center">
+                                <h6 id="mensajeExito"></h6>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Volver</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Advertencia de selección -->
+                <div class="modal fade" id="modalSeleccionar" tabindex="-1" aria-labelledby="modalSeleccionarLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Advertencia</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <h6>Debe seleccionar al menos una mesa para eliminar.</h6>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal"> Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+    
+                {% endfor %}
+                <div class="modal fade" id="confirmarEliminar" tabindex="-1" aria-labelledby="modalTitulo" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title-custom" id="modalTitulo">Confirmar Eliminación</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <h6 class "modal-pregunta-custom text-center" id="modalMensaje"></h6>
+                            </div>
+                            <div class="modal-footer modal-rederigir-custom">
+                                <form id="formEliminarTodo" method="post" action="{% url 'eliminar_mesas_seleccionadas' %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger" type="submit">Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+
+<div class="text-center">
+    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
+  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+</div>
+{% endif %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    {%for MesaFinal in object_list%}
+        inscripcion=document.getElementById("inscripcion{{MesaFinal.id}}")
+            if (inscripcion.innerHTML=='True')
+            {
+                inscripcion.innerHTML='Si'
+            }
+            else if(inscripcion.innerHTML=='False')
+            {
+                inscripcion.innerHTML='No'
+            }
+    {%endfor%}
+function quitarTildes(texto) 
+{
+    return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+    
+$(document).ready(function(){
+    $("#myInput").on("keyup", function() {
+        var value = quitarTildes($(this).val()); // Aplicar la función a la entrada del usuario
+        $("#myTable tbody tr").each(function() {
+            var found = false;
+            $(this).find("td").each(function() {
+                var cellText = quitarTildes($(this).text()); // Aplicar la función a cada celda de la tabla
+                if (cellText.indexOf(value) > -1) {
+                    found = true;
+                    return false; // Salir del bucle interno si se encuentra una coincidencia
+                }
+            });
+            $(this).toggle(found); // Mostrar u ocultar la fila según si se encontró una coincidencia
+        });
+        $("#myTable thead tr").css("display", "table-row");
+
+        if ($("#myTable tbody tr:visible").length === 0) {
+            $(".pagination").hide();
+        } else {
+            $(".pagination").show();
+        }
+    });
+
+    // Checkbox
+    $("#checkTodos").change(function() {
+        var isChecked = $(this).prop("checked");
+        $("input[name='mesa_ids']").prop("checked", isChecked);
+    });
+
+    // Modal de confirmación de eliminación
+    $("#eliminarSeleccionados").click(function() {
+        var checkedBoxes = $("input[name='mesa_ids']:checked");
+        if (checkedBoxes.length > 0) {
+            if (checkedBoxes.length === 1) {
+                var mesaNombre = checkedBoxes.closest('tr').find('.h6:nth-child(3)').text().trim(); 
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar la mesa "${mesaNombre}" ?</h6>`);
+            } else {
+                $("#modalTitulo").text("Advertencia");
+                $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar las ${checkedBoxes.length} mesas seleccionadas? </h6>`);
+            }
+            $("#confirmarEliminar").modal("show");
+        } else {
+            $("#modalSeleccionar").modal("show");
+        }
+    });
+
+    // Modal de Éxito después de eliminar
+    var cantidadEliminadas = {{ cantidad_eliminadas|default:0 }};
+    if (cantidadEliminadas > 0) {
+        var mensaje = cantidadEliminadas === 1 ? "¡La mesa ha sido eliminada correctamente!" : "¡Las " + cantidadEliminadas + " mesas han sido eliminadas correctamente!";
+        $("#mensajeExito").text(mensaje);
+        $('#alertModal').modal('show');
+    }
+});
+</script>
+{% endblock %}
