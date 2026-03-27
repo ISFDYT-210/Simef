@@ -1,52 +1,169 @@
-# Proyecto Gestión de Inscripciones a Final del **Instituto 210**
+# Proyecto Gestión de Inscripciones a Final - Instituto 210
 
-## Proyecto de articulación de materias de la Carrera Tecnicatura Superior en Analisís de Sistemas
+## Proyecto de articulación de materias de la carrera  
+**Tecnicatura Superior en Análisis de Sistemas**
 
-## Instalación
+---
 
-### Debian
+## Descripción
 
-Clonar el repostorio
+Este proyecto corresponde al sistema de **Gestión de Inscripciones a Mesas de Examen Final** del **Instituto 210**.
 
-Usando  ssh
-`git clone git@gitlab.com:Naueru2/Instituto210.git`
+Su objetivo es facilitar la administración de inscripciones, el acceso de usuarios y la gestión interna mediante un panel de administración (*backoffice*).
 
-Usando https
+---
 
-`https://gitlab.com/Naueru2/Instituto210.git`
+## Requisitos previos
 
-Creamos el entorno Virtual
+Antes de comenzar, asegurate de tener instalado en tu sistema:
 
-`python3 -m venv env`
+- Python 3
+- `pip`
+- `venv`
+- Git
 
-Activamos el entorno Virtual
-`source env/bin/activate`
+En GNU/Linux Debian podés instalarlos con:
 
-Instalamos los paquetes 
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-pip python3-venv
+```
 
-`pip3 install -r requirements.txt `
+---
 
-Copiamos el Settings de desarrollo situado en la carpeta del proyecto (gestionInstituto)
-`cd gestionInstituto`
+## Instalación en GNU/Linux Debian
 
-`cp settings_DEV.py settings.py`
+### 1. Clonar el repositorio
 
-Corremos las migraciones
+Podés clonar el proyecto usando **SSH** o **HTTPS**.
 
-`python manage.py migrate`
+#### Usando SSH
 
-Para acceder al backoffice http://127.0.0.1:8000/admin se deberá crear un usuario superadmin de la forma:
+```bash
+git clone git@github.com:ISFDYT-210/Simef.git
+```
 
-`python manage.py createsuperuser`
+#### Usando HTTPS
 
-Para ejecutar el proyecto se debe:
+```bash
+git clone https://github.com/ISFDYT-210/Simef.git
+```
 
-`python manage.py runserver`
+---
 
-Para acceder al login, ingresar a http://127.0.0.1:8000 desde el navegador.
+### 2. Ingresar al directorio del proyecto
 
-Para redireccionar al index luego del login agregar en settings.py
+```bash
+cd Simef
+```
 
-`LOGIN_REDIRECT_URL = 'inicio'`
-<!-- Fin -->
-"# Instituto210Proyecto"
+---
+
+### 3. Crear el entorno virtual
+
+```bash
+python3 -m venv env
+```
+
+---
+
+### 4. Activar el entorno virtual
+
+```bash
+source env/bin/activate
+```
+
+---
+
+### 5. Instalar las dependencias
+
+```bash
+pip3 install -r requirements.txt
+```
+
+---
+
+### 6. Configurar el archivo de settings
+
+Ingresar a la carpeta principal del proyecto Django:
+
+```bash
+cd gestionInstituto
+```
+
+Copiar el archivo de configuración de desarrollo:
+
+```bash
+cp settings_DEV.py settings.py
+```
+
+---
+
+### 7. Ejecutar las migraciones
+
+```bash
+python manage.py migrate
+```
+
+---
+
+### 8. Crear un usuario administrador
+
+Para acceder al panel de administración (*backoffice*), es necesario crear un usuario con permisos de superusuario:
+
+```bash
+python manage.py createsuperuser
+```
+
+---
+
+### 9. Ejecutar el servidor de desarrollo
+
+```bash
+python manage.py runserver
+```
+
+---
+
+## Acceso al sistema
+
+### Panel de administración (Backoffice)
+
+Una vez iniciado el servidor, podés acceder al panel de administración desde:
+
+```text
+http://127.0.0.1:8000/admin
+```
+
+---
+
+### Pantalla de login
+
+Para ingresar al sistema desde el navegador:
+
+```text
+http://127.0.0.1:8000/
+```
+
+---
+
+## Redirección luego del login
+
+Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista `inicio`, agregá la siguiente línea en el archivo `settings.py`:
+
+```python
+LOGIN_REDIRECT_URL = 'inicio'
+```
+
+---
+
+## Notas
+
+- Este entorno está pensado para **desarrollo local**.
+- Para un entorno de **producción**, se recomienda:
+  - usar variables de entorno para datos sensibles,
+  - configurar `DEBUG = False`,
+  - definir `ALLOWED_HOSTS`,
+  - utilizar un servidor como **Gunicorn** o **uWSGI** detrás de **Nginx** o **Apache**.
+
+---
