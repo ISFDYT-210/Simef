@@ -178,7 +178,6 @@ Antes de comenzar, asegurate de tener instalado en tu sistema:
 
 > **Importante:** durante la instalación de Python en Windows, marcá la opción  
 > **“Add Python to PATH”** antes de hacer clic en **Install Now**.
->En sistemas windows es necesario instalar el software GTK. El siguiente link los deriva al archivo .exe que se debe bajar : (https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe)
 
 ---
 
@@ -351,3 +350,70 @@ LOGIN_REDIRECT_URL = 'inicio'
 ```
 
 ---
+
+## Problemas comunes en Windows
+
+### Error GTK
+
+En sistemas windows es necesario instalar el software GTK. El siguiente link los deriva al archivo .exe que se debe bajar : (https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe)
+
+### Error de ejecución de scripts en PowerShell
+
+Si PowerShell bloquea la activación del entorno virtual, ejecutá:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Luego cerrá y abrí nuevamente PowerShell, y volvé a activar el entorno:
+
+```powershell
+.\env\Scripts\Activate.ps1
+```
+
+---
+
+### Python no reconocido como comando
+
+Si aparece un error como:
+
+```text
+'python' no se reconoce como un comando interno o externo
+```
+
+probá con:
+
+```powershell
+py
+```
+
+Si tampoco funciona, reinstalá Python y asegurate de marcar:
+
+- **Add Python to PATH**
+
+---
+
+### Error al instalar dependencias con pip
+
+Actualizá `pip` con:
+
+```powershell
+python -m pip install --upgrade pip
+```
+
+o
+
+```powershell
+py -m pip install --upgrade pip
+```
+
+---
+
+## Notas
+
+- Este entorno está pensado para **desarrollo local**.
+- Para un entorno de **producción**, se recomienda:
+  - usar variables de entorno para datos sensibles,
+  - configurar `DEBUG = False`,
+  - definir `ALLOWED_HOSTS`,
+  - utilizar un servidor como **Gunicorn** o **uWSGI** detrás de **Nginx** o **Apache**.
