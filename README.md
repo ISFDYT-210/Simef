@@ -178,6 +178,7 @@ Antes de comenzar, asegurate de tener instalado en tu sistema:
 
 > **Importante:** durante la instalación de Python en Windows, marcá la opción  
 > **“Add Python to PATH”** antes de hacer clic en **Install Now**.
+>En sistemas windows es necesario instalar el software GTK. El siguiente link los deriva al archivo .exe que se debe bajar : (https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe)
 
 ---
 
