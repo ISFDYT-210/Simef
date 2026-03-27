@@ -167,3 +167,186 @@ LOGIN_REDIRECT_URL = 'inicio'
   - utilizar un servidor como **Gunicorn** o **uWSGI** detrás de **Nginx** o **Apache**.
 
 ---
+## Instalación en Windows
+
+### Requisitos previos
+
+Antes de comenzar, asegurate de tener instalado en tu sistema:
+
+- **Python 3**
+- **Git**
+
+> **Importante:** durante la instalación de Python en Windows, marcá la opción  
+> **“Add Python to PATH”** antes de hacer clic en **Install Now**.
+
+---
+
+### 1. Clonar el repositorio
+
+Podés clonar el proyecto usando **Git Bash**, **PowerShell** o **Símbolo del sistema (CMD)**.
+
+#### Usando HTTPS
+
+```powershell
+git clone https://github.com/ISFDYT-210/Simef.git
+```
+
+#### Usando SSH (si ya tenés tu clave configurada)
+
+```powershell
+git clone git@github.com:ISFDYT-210/Simef.git
+```
+
+---
+
+### 2. Ingresar al directorio del proyecto
+
+```powershell
+cd Instituto210
+```
+
+---
+
+### 3. Crear el entorno virtual
+
+```powershell
+python -m venv env
+```
+
+> Si `python` no funciona, probá con:
+
+```powershell
+py -m venv env
+```
+
+---
+
+### 4. Activar el entorno virtual
+
+#### En PowerShell
+
+```powershell
+.\env\Scripts\Activate.ps1
+```
+
+#### En CMD
+
+```cmd
+env\Scripts\activate.bat
+```
+
+#### En Git Bash
+
+```bash
+source env/Scripts/activate
+```
+
+---
+
+### 5. Instalar las dependencias
+
+```powershell
+pip install -r requirements.txt
+```
+
+> Si `pip` no responde correctamente, podés usar:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+o
+
+```powershell
+py -m pip install -r requirements.txt
+```
+
+---
+
+### 6. Configurar el archivo de settings
+
+Ingresar a la carpeta principal del proyecto Django:
+
+```powershell
+cd gestionInstituto
+```
+
+Copiar el archivo de configuración de desarrollo:
+
+#### En PowerShell
+
+```powershell
+Copy-Item settings_DEV.py settings.py
+```
+
+#### En CMD
+
+```cmd
+copy settings_DEV.py settings.py
+```
+
+---
+
+### 7. Ejecutar las migraciones
+
+```powershell
+python manage.py migrate
+```
+
+> Si fuera necesario:
+
+```powershell
+py manage.py migrate
+```
+
+---
+
+### 8. Crear un usuario administrador
+
+Para acceder al panel de administración (*backoffice*), es necesario crear un usuario con permisos de superusuario:
+
+```powershell
+python manage.py createsuperuser
+```
+
+---
+
+### 9. Ejecutar el servidor de desarrollo
+
+```powershell
+python manage.py runserver
+```
+
+---
+
+## Acceso al sistema
+
+### Panel de administración (Backoffice)
+
+Una vez iniciado el servidor, podés acceder al panel de administración desde:
+
+```text
+http://127.0.0.1:8000/admin
+```
+
+---
+
+### Pantalla de login
+
+Para ingresar al sistema desde el navegador:
+
+```text
+http://127.0.0.1:8000/
+```
+
+---
+
+## Redirección luego del login
+
+Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista `inicio`, agregá la siguiente línea en el archivo `settings.py`:
+
+```python
+LOGIN_REDIRECT_URL = 'inicio'
+```
+
+---
