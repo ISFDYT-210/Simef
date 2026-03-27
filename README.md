@@ -202,7 +202,7 @@ git clone git@github.com:ISFDYT-210/Simef.git
 ### 2. Ingresar al directorio del proyecto
 
 ```powershell
-cd Instituto210
+cd Simef
 ```
 
 ---
