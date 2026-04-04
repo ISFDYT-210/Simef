@@ -102,6 +102,7 @@ cp settings_DEV.py settings.py
 ### 7. Ejecutar las migraciones
 
 ```bash
+cd ..
 python manage.py migrate
 ```
 
