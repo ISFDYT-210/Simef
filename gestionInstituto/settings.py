@@ -27,7 +27,9 @@ SECRET_KEY = 'django-insecure-utp902oup=*=ltlzswjy)s5l-ko5c)ju@c2sx(5n6#&(d0(2)@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['.vercel.app', 'pulqui-simef210.com.ar', 'www.pulqui-simef210.com.ar', 'localhost', '127.0.0.1']
+
+
 
 
 # Application definition
