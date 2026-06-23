@@ -6,3 +6,5 @@ db.sqlite3
 debug.log
 gestioninstituto_models_*.png
 env/
+venv/
+.env
