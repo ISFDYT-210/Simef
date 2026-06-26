@@ -1,9 +1,146 @@
-from django.contrib.auth.models import (AbstractBaseUser, BaseUserManager, Group, PermissionsMixin, AbstractUser, User,)
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
-from django.utils.timezone import now
-from .choices import ESTADO_CIVIL_CHOICES,SEXO_CHOICES,MODALIDAD_CHOICES
-import random
-#from django.contrib.auth.forms import PasswordChangeForm
+from .choices import ESTADO_CIVIL_CHOICES, SEXO_CHOICES, MODALIDAD_CHOICES
+
+
+# === Matriz de capacidades por rol ===========================================
+# Única fuente de verdad del "alcance" de cada rol. Para cambiar qué puede
+# hacer un rol, se edita SOLO este diccionario.
+CAPACIDADES_POR_ROL = {
+    'Directivo':  {'gestionar_usuarios', 'gestionar_materias', 'gestionar_mesas',
+                   'abrir_inscripciones', 'cargar_notas', 'ver_reportes'},
+    'Secretario': {'gestionar_usuarios', 'gestionar_materias', 'gestionar_mesas',
+                   'abrir_inscripciones', 'cargar_notas', 'ver_reportes'},
+    'Preceptor':  {'gestionar_mesas', 'abrir_inscripciones', 'cargar_notas',
+                   'ver_reportes'},
+    'Profesor':   {'cargar_notas', 'ver_reportes'},
+    'Estudiante': {'inscribirse'},
+}
+
+
+class UsuarioManager(BaseUserManager):
+
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Los usuarios deben tener una dirección de email')
+        user = self.model(email=self.normalize_email(email), **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_admin', True)
+        return self.create_user(email, password, **extra_fields)
+
+
+class Usuario(AbstractBaseUser, PermissionsMixin):
+
+    email = models.EmailField('email', max_length=254, unique=True)
+    username = models.CharField('username', unique=True, null=True, max_length=100, blank=False)
+    nombre_completo = models.CharField('nombre_completo', max_length=200, null=True, blank=True)
+    fecha_nac = models.DateField('fecha_nac', null=True, blank=True)
+    dni = models.IntegerField('dni', unique=True, null=True, blank=True)
+    direccion = models.CharField('direccion', max_length=50, null=True, blank=True)
+    localidad = models.CharField('localidad', max_length=50, null=True, blank=True)
+    ciudad = models.CharField('ciudad', max_length=100, null=True, blank=True)
+    nacionalidad = models.CharField('nacionalidad', max_length=50, null=True, blank=True)
+    telefono_1 = models.IntegerField('telefono_1', null=True, blank=True)
+    telefono_2 = models.IntegerField('telefono_2', null=True, blank=True)
+    estado_civil = models.CharField('estado_civil', choices=ESTADO_CIVIL_CHOICES, max_length=50, null=True, blank=True)
+    sexo = models.CharField('sexo', choices=SEXO_CHOICES, max_length=10, null=True, blank=True)
+    imagen = models.ImageField('imagenPerfil', upload_to='perfil/', max_length=200, null=True, blank=True)
+    is_admin = models.BooleanField('is_admin', default=False)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    carrera = models.ManyToManyField('Carrera', blank=True)
+    first_login = models.BooleanField(default=True, help_text="True si es el primer login del usuario")
+
+    # === Roles ===============================================================
+    DIRECTIVO = 'Directivo'
+    SECRETARIO = 'Secretario'
+    PRECEPTOR = 'Preceptor'
+    PROFESOR = 'Profesor'
+    ESTUDIANTE = 'Estudiante'
+
+    ROL_CHOICES = (
+        (DIRECTIVO, 'Director'),
+        (SECRETARIO, 'Secretario'),
+        (PRECEPTOR, 'Preceptor'),
+        (PROFESOR, 'Profesor'),
+        (ESTUDIANTE, 'Estudiante'),
+    )
+    rol = models.CharField(max_length=20, choices=ROL_CHOICES, default=ESTUDIANTE)
+
+    objects = UsuarioManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    def __str__(self):
+        return self.nombre_completo or self.email
+
+    # === Identidad por rol ===================================================
+    def es_estudiante(self):
+        return self.rol == self.ESTUDIANTE
+
+    def es_profesor(self):
+        return self.rol == self.PROFESOR
+
+    def es_directivo(self):
+        return self.rol == self.DIRECTIVO
+
+    def es_secretario(self):
+        return self.rol == self.SECRETARIO
+
+    def es_preceptor(self):
+        return self.rol == self.PRECEPTOR
+
+    def es_super_admin(self):
+        return self.is_superuser
+
+    # === Alcance: capacidades ===============================================
+    def tiene_capacidad(self, capacidad):
+        """El super admin puede todo; el resto, según la matriz de su rol."""
+        if self.is_superuser:
+            return True
+        return capacidad in CAPACIDADES_POR_ROL.get(self.rol, set())
+
+    def puede_gestionar_usuarios(self):
+        return self.tiene_capacidad('gestionar_usuarios')
+
+    def puede_gestionar_materias(self):
+        return self.tiene_capacidad('gestionar_materias')
+
+    def puede_gestionar_mesas(self):
+        return self.tiene_capacidad('gestionar_mesas')
+
+    def puede_abrir_inscripciones(self):
+        return self.tiene_capacidad('abrir_inscripciones')
+
+    def puede_cargar_notas(self):
+        return self.tiene_capacidad('cargar_notas')
+
+    def puede_ver_reportes(self):
+        return self.tiene_capacidad('ver_reportes')
+
+    def puede_administrar(self):
+        """Atajo: ¿es personal administrativo (no estudiante ni profesor)?"""
+        return self.is_superuser or self.rol in (self.DIRECTIVO, self.SECRETARIO, self.PRECEPTOR)
+
+    # === Consultas por rol ===================================================
+    @classmethod
+    def obtener_profesores(cls):
+        return cls.objects.filter(rol=cls.PROFESOR).order_by('nombre_completo')
+
+    @classmethod
+    def obtener_estudiantes(cls):
+        return cls.objects.filter(rol=cls.ESTUDIANTE).order_by('nombre_completo')
+
+    @classmethod
+    def obtener_por_rol(cls, rol):
+        return cls.objects.filter(rol=rol).order_by('nombre_completo')
 
 
 class UsuarioManager(BaseUserManager):
