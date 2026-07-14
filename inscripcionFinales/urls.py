@@ -33,7 +33,7 @@ urlpatterns = [
     path('reset/<uidb64>/<token>/', CustomPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', CustomPasswordResetCompleteView.as_view(), name='password_reset_complete'),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='registration/password_reset_confirm.html'), name='password_reset_confirm'),
-    path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estudiante'),
+#     path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estudiante'),
 
     #Alta e Inscripcion materias
     
@@ -62,10 +62,10 @@ urlpatterns = [
     path('cerrar_materias_seleccionadas/', cerrar_materias_seleccionadas, name='cerrar_materias_seleccionadas'),
     path('abrir_mesas_seleccionadas/', abrir_mesas_seleccionadas, name='abrir_mesas_seleccionadas'),
     path('cerrar_mesas_seleccionadas/', cerrar_mesas_seleccionadas, name='cerrar_mesas_seleccionadas'),
-    path('estudiantes/<int:usuario_id>/reporte_usuario_materias/', reporte_usuario_materias, name='reporte_usuario_materias'),
-    path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_estudiante_html'),
+#     path('estudiantes/<int:usuario_id>/reporte_usuario_materias/', reporte_usuario_materias, name='reporte_usuario_materias'),
+#     path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_estudiante_html'),
 
-    path('mesas_finales/cartel_pdf/', imprimir_mesas_finales_pdf, name='imprimir_mesas_finales_pdf'),
+    path('imprimir_mesas_finales_pdf/', imprimir_mesas_finales_pdf, name='imprimir_mesas_finales_pdf'),
 
     #Alta e Inscripcion mesa de final Administrativo
     path('mesas_finales/', MesasFinalesListView.as_view(), name='mesas_finales_list'),
@@ -73,10 +73,10 @@ urlpatterns = [
     #Alta e Inscripcion mesa de final
 
     # Y AGREGAR solo estas dos nuevas rutas después de la línea 73:
-    path('obtener_finales_estudiante/', obtener_finales_estudiante, name='obtener_finales_estudiante'),
-    path('inscribir_final/', inscribir_final, name='inscribir_final'),
+#     path('obtener_finales_estudiante/', obtener_finales_estudiante, name='obtener_finales_estudiante'),
+#     path('inscribir_final/', inscribir_final, name='inscribir_final'),
 
-    path('acta_volante/<int:final_id>/', login_required(acta_volante), name='acta_volante'),
+#     path('acta_volante/<int:final_id>/', login_required(acta_volante), name='acta_volante'),
     path('exito_final_eliminado_est/', exito_final_eliminado_est, name='exito_final_eliminado_est'),
     path('exito_final_eliminado_adm/', exito_final_eliminado_adm, name='exito_final_eliminado_adm'),
     path('TESTINGlistamateriasfinal/',listarMateriasFinal,name='listarMesas'),
@@ -117,13 +117,13 @@ urlpatterns = [
     path('ver_usuario_materia/',listar_usuarios_materia,name='verUsuarioMateria'),
     # Primer logeo
 
-     path('change_password_first/', FirstLoginPasswordChangeView.as_view(), name='first_login_password_change'),
-     path('change_password_first/done/', first_login_password_change_done, name='first_login_password_change_done'),
+#      path('change_password_first/', FirstLoginPasswordChangeView.as_view(), name='first_login_password_change'),
+#      path('change_password_first/done/', first_login_password_change_done, name='first_login_password_change_done'),
 
     ###TESTING###
     path('validar-inscripcion/<int:usuario_id>/<int:materia_id>/', validar_inscripcion_final, name='validar_inscripcion_final'),
     
 
-    path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estudiante'),
-    path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_estudiante_html'),
+#     path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estudiante'),
+#     path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_estudiante_html'),
 ]

@@ -63,6 +63,18 @@
                         {%endif%}
                     </p>
 
+                    <!-- Rol (movido a columna izquierda) -->
+                    <p class="campo-form">
+                        <label for="id_rol">Rol:</label>
+                        <br>
+                        {{ form.rol }}
+                        {% if form.rol.errors %}
+                        <div class="field-error">
+                            {{ form.rol.errors }}
+                        </div>
+                        {% endif %}
+                    </p>
+
                     <!-- Email -->
                     <p class="campo-form">
                         <label for="id_email">Email:</label>
@@ -202,17 +214,6 @@
 
             <!-- Campos que van en ancho completo -->
             <div class="form-full-width">
-                <!-- Rol -->
-                <p class="campo-form">
-                  <label for="id_rol">Rol:</label>
-                  <br>
-                  {{ form.rol }}
-                  {% if form.rol.errors %}
-                  <div class="field-error">
-                      {{form.rol.errors}}
-                  </div>
-                  {%endif%}
-                </p>
 
                 <!-- Campos condicionales según el rol -->
                 {% if form.rol.value == 'estudiante' %}
@@ -248,6 +249,20 @@
                 <img src="/static/imagenes/SIMEF.png" class="logo-reg only-lt" style="width: 300px;height: 320px;">
             </div>
             <div class="botones-registracion">
+                    <!-- Contraseña (opcional) -->
+                    <p class="campo-form">
+                        <label for="id_password">Contraseña:</label>
+                        <br>
+                        {{ form.password }}
+                        <br>
+                        <small style="color:#666;">Si la dejás vacía, se genera una automáticamente.</small>
+                        {% if form.password.errors %}
+                        <div class="field-error">
+                            {{ form.password.errors }}
+                        </div>
+                        {% endif %}
+                    </p>
+
               <button type="submit" class="btn btn-blue fs-6" style="transition: 0.6s">Registrar</button>
                <div id="volver_usuario">
               <a class="fs-5" href="/user_list/" style="text-decoration: none">Volver a Usuarios</a>
