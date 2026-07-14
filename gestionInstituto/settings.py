@@ -127,6 +127,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Archivos de medios (imágenes subidas por usuarios, ej. fotos de perfil)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Mensajes estandar (constantes)
 
