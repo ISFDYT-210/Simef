@@ -60,6 +60,12 @@ padding: 0;
 display: flex;
 }
 
+.navbar .container-fluid{
+align-items: center;
+flex-wrap: wrap;
+row-gap: 0.5vh;
+}
+
 .logo-insti{
 max-width: 7vh;
 height: 7vh;
@@ -72,6 +78,9 @@ color: #fff;
 font-weight: 700;
 font-size: 2.7vw;
 line-height: 3.86vw;
+text-align: center;
+flex: 1 1 auto;
+min-width: 150px;
 }
 
 @media(min-width: 568px){
@@ -379,6 +388,7 @@ order: 1;
 @media(max-width: 960px){
 .card-l{
   min-height: 40vh;
+  width: 100%;
 }
 }
 
@@ -449,8 +459,9 @@ text-align: center;
 
 .login-form div p{
 display: grid;
-grid-template-columns: 25% 75%;
+grid-template-columns: 7.5rem 1fr;
 margin-top: 1vh;
+height: 3rem;
 border: solid 1px #00000080;
 border-radius: 20px;
 }
@@ -465,12 +476,13 @@ border-radius: 20px;
 .login-form div p label{
 display: inline;
 align-self:center;
-justify-self: center;
+justify-self: start;
 vertical-align: middle;
 
 color: #00000080;
 margin-left: 1vw;
 text-align: left;
+white-space: nowrap;
 }
 
 /* #id_username{
@@ -478,12 +490,15 @@ margin-left: 2vw;
 } */
 
 .login-form div p input{
-display: inline;
+display: inline-block;
 align-self:center;
 vertical-align: middle;
 margin:1vw;
 padding: 0 1vw;
 
+width: calc(100% - 2vw);
+min-width: 0;
+box-sizing: border-box;
 height: 80%;
 
 border: none;
@@ -496,13 +511,14 @@ color: #00000080;
 .recordarme{
 display: grid;
 grid-template-columns: 12% auto;
+margin-bottom: 0.5vh;
 }
 
 .recordarme input{
 display: inline;
 align-self:center;
 vertical-align: middle;
-margin: 1vw;
+margin: 0 1vw;
 
 }
 
@@ -510,13 +526,7 @@ margin: 1vw;
 display: inline;
 align-self:center;
 vertical-align: middle;
-margin: 1vw;
-}
-
-@media(max-width:768px){
-.recordarme{
-  margin-bottom: 2vh;
-}
+margin: 0 1vw;
 }
 
 .center-content{
@@ -567,6 +577,7 @@ display: grid;
 @media(max-width:960px){
 .card-r{
   height: 20vh;
+  width: 100%;
 }
 }
 
