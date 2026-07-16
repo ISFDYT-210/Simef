@@ -33,9 +33,13 @@
                 Materias
               </button>
               <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
-                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                {% if request.user.puede_gestionar_materias %}
                   <li><a class="dropdown-item" href="/altaMateria/">Crear materia</a></li>
+                {% endif %}
+                {% if request.user.puede_ver_materias %}
                   <li><a class="dropdown-item" href="/lista_materias_admin/">Listado de materias</a></li>
+                {% endif %}
+                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
                   <li><a class="dropdown-item" href="/inscripcionMateria/">Inscripcion a materias</a></li>
                   <li><a class="dropdown-item" href="/listaMateriasAdm/">Lista de inscripciones</a></li> 
                 {% endif %}

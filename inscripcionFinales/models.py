@@ -7,12 +7,12 @@ from .choices import ESTADO_CIVIL_CHOICES, SEXO_CHOICES, MODALIDAD_CHOICES
 # Única fuente de verdad del "alcance" de cada rol. Para cambiar qué puede
 # hacer un rol, se edita SOLO este diccionario.
 CAPACIDADES_POR_ROL = {
-    'Directivo':  {'gestionar_usuarios', 'gestionar_materias', 'gestionar_mesas',
-                   'abrir_inscripciones', 'cargar_notas', 'ver_reportes'},
-    'Secretario': {'gestionar_usuarios', 'gestionar_materias', 'gestionar_mesas',
-                   'abrir_inscripciones', 'cargar_notas', 'ver_reportes'},
-    'Preceptor':  {'gestionar_mesas', 'abrir_inscripciones', 'cargar_notas',
-                   'ver_reportes'},
+    'Directivo':  {'gestionar_usuarios', 'gestionar_materias', 'ver_materias',
+                   'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes'},
+    'Secretario': {'gestionar_usuarios', 'gestionar_materias', 'ver_materias',
+                   'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes'},
+    'Preceptor':  {'ver_materias', 'gestionar_mesas', 'abrir_inscripciones',
+                   'cargar_notas', 'ver_reportes'},
     'Profesor':   {'cargar_notas', 'ver_reportes'},
     'Estudiante': {'inscribirse'},
 }
@@ -113,6 +113,9 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def puede_gestionar_materias(self):
         return self.tiene_capacidad('gestionar_materias')
 
+    def puede_ver_materias(self):
+        return self.tiene_capacidad('ver_materias')
+
     def puede_gestionar_mesas(self):
         return self.tiene_capacidad('gestionar_mesas')
 
@@ -134,12 +137,31 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
         """True si puede cargar notas de ESTA materia en particular."""
         if not self.tiene_capacidad('cargar_notas'):
             return False
-        # Los administrativos pueden con cualquier materia
-        if self.is_superuser or self.rol in (self.DIRECTIVO, self.SECRETARIO, self.PRECEPTOR):
+        # El super admin siempre puede; el preceptor gestiona todas las materias
+        if self.is_superuser or self.es_preceptor():
             return True
         # El profesor, solo las materias que dicta
         if self.es_profesor():
             return materia.profesor_id == self.id
+        return False
+
+    def puede_ver_reporte_de(self, estudiante):
+        """True si puede ver el reporte/constancia de ESTE estudiante."""
+        if self.is_superuser:
+            return True
+        # Cada usuario puede ver su propio reporte
+        if self.id == estudiante.id:
+            return True
+        if not self.tiene_capacidad('ver_reportes'):
+            return False
+        # Personal administrativo: cualquier estudiante
+        if self.rol in (self.DIRECTIVO, self.SECRETARIO, self.PRECEPTOR):
+            return True
+        # Profesor: solo estudiantes inscriptos en sus materias
+        if self.es_profesor():
+            return usuarios_materia.objects.filter(
+                usuario=estudiante, materia__profesor=self
+            ).exists()
         return False
 
     @classmethod
