@@ -9,7 +9,7 @@
 <div id="registracion">  
     <form method="POST" class="form" id="registroForm">
         <div class="reg-rectangulo1">
-            <p class = "text-center reg-title">
+            <p class="reg-title">
               Completar los siguientes campos:
             </p>
             {% csrf_token %}
@@ -246,16 +246,16 @@
 
         <div class="reg-rectangulo2">
             <div class="logo-registracion only-lt">
-                <img src="/static/imagenes/SIMEF.png" class="logo-reg only-lt" style="width: 300px;height: 320px;">
+                <img src="/static/imagenes/SIMEF.png" class="logo-reg only-lt" style="width: 100%; max-width: 260px; height: auto;">
             </div>
             <div class="botones-registracion">
                     <!-- Contraseña (opcional) -->
-                    <p class="campo-form">
+                    <p class="campo-form campo-form-claro">
                         <label for="id_password">Contraseña:</label>
                         <br>
                         {{ form.password }}
                         <br>
-                        <small style="color:#666;">Si la dejás vacía, se genera una automáticamente.</small>
+                        <small class="aclaracion-clara">Si la dejás vacía, se genera una automáticamente.</small>
                         {% if form.password.errors %}
                         <div class="field-error">
                             {{ form.password.errors }}
@@ -265,7 +265,7 @@
 
               <button type="submit" class="btn btn-blue fs-6" style="transition: 0.6s">Registrar</button>
                <div id="volver_usuario">
-              <a class="fs-5" href="/user_list/" style="text-decoration: none">Volver a Usuarios</a>
+              <a class="fs-5 volver-claro" href="/user_list/" style="text-decoration: none">Volver a Usuarios</a>
               </div>
             </div>
         </div>   
@@ -273,17 +273,18 @@
 </div>
 
 <style>
-/* Contenedor de las dos columnas */
+/* Contenedor de las dos columnas: se auto-ajusta al ancho disponible, */
+/* sin depender de un breakpoint fijo de pantalla */
 .form-columns {
-    display: flex;
-    gap: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0 20px;
     width: 100%;
 }
 
 .form-column-left,
 .form-column-right {
-    flex: 1;
-    min-width: 0; /* Para que funcione correctamente el flex */
+    min-width: 0;
 }
 
 /* Campos de ancho completo */
@@ -294,8 +295,13 @@
 
 /* Estilos para los campos del formulario */
 .campo-form {
-    margin-bottom: 10px;
+    margin-bottom: 14px;
     text-align: center;
+}
+
+.campo-form label {
+    font-size: 14px;
+    font-weight: 600;
 }
 
 .campo-condicional {
@@ -320,50 +326,43 @@
     text-align: center;
 }
 
-/* Inputs más pequeños */
+/* Inputs modernos, redondeados, que ocupan todo su espacio disponible */
 .campo-form input,
 .campo-form select {
     width: 100%;
-    max-width: 200px;
     font-size: 14px;
-    padding: 5px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 10px;
+    background-color: var(--color-white);
 }
 
-/* Estilos responsive */
-@media only screen and (max-width: 900px) {
-    .form-columns {
-        flex-direction: column;
-        gap: 0;
-    }
-    
-    .form-column-left,
-    .form-column-right {
-        width: 100%;
-    }
+/* Texto claro para el panel violeta de la derecha */
+.campo-form-claro label,
+.campo-form-claro,
+.aclaracion-clara {
+    color: var(--color-white);
+}
+
+.aclaracion-clara {
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+.volver-claro {
+    color: var(--color-white);
+    font-weight: 600;
+}
+
+.volver-claro:hover {
+    color: var(--color-white);
+    opacity: 0.85;
 }
 
 @media only screen and (max-width: 600px) {
-  .reg-rectangulo1 {
-          width: 95%;
-          margin-left: 8%;
-          margin-top: 0%;
-        }
    .text-center {
     font-size: 15px;
    }
-   .campo-form {
-    margin-bottom: 8px;
-   }
-   .campo-form input,
-   .campo-form select {
-    max-width: 100%;
-   }
-   body {
-    overflow-y: auto !important;
-  }
-  .form {
-    padding-bottom: 85px;
-  }
 }
 
 /* Estilos para alertas personalizadas */
