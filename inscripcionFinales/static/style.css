@@ -169,13 +169,19 @@ padding: 0;
 .only-mob{
   display: none
 }
-}  
+}
 
 @media(max-width:960px){
 .only-lt{
   display: none
 }
-}  
+}
+
+@media(min-width:768px){
+.only-mob-nav{
+  display: none
+}
+}
 
 .user-dd{
 background-color: var(--color-primary);
@@ -224,10 +230,20 @@ line-height: 2.86vw;
 text-decoration: underline 2px;
 }
 
-@media(min-width:960px){
+@media(min-width:768px){
 .nav-user{
   display: none;
 }
+}
+
+.nav-user-wrap{
+display: flex;
+align-items: center;
+}
+
+.nav-user-email{
+margin-left: 0.4rem;
+color: var(--color-white);
 }
 
 
