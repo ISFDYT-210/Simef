@@ -7,3 +7,4 @@ debug.log
 gestioninstituto_models_*.png
 env/
 venv/
+.claude/
