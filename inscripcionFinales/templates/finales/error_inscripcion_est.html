@@ -1,25 +1,24 @@
 {% extends 'base/base.html' %}
-
-{% block title %}Error: Inscripcion a final{% endblock %}
-
+{% block title %}Error de inscripción{% endblock %}
 {% block content %}
-{%if user.is_authenticated and not user.is_staff%}
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Error: Inscripcion a final</title>
-</head>
-<body>
-    <h1>Error al inscribirse a la mesa</h1>
-    <p class="fs-3">¡Ya estas inscripto a esta mesa! Si queres anular la inscripcion, comunicate con administración.</p>
-</body>
-</html>
-{% else %}
-
-<div class="text-center">
-    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+{% if user.is_authenticated and not user.is_staff %}
+<div class="grid min-h-[60vh] place-items-center px-4">
+  <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center">
+    <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-red-50 text-red-500">
+      <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v5m0 3h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+    </div>
+    <h2 class="mt-4 text-lg font-bold text-tinta-900">Error al inscribirse</h2>
+    <div class="mt-2 text-sm leading-relaxed text-slate-600">¡Ya estás inscripto en esta mesa! Si querés anular la inscripción, comunicate con administración.</div>
+      <a href="{% url 'inicio' %}" class="mt-5 inline-block rounded-lg bg-tinta-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
 </div>
-
+{% else %}
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

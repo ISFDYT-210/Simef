@@ -226,16 +226,16 @@ Sistema Educativo
                 fail_silently=False,
             )
             
-            print(f"✅ Credenciales enviadas exitosamente a {usuario.email}")
-            print(f"   📧 Email: {usuario.email}")
-            print(f"   🔑 Password: {password}")
+            print(f"[OK] Credenciales enviadas exitosamente a {usuario.email}")
+            print(f"   [EMAIL] Email: {usuario.email}")
+            print(f"   [PASS] Password: {password}")
             return True
             
         except Exception as e:
-            print(f"❌ Error enviando email a {usuario.email}: {str(e)}")
+            print(f"[ERROR] Error enviando email a {usuario.email}: {str(e)}")
             # Mostrar las credenciales en consola como fallback
-            print(f"   📧 Email: {usuario.email}")
-            print(f"   🔑 Password: {password}")
+            print(f"   [EMAIL] Email: {usuario.email}")
+            print(f"   [PASS] Password: {password}")
             return False
 
     def save(self, commit=True):
