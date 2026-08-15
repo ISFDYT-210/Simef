@@ -1,0 +1,248 @@
+{% extends 'base/base.html' %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/registration/list_user.html (reemplaza al actual)
+
+  Migrado a Tailwind + Alpine (sin jQuery ni Bootstrap JS). Se conservan:
+  búsqueda por DNI (redirige a show_user), selección múltiple con confirmación,
+  aviso de "reportes solo para estudiantes", y paginación cliente de a 10.
+  Nota: en el original los modales estaban dentro del {% templatetag openblock %} for {% templatetag closeblock %} y se duplicaban por
+  cada fila; acá quedan como modales únicos fuera de la tabla.
+{% endcomment %}
+
+{% block title %}Registro de usuarios{% endblock %}
+{% block encabezado %}Registro de usuarios{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+
+<div x-data="listaUsuarios()">
+
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+
+    <!-- Encabezado + acciones -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+      <div>
+        <h2 class="text-sm font-semibold text-tinta-900">Usuarios registrados</h2>
+        <p class="text-xs text-slate-500"><span x-text="seleccionados().length"></span> seleccionado(s)</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="flex items-center">
+          <input type="text" x-model="dni" @keydown.enter.prevent="buscarPorDni()" placeholder="Buscar por DNI"
+                 class="rounded-l-lg border border-r-0 border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+          <button @click="buscarPorDni()" title="Buscar"
+                  class="grid h-[34px] w-10 place-items-center rounded-r-lg bg-celeste-600 text-white hover:bg-celeste-500">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z"/></svg>
+          </button>
+        </div>
+
+        <button @click="pedirEliminar()" title="Eliminar seleccionados"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg>
+          Eliminar
+        </button>
+      </div>
+    </div>
+
+    <!-- Avisos de búsqueda -->
+    <div x-show="avisoDni" x-cloak class="border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-800">
+      Debés ingresar un DNI para hacer la búsqueda.
+    </div>
+    <div x-show="errorDni" x-cloak class="border-b border-red-200 bg-red-50 px-5 py-2 text-sm text-red-800">
+      DNI no registrado.
+    </div>
+
+    <!-- Tabla -->
+    <form id="formEliminarTodo" method="post" action="{% url 'eliminar_usuarios_seleccionados' %}" x-ref="formEliminar">
+      {% csrf_token %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+              <th class="px-5 py-3">
+                <input type="checkbox" @change="toggleTodos($event)" x-ref="checkTodos"
+                       title="Seleccionar todo"
+                       class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+              </th>
+              <th class="px-5 py-3 font-semibold">Email</th>
+              <th class="px-5 py-3 font-semibold">Nombre completo</th>
+              <th class="px-5 py-3 font-semibold">DNI</th>
+              <th class="px-5 py-3 font-semibold">Rol</th>
+              <th class="px-5 py-3 font-semibold text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for usuarios in object_list %}
+            <tr class="fila-usuario hover:bg-slate-50"
+                data-dni="{{ usuarios.dni }}" data-id="{{ usuarios.id }}"
+                x-show="filaVisible($el)">
+              <td class="px-5 py-3">
+                <input type="checkbox" name="usuarios_ids" value="{{ usuarios.id }}"
+                       @change="sincronizar()"
+                       class="usuario-check h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+              </td>
+              <td class="px-5 py-3 font-medium text-tinta-900">{{ usuarios.email|default:"—" }}</td>
+              <td class="px-5 py-3">{{ usuarios.nombre_completo|default:"—" }}</td>
+              <td class="px-5 py-3">{{ usuarios.dni|default:"—" }}</td>
+              <td class="px-5 py-3">
+                <span class="rounded-full bg-tinta-50 px-2.5 py-1 text-xs font-semibold text-tinta-700">{{ usuarios.get_rol_display }}</span>
+              </td>
+              <td class="px-5 py-3">
+                <div class="flex items-center justify-end gap-2">
+                  <a href="/show_user/{{ usuarios.id }}" title="Ver"
+                     class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </a>
+                  <a href="/edit_user/{{ usuarios.id }}" title="Editar"
+                     class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg>
+                  </a>
+                  {% if usuarios.rol == 'Estudiante' %}
+                  <a href="/reporte_html/{{ usuarios.id }}" title="Ver reporte"
+                     class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
+                  </a>
+                  {% else %}
+                  <button type="button" @click="avisoReporte('{{ usuarios.get_rol_display }}')"
+                          title="Reportes solo disponibles para estudiantes"
+                          class="grid h-8 w-8 place-items-center rounded-lg bg-slate-200 text-slate-400 hover:bg-slate-300">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+
+    <!-- Estado vacío al filtrar -->
+    <div x-show="totalVisibles() === 0" class="px-5 py-16 text-center">
+      <p class="text-sm font-medium text-tinta-900">No hay usuarios para mostrar</p>
+    </div>
+
+    <!-- Paginación cliente -->
+    <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm" x-show="totalPaginas() > 1">
+      <p class="text-slate-500">Página <span x-text="pagina"></span> de <span x-text="totalPaginas()"></span></p>
+      <div class="flex gap-1">
+        <button @click="pagina = Math.max(1, pagina - 1)" :disabled="pagina === 1"
+                class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
+        <button @click="pagina = Math.min(totalPaginas(), pagina + 1)" :disabled="pagina === totalPaginas()"
+                class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal confirmar eliminación ══ -->
+  <div x-show="modalEliminar" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modalEliminar = false" x-transition.opacity>
+    <div class="w-full max-w-md rounded-2xl bg-white shadow-xl" @keydown.escape.window="modalEliminar = false">
+      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <h3 class="text-sm font-semibold text-tinta-900">Advertencia</h3>
+        <button @click="modalEliminar = false" class="text-slate-400 hover:text-slate-600" aria-label="Cerrar">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="px-5 py-6 text-center text-sm text-slate-700" x-text="mensajeEliminar"></p>
+      <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <button @click="modalEliminar = false" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button @click="$refs.formEliminar.submit()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal "seleccioná al menos uno" ══ -->
+  <div x-show="modalVacio" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modalVacio = false" x-transition.opacity>
+    <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+      <h3 class="text-sm font-semibold text-tinta-900">Advertencia</h3>
+      <p class="mt-2 text-sm text-slate-600">Debés seleccionar al menos un usuario para eliminar.</p>
+      <button @click="modalVacio = false" class="mt-4 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- ══ Modal reporte no disponible ══ -->
+  <div x-show="modalReporte" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modalReporte = false" x-transition.opacity>
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
+      <div class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-500">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      </div>
+      <h3 class="mt-3 text-sm font-semibold text-tinta-900">Reporte no disponible</h3>
+      <p class="mt-2 text-sm text-slate-600">Los reportes de constancia académica solo están disponibles para usuarios con rol de <strong>Estudiante</strong>.</p>
+      <p class="mt-1 text-sm text-slate-500">Este usuario tiene el rol: <strong x-text="rolReporte"></strong></p>
+      <button @click="modalReporte = false" class="mt-4 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Entendido</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function listaUsuarios() {
+    return {
+      pagina: 1, porPagina: 10,
+      dni: '', avisoDni: false, errorDni: false,
+      modalEliminar: false, modalVacio: false, modalReporte: false,
+      mensajeEliminar: '', rolReporte: '',
+
+      filas() { return Array.from(document.querySelectorAll('.fila-usuario')); },
+      totalVisibles() { return this.filas().length; },
+      totalPaginas() { return Math.max(1, Math.ceil(this.totalVisibles() / this.porPagina)); },
+      filaVisible(el) {
+        const idx = this.filas().indexOf(el);
+        const inicio = (this.pagina - 1) * this.porPagina;
+        return idx >= inicio && idx < inicio + this.porPagina;
+      },
+
+      checks() { return Array.from(document.querySelectorAll('.usuario-check')); },
+      seleccionados() { return this.checks().filter(c => c.checked); },
+      toggleTodos(e) {
+        this.filas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina)
+          .forEach(f => { const c = f.querySelector('.usuario-check'); if (c) c.checked = e.target.checked; });
+      },
+      sincronizar() {
+        const visibles = this.filas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina);
+        const todas = visibles.every(f => f.querySelector('.usuario-check')?.checked);
+        if (this.$refs.checkTodos) this.$refs.checkTodos.checked = visibles.length > 0 && todas;
+      },
+
+      buscarPorDni() {
+        this.avisoDni = false; this.errorDni = false;
+        const valor = (this.dni || '').trim();
+        if (!valor || valor === 'None') { this.avisoDni = true; return; }
+        const fila = this.filas().find(f => (f.dataset.dni || '') === valor);
+        if (fila) { location.href = '/show_user/' + fila.dataset.id; }
+        else { this.errorDni = true; }
+      },
+
+      pedirEliminar() {
+        const sel = this.seleccionados();
+        if (sel.length === 0) { this.modalVacio = true; return; }
+        if (sel.length === 1) {
+          const nombre = sel[0].closest('tr').children[2].textContent.trim();
+          this.mensajeEliminar = `¿Está seguro que desea eliminar al usuario "${nombre}"?`;
+        } else {
+          this.mensajeEliminar = `¿Está seguro que desea eliminar a los ${sel.length} usuarios seleccionados?`;
+        }
+        this.modalEliminar = true;
+      },
+
+      avisoReporte(rol) { this.rolReporte = rol; this.modalReporte = true; },
+    };
+  }
+</script>
+
+{% else %}
+
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

@@ -1,59 +1,39 @@
 {% extends 'base/base.html' %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/index.html (reemplaza al actual)
+{% endcomment %}
 
 {% block title %}Inicio{% endblock %}
+{% block encabezado %}Inicio{% endblock %}
 
 {% block content %}
 
-<div class="index-body" >
-  {%if user.is_authenticated%}  
-  <br>
-  <div class="index-body">
-    <center style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-      <img style='height:10%;width:%' src="/static/imagenes/SIMEFN.png" >
-    </center>
+{% if user.is_authenticated %}
+<!-- Home con sesión: logo SIMEF centrado, como el original -->
+<div class="grid min-h-[65vh] place-items-center">
+  <div class="text-center">
+    <img src="/static/imagenes/SIMEFN.png" alt="SIMEF" class="mx-auto h-28 object-contain sm:h-36">
+    <p class="mt-6 text-sm text-slate-500">
+      Bienvenido, {{ user.nombre_completo|default:user.email }}. Usá el menú lateral para navegar el sistema.
+    </p>
   </div>
-
-  {%else%}
-  <br>
-  <div class="p-3 card text-white rounded" style="margin-top: 180px; background-color: #dbd8e3; font-size: 100px;   width: 986px;
-            height: 326px;"><h2 class="text-black" style="margin-top: 60px">Hola, bienvenidos!</h2>
-    <h4 class="text-black" style="margin-top: 20px">Para acceder al sistema, loguéese.<br>Si no posee usuario, póngase en contacto con el instituto<br>Muchas Gracias!</h4><img src="/static/imagenes/SIMEF.png" style="margin-left: 650px; margin-top: -220px;"></div>
-  {%endif%}
 </div>
 
-<style>
-  body {
-      overflow-y:hidden;
-    }
-    @media (max-width: 768px) {
-      h2,h4 {
-          font-size: 5vw; /* Tamaño de fuente más grande en pantallas más pequeñas */
-          margin-left: 20px;
-          margin-bottom: 30px;
-      }
-  }
-  
-  @media (max-width: 480px) {
-      h2,h4 {
-          font-size: 6vw; /* Tamaño de fuente aún más grande en pantallas muy pequeñas */
-          margin-left: 20px;
-          margin-bottom: 30px;
-      } h2, h4 {
-        text-align: center; /* Centrar el texto dentro del card */
-    }
-  
-    @media (max-width: 768px) {
-        h2, h4 {
-            font-size: 5vw; /* Tamaño de fuente más grande en pantallas más pequeñas */
-        }
-    }
-    
-    @media (max-width: 480px) {
-        h2, h4 {
-            font-size: 6vw; /* Tamaño de fuente aún más grande en pantallas muy pequeñas */
-        }
-    }
-  }
-</style>  
-{% endblock %}
+{% else %}
+<!-- Home sin sesión: mensaje de bienvenida dentro de la tarjeta -->
+<div class="text-center">
+  <img src="/static/imagenes/SIMEF.png" alt="SIMEF" class="mx-auto mb-4 h-16 object-contain">
+  <h2 class="text-xl font-bold text-tinta-900">¡Hola, bienvenidos!</h2>
+  <p class="mt-3 text-sm leading-relaxed text-slate-600">
+    Para acceder al sistema, iniciá sesión.<br>
+    Si no tenés usuario, ponete en contacto con el instituto.<br>
+    ¡Muchas gracias!
+  </p>
+  <a href="{% url 'login' %}"
+     class="mt-6 inline-block rounded-lg bg-tinta-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">
+    Iniciar sesión
+  </a>
+</div>
+{% endif %}
 
+{% endblock %}
