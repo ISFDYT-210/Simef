@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Proyecto Gestión de Inscripciones a Final - Instituto 210
 
 ## Proyecto de articulación de materias de la carrera  
@@ -418,3 +419,9 @@ py -m pip install --upgrade pip
   - configurar `DEBUG = False`,
   - definir `ALLOWED_HOSTS`,
   - utilizar un servidor como **Gunicorn** o **uWSGI** detrás de **Nginx** o **Apache**.
+=======
+# SO2026
+# SO2026
+# SO2026
+# SO2026
+>>>>>>> 551bb286b41a7af02639e5ddbe016763eb288fae
