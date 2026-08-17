@@ -2,14 +2,5 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fuente Archivo servida localmente (opcional). Si no colocás el .woff2 en
-   inscripcionFinales/static/fonts/, cae en system-ui automáticamente. */
-@font-face {
-  font-family: 'Archivo';
-  src: url('../fonts/Archivo-Variable.woff2') format('woff2');
-  font-weight: 300 800;
-  font-stretch: 62% 125%;
-  font-display: swap;
-}
 .brand-expanded { font-variation-settings: 'wdth' 125; letter-spacing: 0.14em; }
 [x-cloak] { display: none !important; }

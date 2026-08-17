@@ -9,3 +9,6 @@ env/
 venv/
 .claude/
 .env
+graft
+.ignore
+.mcp.json
