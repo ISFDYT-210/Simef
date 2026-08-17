@@ -1,0 +1,104 @@
+# .github/workflows/deploy-docker.yml
+#
+# Construye la imagen del Dockerfile, la publica en GHCR
+# (ghcr.io/isfdyt-210/simef) y opcionalmente la despliega por SSH en un VPS
+# que corra el docker-compose.yml del repo.
+#
+# Secrets opcionales para el paso de VPS (si no estan, ese paso se saltea):
+#   VPS_HOST     -> IP o dominio del servidor
+#   VPS_USER     -> usuario ssh
+#   VPS_SSH_KEY  -> clave privada dedicada a CI (generar un par nuevo,
+#                   la publica va en ~/.ssh/authorized_keys del servidor)
+#   VPS_APP_PATH -> ruta del docker-compose.yml en el servidor (ej: /opt/simef)
+
+name: Deploy Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-docker-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build y push a GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Versiona por SHA ademas de latest, para poder hacer rollback determinista
+      - name: Metadata (tags y labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=ref,event=tag
+
+      - name: Build y push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-vps:
+    name: Deploy por SSH (opcional)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+    steps:
+      - name: Deploy over SSH
+        if: env.VPS_HOST != ''
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_APP_PATH }}
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} simef:current
+            # entrypoint.sh ya corre migrate + collectstatic al levantar el contenedor
+            docker compose up -d --no-build
+            docker image prune -f
+
+      - name: Sin VPS configurado
+        if: env.VPS_HOST == ''
+        run: echo "::notice title=Deploy omitido::No hay secret VPS_HOST configurado; la imagen quedo publicada en GHCR."
