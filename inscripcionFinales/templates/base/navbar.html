@@ -1,4 +1,4 @@
-<nav class="navbar  navbar-expand-lg navbar-dark">
+<nav class="navbar navbar-expand-md navbar-dark">
   <div class="container-fluid">
     <a class="navbar-brand" href="/">
       <img class="logo-insti" src="/static/imagenes/Logo_i210_fondo_trans.png">
@@ -15,10 +15,10 @@
         {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
           <li class="nav-item">
             <div class="dropdown">
-              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownUsuarios" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
                 Usuarios
               </button>
-              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownUsuarios">
                 <li><a class="dropdown-item" href="/user_list/">Lista de usuarios</a></li>
                 <li><a class="dropdown-item" href="/create_user/">Crear nuevo usuario</a></li>
                 <li><a class="dropdown-item" href="/cargaMasivaEstudiantes/">Carga Masiva de usuario</a></li>
@@ -29,13 +29,17 @@
         {% if user.is_authenticated %}
         <li class="nav-item">
             <div class="dropdown">
-              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMaterias" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
                 Materias
               </button>
-              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
-                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMaterias">
+                {% if request.user.puede_gestionar_materias %}
                   <li><a class="dropdown-item" href="/altaMateria/">Crear materia</a></li>
+                {% endif %}
+                {% if request.user.puede_ver_materias %}
                   <li><a class="dropdown-item" href="/lista_materias_admin/">Listado de materias</a></li>
+                {% endif %}
+                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
                   <li><a class="dropdown-item" href="/inscripcionMateria/">Inscripcion a materias</a></li>
                   <li><a class="dropdown-item" href="/listaMateriasAdm/">Lista de inscripciones</a></li> 
                 {% endif %}
@@ -50,10 +54,10 @@
         {% if user.is_authenticated %}
         <li class="nav-item">
             <div class="dropdown">
-              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownFinales" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
                 Finales
               </button>
-              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownFinales">
                 {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
                   <li><a class="dropdown-item" href="/altaMesa/">Dar alta mesa de final</a></li>
                   <li><a class="dropdown-item" href="/mesas_lista/">Listado de mesas</a></li>
@@ -71,10 +75,10 @@
           {% if user.is_authenticated %}
           <li class="nav-item">
             <div class="dropdown">
-              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none" style="text-align: right">
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownInformacion" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
                 Información
               </button>
-              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
+              <ul class="dropdown-menu user-dd" aria-labelledby="dropdownInformacion">
                 <li><a class="dropdown-item" href="https://isfdyt210-bue.infd.edu.ar/sitio/carreras/">Carreras</a></li>
                 <li><a class="dropdown-item" href="https://isfdyt210-bue.infd.edu.ar/sitio/datos-institucionales/">Información</a></li>
               </ul>
@@ -108,18 +112,16 @@
           </li>
         {% else %}
           <li class="nav-item">
-            <a class="nav-link only-mob" href="{% url 'logout' %}">
+            <a class="nav-link only-mob-nav" href="{% url 'logout' %}">
               <img class="icono-nav" src="/static/imagenes/Logout.png">
               <span class="nav-user">Cerrar sesión</span>
             </a>
           </li>
+
           <li class="nav-item last-nav-item">
-            
-           <!-- Display only in mobile -->
-           <li class="nav-item only-mob">
             <div class="dropdown">
-              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownMenuButtonUser" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none; text-align: right">
-                <style> .dropdown-menu-end {--bs-dropdown-bg: #ffffff00; /* Cambia el fondo del dropdown */ background-color: #ffffff00; /* Asegúrate de que el fondo sea transparente */}</style>          
+              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
+                <span class="nav-user">{{ user.email }}</span>
                 {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
                   <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
                 {% else %}
@@ -129,58 +131,15 @@
                     <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
                   {% endif %}
                 {% endif %}
-                <span class="nav-user">{{ user.email }}</span>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButtonUser">
-                <li><a class="dropdown-item" href="/edit_user/9">Editar perfil</a></li>
+              <ul class="dropdown-menu dropdown-menu-end user-dd" aria-labelledby="dropdownUser">
+                <li><a class="dropdown-item" href="/edit_user/{{ request.user.id }}">Editar perfil</a></li>
                 <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
                 <li>
-                  <form id="logoutForm" action="/accounts/logout/" method="post">
-                    <input type="hidden" name="csrfmiddlewaretoken" value="LGAPDiVYnrqOF3v8vlxFZ5GctEygskcDGM5wQUsYaypdBrDI48VpqIVuDCkkljMs">
+                  <form id="logoutForm" action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
                     <button type="submit" class="dropdown-item">Cerrar Sesión</button>
                   </form>
-                </li>
-              </ul>
-            </div>
-          </li>
-          <li class="nav-item last-nav-item">
-
-            <!-- Display only in laptop -->
-            <div class="dropdown">
-              <table>
-                <tr>
-                  <h9 style="color:ghostwhite">{{user.email}}</h9>
-                  <button class="btn dropdown mrg-0 only-lt" type="button" data-bs-toggle="dropdown">
-                    <a class="nav-link" href="#">
-                      {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
-                      <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
-                    {% else %}
-                      {% if user.imagen %}
-                        <img class="icono-nav" src="{{ user.imagen.url }}" alt="User Image">
-                      {% else %}
-                        <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
-                      {% endif %}
-                    {% endif %}
-                    </a>
-                  </button>
-                </tr>
-                <tr>
-                  <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButton1">
-                    <li><a class="dropdown-item" href="/edit_user/{{ request.user.id }}">Editar perfil</a></li>
-                    <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
-                    <li>
-                      <form id="logoutForm" action="{% url 'logout' %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" class="dropdown-item">
-                            <p>Cerrar Sesión</p>
-                            <span class="nav-user">Cerrar sesión</span>
-                        </button>
-                      </form>
-                    </li>
-                  </ul>
-                </tr>
-                </table>
-                  </a>
                 </li>
               </ul>
             </div>
@@ -196,27 +155,38 @@
     .rotulo {
         font-size: 11px; /* Tamaño de fuente más grande en pantallas más pequeñas */
     }
-    @media (max-width: 992px) { /* Para tabletas y móviles */
-      .navbar-nav {
-        flex-direction: column; /* Cambiar a columna para dispositivos más pequeños */
-        width: 100%; /* Asegurar que ocupe todo el ancho */
-      }
-    
-      .navbar-nav .nav-link, .nav-link only-mob {
-        text-align: left; /* Alinear el texto a la izquierda */
-      }
-    
-      .dropdown-menu, .navbar-nav {
-        left: 0; /* Alinear el menú desplegable a la izquierda */
-      }
-      .last-nav-item {
-        text-align: left; /* Alinear el texto a la izquierda */
-        width: 100%; /* Asegurar que ocupe todo el ancho */
+  }
+
+  @media (max-width: 992px) { /* Para tabletas y móviles */
+    .navbar-nav {
+      flex-direction: column; /* Cambiar a columna para dispositivos más pequeños */
+      width: 100%; /* Asegurar que ocupe todo el ancho */
+    }
+
+    .navbar-nav .nav-link, .nav-link only-mob {
+      text-align: left; /* Alinear el texto a la izquierda */
+    }
+
+    .dropdown-menu, .navbar-nav {
+      left: 0; /* Alinear el menú desplegable a la izquierda */
+    }
+    .last-nav-item {
+      text-align: left; /* Alinear el texto a la izquierda */
+      width: 100%; /* Asegurar que ocupe todo el ancho */
     }
 
     .last-nav-item a {
         display: block; /* Asegura que el enlace ocupe todo el ancho */
         width: 100%; /* Asegurar que ocupe todo el ancho */
-} 
     }
+  }
+
+  #dropdownUser .nav-user {
+    display: inline;
+    margin-right: 0.5rem;
+  }
+
+  #dropdownUser .icono-nav {
+    margin: 0;
+  }
 </style>

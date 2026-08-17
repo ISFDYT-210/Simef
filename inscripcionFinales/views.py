@@ -62,6 +62,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas
 import io
 from django.utils.timezone import now
+from .permissions import capacidad_requerida, CapacidadRequeridaMixin
+from .audit import registrar_auditoria
 
 # ... aquí van tus otros imports existentes
 
@@ -86,33 +88,23 @@ class CustomLogoutView(LogoutView):
 
 
 
-class registerView(CreateView):
+class registerView(CapacidadRequeridaMixin, CreateView):
+    capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     form_class = registri_user_form
     
     def form_valid(self, form):
         usuario_email = form.cleaned_data.get('email')
-        password1 = form.cleaned_data.get('password1')
-        
-        # Crear el usuario
-        nuevo_usuario = form.save(commit=False)
-        nuevo_usuario.first_login = True
-        nuevo_usuario.save()
-        
-        # DESCOMENTA Y CORRIGE ESTA LÍNEA:
-        from django.core.mail import send_mail
-        try:
-            send_mail(
-                subject='Credenciales de acceso - Sistema Instituto',
-                message=f'Bienvenido al sistema.\n\nTus credenciales de acceso son:\n- Email: {usuario_email}\n- Contraseña temporal: {password1}\n\nPor seguridad, deberás cambiar esta contraseña en tu primer ingreso.',
-                from_email='proyec.i210@gmail.com',
-                recipient_list=[usuario_email],
-                fail_silently=False,
-            )
-            messages.success(self.request, f'Usuario creado exitosamente. Se han enviado las credenciales a {usuario_email}')
-        except Exception as e:
-            messages.warning(self.request, f'Usuario creado, pero hubo un error al enviar el email: {str(e)}')
-        
+        password_generado = form.password_generado
+
+        form.instance.first_login = True
+        form.save()  # guarda el usuario, asigna carrera y (si puede) manda el mail
+
+        messages.success(
+            self.request,
+            f'Usuario {usuario_email} creado correctamente. Contraseña: {password_generado}'
+        )
+        registrar_auditoria(self.request, f'Creó el usuario {usuario_email}', 'Usuario', form.instance.pk)
         return redirect('/user_list')
     
 
@@ -124,6 +116,11 @@ class editUser(UpdateView):
     template_name = 'registration/edit_profile.html'
     success_url = '/user_list/'  # Cambiar a lista de usuarios
     
+    def dispatch(self, request, *args, **kwargs):
+        es_perfil_propio = str(request.user.pk) == str(kwargs.get('pk'))
+        if not es_perfil_propio and not request.user.tiene_capacidad('gestionar_usuarios'):
+            return render(request, '403_forbidden.html', status=403)
+        return super().dispatch(request, *args, **kwargs)
     def form_valid(self, form):
         # Validaciones adicionales antes de guardar
         dni = form.cleaned_data.get('dni')
@@ -206,7 +203,8 @@ class profileviews(TemplateView):
     model = Usuario 
   
 
-class deleteUser(DeleteView):
+class deleteUser(CapacidadRequeridaMixin, DeleteView):
+    capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     template_name ='registration/delete_user.html'
     success_url = '/user_list'
@@ -248,7 +246,8 @@ class carreraView(CreateView):
         
         return redirect('/')
 
-class listUser(ListView):
+class listUser(CapacidadRequeridaMixin, ListView):
+    capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     template_name = 'registration/list_user.html'
     paginate_by = 20  # Agregar paginación
@@ -316,6 +315,7 @@ def lista_materias_inscriptas_adm(request):
     materias_inscriptas = usuarios_materia.objects.select_related('materia')
     return render(request, 'materias/lista_materias_inscriptas_adm.html', {'materias': materias_inscriptas})
 
+@capacidad_requerida('ver_materias')
 def lista_materias_admin(request):
     carreras = Carrera.objects.all()
     materias_all = Materia.objects.all().order_by('anio')  
@@ -343,6 +343,7 @@ def lista_materias_admin(request):
     
     return render(request, 'materias/lista_materias_admin.html', {'materias': materias, 'carreras': carreras})    
 
+@capacidad_requerida('gestionar_materias')
 def alta_materia(request):
     if request.method == 'POST':
         form = MateriaForm(request.POST)
@@ -628,6 +629,7 @@ class EstudianteDeleteView(DeleteView):
     
 
 
+@capacidad_requerida('gestionar_usuarios')
 def cargar_usuarios(request):
     if request.method == 'POST':
         formulario = ArchivoForm(request.POST, request.FILES)
@@ -946,6 +948,7 @@ def cargar_usuarios(request):
     
     return render(request, 'registration/cargar_usuarios.html', {'formulario': formulario})
 
+@capacidad_requerida('gestionar_materias')
 def alta_masiva_materia(request):
     if request.method == 'POST' and request.Files['archivo_csv']:
         archivo_csv = request.FILES['archivo_csv']
@@ -959,6 +962,7 @@ def alta_masiva_materia(request):
         return HttpResponse ('Materias importadas correctamente')
     return render(request, 'alta_masiva_materia.html') 
     
+@capacidad_requerida('gestionar_materias')
 def editar_materia(request, id):
     materia = get_object_or_404(Materia, id=id)
     if request.method == 'POST':
@@ -972,6 +976,7 @@ def editar_materia(request, id):
 
 
     
+@capacidad_requerida('gestionar_materias')
 def eliminar_materia(request, id):
     materia = get_object_or_404(Materia, pk=id)
     if request.method == 'POST':
@@ -988,101 +993,71 @@ def eliminar_mesa(request, id):
 
 def eliminar_inscripcion_final(request, id):
     final = get_object_or_404(InscripcionFinal, pk=id)
-    if request.user.id==final.usuario_id and not request.user.is_staff and not request.user.is_superuser:
-        if request.method == 'POST':
-            final.delete()
-            return redirect('exito_final_eliminado_est')
-        return render(request, 'finales/eliminar_final_est.html', {'final': final})
-    elif request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            final.delete()
-            return redirect('exito_final_eliminado_adm')
-        return render(request, 'finales/eliminar_final_est.html', {'final': final})        
-    else:
-        return render(request,'403_forbidden.html')
+    es_titular = request.user.id == final.usuario_id
+    es_admin = request.user.tiene_capacidad('gestionar_mesas')
+    if not (es_titular or es_admin):
+        return render(request, '403_forbidden.html', status=403)
+    if request.method == 'POST':
+        final.delete()
+        return redirect('exito_final_eliminado_adm' if es_admin else 'exito_final_eliminado_est')
+    return render(request, 'finales/eliminar_final_est.html', {'final': final})
 
+@capacidad_requerida('gestionar_materias')
 def eliminar_materias_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            materia_ids = request.POST.getlist('materia_ids')
-            cantidad_eliminadas = len(materia_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                Materia.objects.filter(id__in=materia_ids).delete()
-            materias = Materia.objects.all()
-            return render(request, 'materias/lista_materias_admin.html', {'materias': materias, 'cantidad_eliminadas': cantidad_eliminadas})
-        return redirect("lista_materias_admin")
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
-def abrir_materias_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            materia_ids = request.POST.getlist('materia_ids')
-            cantidad_eliminadas = len(materia_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=True)
-            return redirect(reverse_lazy('lista_materias_admin'))
-        else:
-            return redirect(reverse_lazy('lista_materias_admin'))
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
+    if request.method == 'POST':
+        materia_ids = request.POST.getlist('materia_ids')
+        cantidad_eliminadas = len(materia_ids)
+        if cantidad_eliminadas > 0:
+            Materia.objects.filter(id__in=materia_ids).delete()
+        materias = Materia.objects.all()
+        return render(request, 'materias/lista_materias_admin.html',
+                      {'materias': materias, 'cantidad_eliminadas': cantidad_eliminadas})
+    return redirect("lista_materias_admin")
 
+
+@capacidad_requerida('abrir_inscripciones')
+def abrir_materias_seleccionadas(request):
+    if request.method == 'POST':
+        materia_ids = request.POST.getlist('materia_ids')
+        if len(materia_ids) > 0:
+            Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=True)
+    return redirect(reverse_lazy('lista_materias_admin'))
+
+
+@capacidad_requerida('abrir_inscripciones')
 def cerrar_materias_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            materia_ids = request.POST.getlist('materia_ids')
-            cantidad_eliminadas = len(materia_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=False)
-            return redirect(reverse_lazy('lista_materias_admin'))
-        else:
-            return redirect(reverse_lazy('lista_materias_admin'))
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
+    if request.method == 'POST':
+        materia_ids = request.POST.getlist('materia_ids')
+        if len(materia_ids) > 0:
+            Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=False)
+    return redirect(reverse_lazy('lista_materias_admin'))
+
+
+@capacidad_requerida('gestionar_mesas')
 def eliminar_mesas_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            mesa_ids = request.POST.getlist('mesa_ids')
-            cantidad_eliminadas = len(mesa_ids)
-            if cantidad_eliminadas > 0:
-                MesaFinal.objects.filter(id__in=mesa_ids).delete()
-            mesas = MesaFinal.objects.all()
-            return redirect('/mesas_lista')
-        return redirect('/mesas_lista')
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
+    if request.method == 'POST':
+        mesa_ids = request.POST.getlist('mesa_ids')
+        if len(mesa_ids) > 0:
+            MesaFinal.objects.filter(id__in=mesa_ids).delete()
+    return redirect('/mesas_lista')
+
+
+@capacidad_requerida('gestionar_mesas')
 def abrir_mesas_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            mesa_ids = request.POST.getlist('mesa_ids')
-            cantidad_eliminadas = len(mesa_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=True)
-            mesas = MesaFinal.objects.all()
-            return redirect('/mesas_lista')
-        return redirect('/mesas_lista')
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
+    if request.method == 'POST':
+        mesa_ids = request.POST.getlist('mesa_ids')
+        if len(mesa_ids) > 0:
+            MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=True)
+    return redirect('/mesas_lista')
+
+
+@capacidad_requerida('gestionar_mesas')
 def cerrar_mesas_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            mesa_ids = request.POST.getlist('mesa_ids')
-            cantidad_eliminadas = len(mesa_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=False)
-            mesas = MesaFinal.objects.all()
-            return redirect('/mesas_lista')
-        return redirect('/mesas_lista')
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
+    if request.method == 'POST':
+        mesa_ids = request.POST.getlist('mesa_ids')
+        if len(mesa_ids) > 0:
+            MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=False)
+    return redirect('/mesas_lista')
 
 #def eliminar_inscripcion_materia(request, id):
 #    materia = get_object_or_404(usuarios_materia, pk=id)
@@ -1101,33 +1076,17 @@ def cerrar_mesas_seleccionadas(request):
     
 def eliminar_inscripcion_materia(request, id):
     materia = get_object_or_404(usuarios_materia, pk=id)
-    
-    if request.user.id == materia.usuario_id and not request.user.is_staff and not request.user.is_superuser:
-        if request.method == 'POST':
-            # Eliminar inscripciones a finales relacionadas
-            InscripcionFinal.objects.filter(
-                Q(usuario=request.user) & Q(llamado__materia=materia.materia)
-            ).delete()
-            
-            # Eliminar la inscripción a la materia
-            materia.delete()
-            return redirect('exito_materia_eliminada_est')
-        return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
-    
-    elif request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            # Eliminar inscripciones a finales relacionadas
-            InscripcionFinal.objects.filter(
-                Q(usuario=materia.usuario) & Q(llamado__materia=materia.materia)
-            ).delete()
-            
-            # Eliminar la inscripción a la materia
-            materia.delete()
-            return redirect('exito_materia_eliminada_adm')
-        return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
-    
-    else:
-        return render(request, '403_forbidden.html')
+    es_titular = request.user.id == materia.usuario_id
+    es_admin = request.user.tiene_capacidad('gestionar_materias')
+    if not (es_titular or es_admin):
+        return render(request, '403_forbidden.html', status=403)
+    if request.method == 'POST':
+        InscripcionFinal.objects.filter(
+            Q(usuario=materia.usuario) & Q(llamado__materia=materia.materia)
+        ).delete()
+        materia.delete()
+        return redirect('exito_materia_eliminada_adm' if es_admin else 'exito_materia_eliminada_est')
+    return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
 
 def exito_materia_eliminada(request):
     return render(request, 'materias/exito_materia_eliminada.html')
@@ -1144,6 +1103,7 @@ def exito_final_eliminado_est(request):
 def exito_final_eliminado_adm(request):
     return render(request, 'finales/exito_final_eliminado_adm.html')
 
+@capacidad_requerida('ver_materias')
 def ver_materias(request, id):
     materia = get_object_or_404(Materia, pk=id)
     return render(request, 'materias/ver_materia.html', {'materia': materia})
@@ -1322,9 +1282,13 @@ def inscribir_usuario(usuario, materia):
         inscripcion.Fecha_Inscripcion = timezone.now()
         inscripcion.save()
 
+@capacidad_requerida('cargar_notas')
 def cargar_nota_final(request, inscripcion_id):
     inscripcion = get_object_or_404(InscripcionFinal, id=inscripcion_id)
     usuario_materia = get_object_or_404(usuarios_materia, usuario=inscripcion.usuario, materia=inscripcion.llamado.materia)
+
+    if not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
+        return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
        form = NotaFinalForm(request.POST)
@@ -1351,8 +1315,12 @@ def cargar_nota_final(request, inscripcion_id):
     }
     return render(request, 'finales/cargar_nota.html', context)
 
-def cargar_nota_cursada(request,id):
+@capacidad_requerida('cargar_notas')
+def cargar_nota_cursada(request, id):
     usuario_materia = get_object_or_404(usuarios_materia, id=id)
+
+    if not request.user.puede_cargar_notas_de(usuario_materia.materia):
+        return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
         form = NotaCursadaForm(request.POST)
@@ -1372,8 +1340,12 @@ def cargar_nota_cursada(request,id):
     }
     return render(request, 'materias/cargar_nota.html', context)
 
+@capacidad_requerida('cargar_notas')
 def editar_notas(request, id):
     usuario_materia = get_object_or_404(usuarios_materia, id=id)
+
+    if not request.user.puede_cargar_notas_de(usuario_materia.materia):
+        return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
         form = NotaCursadaForm(request.POST, instance=usuario_materia)
@@ -1402,25 +1374,19 @@ def editar_notas(request, id):
 
 
 
-def abrir_inscripcion_materia(request,carrera,anio):
-    if request.user.is_staff or request.user.is_superuser:
-        Materia.objects.filter(carrera_id=carrera,anio=anio).update(inscripcionAbierta=True)
-        return redirect('lista_materias_admin')
-    else:
-        return render(request,"403_forbidden.html")
+@capacidad_requerida('abrir_inscripciones')
+def abrir_inscripcion_materia(request, carrera, anio):
+    Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=True)
+    return redirect('lista_materias_admin')
 
-def cerrar_inscripcion_materia(request,carrera,anio):
-    if request.user.is_staff or request.user.is_superuser:
-        Materia.objects.filter(carrera_id=carrera,anio=anio).update(InscripcionAbierta=False)
-        return redirect('lista_materias_admin')
-    else:
-        return render(request,"403_forbidden.html")
+
+@capacidad_requerida('abrir_inscripciones')
+def cerrar_inscripcion_materia(request, carrera, anio):
+    Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=False)
+    return redirect('lista_materias_admin')
     
+@capacidad_requerida('gestionar_usuarios')
 def eliminar_usuarios(request):
-    # Restricciones de acceso
-    if not (request.user.is_staff or request.user.is_superuser):
-        return render(request, '403_forbidden.html', {'error_message': "No tienes permiso para realizar esta acción."})
-    
     if request.method == 'POST':
         # Eliminar múltiples usuarios seleccionados
         usuarios_ids = request.POST.getlist('usuarios_ids')
@@ -1434,6 +1400,8 @@ def eliminar_usuarios(request):
         if len(usuarios_ids) > 0:
             try:
                 # Eliminar los usuarios seleccionados
+                emails = list(Usuario.objects.filter(id__in=usuarios_ids).values_list('email', flat=True))
+                registrar_auditoria(request, f'Eliminó usuarios: {", ".join(emails)}', 'Usuario', ",".join(usuarios_ids))
                 usuarios_eliminados = Usuario.objects.filter(id__in=usuarios_ids)
                 cantidad_eliminadas = usuarios_eliminados.count()
                 usuarios_eliminados.delete()
@@ -1445,322 +1413,6 @@ def eliminar_usuarios(request):
             messages.warning(request, 'No se seleccionaron usuarios para eliminar.')
     
     return redirect('list_user')
-    
-class CustomPasswordResetView(PasswordResetView):
-    template_name = 'password_reset_form.html'
-    email_template_name = 'password_reset_email.html'
-    success_url = reverse_lazy('recover_pass.html')
-
-class CustomPasswordResetDoneView(PasswordResetDoneView):
-    template_name = 'registration/password_reset_done.html'
-
-class CustomPasswordResetConfirmView(PasswordResetConfirmView):
-    template_name = 'password_reset_confirm.html'
-    success_url = reverse_lazy('password_reset_complete')
-
-class CustomPasswordResetCompleteView(PasswordResetCompleteView):
-    template_name = 'password_reset_complete.html'
-    
-
-def acta_volante(request, final_id):
-
-    pages = []
-    finales_inscriptos = InscripcionFinal.objects.filter(llamado=final_id).order_by('usuario__nombre_completo')
-    final = get_object_or_404(MesaFinal, id=final_id)
-    if finales_inscriptos.count()<=25:
-        context = {
-            'finales_inscriptos': finales_inscriptos,
-            'final': final,
-            'cant_inscriptos': finales_inscriptos.count(),
-            'piso':0
-        }
-        return render(request, 'finales/acta_volante.html', context)
-    else:
-        for i in range(1,ceil(finales_inscriptos.count()/25)+1):
-            inscriptos = []
-            for inscripto in range(25*(i-1),25*(i-1)+25):
-                print(inscripto)
-                try:
-                    inscriptos.append(finales_inscriptos[inscripto])
-                except:
-                    pass
-            context = {
-                'finales_inscriptos': inscriptos,
-                'final': final,
-                'cant_inscriptos': finales_inscriptos.count(),
-                'piso':25*(i-1),
-            }
-            print(f"fin {i} pagina")
-            html = render(request, 'finales/acta_volante.html', context).content.decode('utf-8')
-            pages.append({
-                'id':f'page_{i}',
-                'title':f'Acta volante {i}: {final.materia}',
-                'content':html
-            })
-        pages_json = dumps(pages)
-        return render(request, 'finales/lista_acta_volante.html', {'pages_json': pages_json})
-
-def reporte_usuario_materias(request, usuario_id):
-
-    try:
-        usuario = Usuario.objects.get(id=usuario_id)
-        print(usuario.id)
-    except Usuario.DoesNotExist:    
-        return HttpResponse("Usuario no encontrado", status=404)
-    
-    carrera = usuario.carrera 
-    # materias_de_carrera = usuarios_materia.objects.filter(carrera = usuario.carrera) #hace falta el total de materias de la carrera, no sólo las inscripciones
-    if not carrera:
-        return HttpResponse("El usuario no tiene carreras registradas", status=404)
-
-    # Aquí asumimos que solo tomamos la primera carrera, en caso que esté inscripto en más de una carrera
-    #carrera = carreras.first()
-    # Acceder al número de resolución de la carrera
-    #num_resolucion = carrera.num_resolucion if carrera else None
-
-    materias_data = usuarios_materia.objects.filter(usuario=usuario, aprobada=True).values(
-        'materia__nombre_materia', 'nota_cursada', 'nota_final', 'materia__anio'
-    )
-    #total_materias = usuarios_materia.objects.filter(carrera=carrera).count()
-    materias_aprobadas = len(materias_data)
-    #porcentaje_aprobado = (materias_aprobadas / total_materias) * 100 if total_materias > 0 else 0
-   
-    materias_por_anio = {}
-    for materia in materias_data:
-        anio = materia['materia__anio']
-        if anio not in materias_por_anio:
-            materias_por_anio[anio] = []
-        materias_por_anio[anio].append(materia)
-
-     # Obtener la fecha actual para el pie del informe
-    fecha_actual = datetime.now()
-    dia = fecha_actual.day
-    mes = fecha_actual.strftime("%B")  # Nombre del mes
-    año = fecha_actual.year
-
-    context = {
-        'usuario': usuario,
-        'materias_por_anio': materias_por_anio,
-       # 'porcentaje_aprobado': porcentaje_aprobado,
-       # 'resolucion': usuarios_carreras.num_resolucion,
-        'fecha_dia': dia,
-        'mes': mes,
-        'año': año,
-    }
-    template = loader.get_template('materias/reporte_usuario_materias.html/')
-    html = template.render(context)
-
-    # Convertir HTML a PDF utilizando WeasyPrint con estilos CSS
-    css = CSS(string='@page { size: A4; margin: 2cm }')  # Define el tamaño del papel y márgenes
-    pdf = HTML(string=html, base_url=request.build_absolute_uri()).write_pdf(stylesheets=[css])
-
-#    Generar la respuesta HTTP
-    response = HttpResponse(pdf, content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename=reporte_usuario_{usuario.nombre_completo}.pdf'
-    return response
-
-
-
-
-
-# También necesitas agregar esta función auxiliar si no existe:
-def numero_a_texto(numero):
-    """Convierte un número a texto en español"""
-    if numero == "-" or numero is None:
-        return "-"
-    
-    try:
-        num = float(numero)
-        numeros = {
-            0: "cero", 1: "uno", 2: "dos", 3: "tres", 4: "cuatro",
-            5: "cinco", 6: "seis", 7: "siete", 8: "ocho", 9: "nueve", 10: "diez"
-        }
-        return numeros.get(int(num), str(num))
-    except:
-        return str(numero)
-    
-
-def reporte_estudiante_html(request, usuario_id):
-    # Obtener el usuario
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-    hoy = timezone.now().date()
-    
-    # Obtener la carrera del usuario (primera carrera si tiene múltiples)
-    carrera = usuario.carrera.first()
-    if not carrera:
-        carrera = Carrera.objects.first()
-        if not carrera:
-            return HttpResponse("No hay carreras registradas en el sistema", status=404)
-    
-    # Contar materias aprobadas del usuario
-    materias_aprobadas = usuarios_materia.objects.filter(
-        usuario_id=usuario_id, 
-        aprobada=True
-    ).count()
-    
-    # Obtener todas las materias de la carrera del usuario
-    materias_de_carrera = Materia.objects.filter(carrera=carrera)
-    
-    # Prefetch para optimizar las consultas
-    usuarios_materia_prefetch = Prefetch(
-        'usuarios_materia_set',
-        queryset=usuarios_materia.objects.filter(usuario_id=usuario_id),
-        to_attr='usuario_materia'
-    )
-    
-    # Obtener materias por año
-    materias_primero = materias_de_carrera.filter(anio=1).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    materias_segundo = materias_de_carrera.filter(anio=2).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    materias_tercero = materias_de_carrera.filter(anio=3).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    materias_cuarto = materias_de_carrera.filter(anio=4).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    
-    # Contar total de materias
-    cant_materias = materias_de_carrera.count()
-    
-    # Función para procesar materias y sus notas
-    def procesar_materias(materias):
-        return [
-            {
-                'materia': materia,
-                'nota_final': next((um.nota_final for um in materia.usuario_materia if um.usuario_id == usuario_id), "-"),
-                'nota_texto': numero_a_texto(next((um.nota_final for um in materia.usuario_materia if um.usuario_id == usuario_id), "-"))
-            }
-            for materia in materias
-        ]
-    
-    # Procesar materias por año
-    materias_primero_con_notas = procesar_materias(materias_primero)
-    materias_segundo_con_notas = procesar_materias(materias_segundo)
-    materias_tercero_con_notas = procesar_materias(materias_tercero)
-    materias_cuarto_con_notas = procesar_materias(materias_cuarto)
-    
-    # Calcular porcentaje de avance
-    if cant_materias > 0:
-        porcentaje = round((materias_aprobadas / cant_materias) * 100, 2)
-    else:
-        porcentaje = 0
-    
-    # Obtener datos del instituto si existe
-    instituto = carrera.instituto if carrera.instituto else None
-    
-    context = {
-        'usuario': usuario,
-        'carrera': carrera,
-        'instituto': instituto,
-        'porcentaje_aprobado': porcentaje,
-        'materias_aprobadas': materias_aprobadas,
-        'total_materias': cant_materias,
-        'materias_primero': materias_primero_con_notas,
-        'materias_segundo': materias_segundo_con_notas,
-        'materias_tercero': materias_tercero_con_notas,
-        'materias_cuarto': materias_cuarto_con_notas,
-        'fecha': hoy
-    }
-    
-    return render(request, 'registration/reporte_estudiante_html.html', context)
-
-def numero_a_texto(numero):
-    """Convierte un número a texto en español para uso académico"""
-    if numero == "-" or numero is None:
-        return "-"
-    
-    try:
-        num = float(numero)
-        if num == int(num):  # Si es un entero
-            num = int(num)
-        
-        numeros = {
-            0: "cero", 1: "uno", 2: "dos", 3: "tres", 4: "cuatro",
-            5: "cinco", 6: "seis", 7: "siete", 8: "ocho", 9: "nueve", 10: "diez"
-        }
-        
-        if num in numeros:
-            return numeros[num]
-        else:
-            return str(numero)
-    except:
-        return str(numero)
-    
-
-
-def obtener_finales_estudiante(request):
-    """Vista AJAX para obtener finales disponibles para un estudiante específico"""
-    if request.method == 'GET':
-        estudiante_id = request.GET.get('estudiante_id')
-        
-        if not estudiante_id:
-            return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
-        
-        try:
-            estudiante = get_object_or_404(Usuario, id=estudiante_id)
-            
-            # Verificar que sea estudiante
-            if estudiante.rol != 'Estudiante':
-                return JsonResponse({'status': 'error', 'message': 'El usuario no es un estudiante'})
-            
-            finales_disponibles = []
-            
-            # Obtener todas las materias en las que está inscripto el estudiante
-            materias_estudiante = usuarios_materia.objects.filter(
-                usuario=estudiante,
-                aprobada=False  # No ha aprobado aún
-            ).select_related('materia')
-            
-            for inscripcion_materia in materias_estudiante:
-                # Verificar requisitos:
-                # 1. Nota de cursada >= 7 O modalidad libre
-                cumple_nota = (
-                    inscripcion_materia.modalidad == 'Libre' or 
-                    (inscripcion_materia.nota_cursada is not None and inscripcion_materia.nota_cursada >= 7)
-                )
-                
-                # 2. No tener nota final aprobada
-                sin_final_aprobado = (
-                    inscripcion_materia.nota_final is None or 
-                    inscripcion_materia.nota_final < 4
-                )
-                
-                # 3. Validar correlativas
-                cumple_correlativas = validar_inscripcion_final(estudiante_id, inscripcion_materia.materia.id)
-                
-                # 4. No estar ya inscripto en una mesa final de esta materia
-                ya_inscripto = InscripcionFinal.objects.filter(
-                    usuario=estudiante,
-                    llamado__materia=inscripcion_materia.materia
-                ).exists()
-                
-                if cumple_nota and sin_final_aprobado and cumple_correlativas and not ya_inscripto:
-                    # Buscar mesas finales abiertas para esta materia
-                    mesas_disponibles = MesaFinal.objects.filter(
-                        materia=inscripcion_materia.materia,
-                        inscripcionAbierta=True,
-                        vigente=True,
-                        llamado__gt=timezone.now()  # Fecha futura
-                    ).order_by('llamado')
-                    
-                    for mesa in mesas_disponibles:
-                        finales_disponibles.append({
-                            'id': mesa.id,
-                            'materia': mesa.materia.nombre_materia,
-                            'fecha_llamado': mesa.llamado.strftime('%d/%m/%Y %H:%M'),
-                            'nota_cursada': inscripcion_materia.nota_cursada or 'Libre',
-                            'modalidad': inscripcion_materia.modalidad or 'Regular'
-                        })
-            
-            return JsonResponse({
-                'status': 'success',
-                'finales': finales_disponibles
-            })
-            
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'Error al obtener finales: {str(e)}'
-            })
-    
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'})
-
-
 @csrf_exempt  # TEMPORAL - solo para debugging
 def inscribir_final(request):
     """Vista AJAX para realizar la inscripción al final"""
@@ -1935,6 +1587,7 @@ class FirstLoginPasswordChangeView(FormView):
 def first_login_password_change_done(request):
     return render(request, 'registration/first_login_success.html')
 
+@capacidad_requerida('ver_reportes')
 def imprimir_mesas_finales_pdf(request):
     """
     Genera un PDF con el listado de mesas de finales vigentes
@@ -2183,6 +1836,8 @@ def reporte_estudiante_descarga(request, usuario_id):
     usando una API externa
     """
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not request.user.is_authenticated or not request.user.puede_ver_reporte_de(usuario):
+        return render(request, '403_forbidden.html', status=403)
     
     if not usuario.es_estudiante():
         return HttpResponse("Este reporte solo está disponible para estudiantes", status=403)
@@ -2339,12 +1994,31 @@ def obtener_contexto_reporte(usuario):
     }
 
 
+
+# ========== RECUPERACIÓN DE CONTRASEÑA ==========
+class CustomPasswordResetView(PasswordResetView):
+    template_name = 'registration/password_reset_form.html'
+    email_template_name = 'registration/password_reset_email.html'
+    success_url = reverse_lazy('password_reset_done')
+
+class CustomPasswordResetDoneView(PasswordResetDoneView):
+    template_name = 'registration/password_reset_done.html'
+
+class CustomPasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = 'registration/password_reset_confirm.html'
+    success_url = reverse_lazy('password_reset_complete')
+
+class CustomPasswordResetCompleteView(PasswordResetCompleteView):
+    template_name = 'registration/password_reset_complete.html'
+
 @login_required
 def reporte_estudiante_html(request, usuario_id):
     """
     Vista HTML del reporte para previsualización
     """
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not request.user.is_authenticated or not request.user.puede_ver_reporte_de(usuario):
+        return render(request, '403_forbidden.html', status=403)
     
     if not usuario.es_estudiante():
         return HttpResponse("Este reporte solo está disponible para estudiantes", status=403)
@@ -2352,3 +2026,80 @@ def reporte_estudiante_html(request, usuario_id):
     context = obtener_contexto_reporte(usuario)
     
     return render(request, 'reportes/constancia_estudiante.html', context)
+def obtener_finales_estudiante(request):
+    """Vista AJAX para obtener finales disponibles para un estudiante específico"""
+    if request.method == 'GET':
+        estudiante_id = request.GET.get('estudiante_id')
+        
+        if not estudiante_id:
+            return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
+        
+        try:
+            estudiante = get_object_or_404(Usuario, id=estudiante_id)
+            
+            # Verificar que sea estudiante
+            if estudiante.rol != 'Estudiante':
+                return JsonResponse({'status': 'error', 'message': 'El usuario no es un estudiante'})
+            
+            finales_disponibles = []
+            
+            # Obtener todas las materias en las que está inscripto el estudiante
+            materias_estudiante = usuarios_materia.objects.filter(
+                usuario=estudiante,
+                aprobada=False  # No ha aprobado aún
+            ).select_related('materia')
+            
+            for inscripcion_materia in materias_estudiante:
+                # Verificar requisitos:
+                # 1. Nota de cursada >= 7 O modalidad libre
+                cumple_nota = (
+                    inscripcion_materia.modalidad == 'Libre' or 
+                    (inscripcion_materia.nota_cursada is not None and inscripcion_materia.nota_cursada >= 7)
+                )
+                
+                # 2. No tener nota final aprobada
+                sin_final_aprobado = (
+                    inscripcion_materia.nota_final is None or 
+                    inscripcion_materia.nota_final < 4
+                )
+                
+                # 3. Validar correlativas
+                cumple_correlativas = validar_inscripcion_final(estudiante_id, inscripcion_materia.materia.id)
+                
+                # 4. No estar ya inscripto en una mesa final de esta materia
+                ya_inscripto = InscripcionFinal.objects.filter(
+                    usuario=estudiante,
+                    llamado__materia=inscripcion_materia.materia
+                ).exists()
+                
+                if cumple_nota and sin_final_aprobado and cumple_correlativas and not ya_inscripto:
+                    # Buscar mesas finales abiertas para esta materia
+                    mesas_disponibles = MesaFinal.objects.filter(
+                        materia=inscripcion_materia.materia,
+                        inscripcionAbierta=True,
+                        vigente=True,
+                        llamado__gt=timezone.now()  # Fecha futura
+                    ).order_by('llamado')
+                    
+                    for mesa in mesas_disponibles:
+                        finales_disponibles.append({
+                            'id': mesa.id,
+                            'materia': mesa.materia.nombre_materia,
+                            'fecha_llamado': mesa.llamado.strftime('%d/%m/%Y %H:%M'),
+                            'nota_cursada': inscripcion_materia.nota_cursada or 'Libre',
+                            'modalidad': inscripcion_materia.modalidad or 'Regular'
+                        })
+            
+            return JsonResponse({
+                'status': 'success',
+                'finales': finales_disponibles
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Error al obtener finales: {str(e)}'
+            })
+    
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'})
+

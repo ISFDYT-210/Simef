@@ -16,19 +16,19 @@
     </div>
 
     <div class="card" style="margin-top: 0px;">
-      <div class="card-header rounded-top" style="background-color: #3A4481; color: #ffffff;">
+      <div class="card-header rounded-top card-headers">
         <h3 style="text-align: center">Registro de Usuarios</h3>
     </div>
-    
-        
+
+
         <div class="card-body">
           <div class="table-responsive">
             <div class="d-flex align-items-center mb-2">
-              <a href="#" id="eliminarSeleccionados" style="width: 40px;" class="btn btn-danger me-3"><i class="fas fa-trash-alt"></i></a>
+              <a href="#" id="eliminarSeleccionados" style="width: 40px;" class="btn btn-danger btn-action me-3"><i class="fas fa-trash-alt"></i></a>
               <div class="ms-auto">
                   <form class="d-flex" role="search">
-                      <input class="form-control me-2" type="text" style="width: 150px; margin-top: 0;" placeholder="DNI" id="busquedaDni" aria-label="Buscar">
-                      <a class="btn btn-primary" id="buscar" onclick="busqueda()" style="margin-top: 0;"><img src="/static/imagenes/Lupita.png" height="20px" width="20px"></a>
+                      <input class="form-control me-2 busqueda-input" type="text" placeholder="DNI" id="busquedaDni" aria-label="Buscar">
+                      <a class="btn btn-primary btn-action" id="buscar" onclick="busqueda()"><img src="/static/imagenes/Lupita.png" height="20px" width="20px"></a>
                   </form>
               </div>
           </div>
@@ -56,14 +56,14 @@
                         <td class="h6">{{usuarios.dni}}</td>
                         <td class="h6">{{usuarios.get_rol_display}}</td>
                         <td>
-                          <a title= "Ver" class="btn btn-primary" href="/show_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/view.png" height="20px" width="20px"></img></a>
-                          <a title= "Editar" class="btn btn-primary" href="/edit_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a> 
-                          
+                          <a title= "Ver" class="btn btn-primary btn-action" href="/show_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/view.png" height="20px" width="20px"></img></a>
+                          <a title= "Editar" class="btn btn-primary btn-action" href="/edit_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a>
+
                           <!-- CONDICIÓN PARA MOSTRAR REPORTE SOLO A ESTUDIANTES -->
                           {% if usuarios.rol == 'Estudiante' %}
-                            <a title="Ver Reporte" class="btn btn-primary" href="/reporte_html/{{ usuarios.id }}" role="button"><img src="/static/imagenes/imprimir.png" height="20px" width="20px"></img></a>
+                            <a title="Ver Reporte" class="btn btn-primary btn-action" href="/reporte_html/{{ usuarios.id }}" role="button"><img src="/static/imagenes/imprimir.png" height="20px" width="20px"></img></a>
                           {% else %}
-                            <a title="Reportes solo disponibles para estudiantes" class="btn btn-secondary" onclick="mostrarAlertaReporte('{{ usuarios.get_rol_display }}')" style="cursor: pointer;">
+                            <a title="Reportes solo disponibles para estudiantes" class="btn btn-secondary btn-action" onclick="mostrarAlertaReporte('{{ usuarios.get_rol_display }}')" style="cursor: pointer;">
                               <img src="/static/imagenes/imprimir.png" height="20px" width="20px" style="opacity: 0.5;"></img>
                             </a>
                           {% endif %}

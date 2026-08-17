@@ -132,6 +132,18 @@ class registri_user_form(UserCreationForm):
     cargo = forms.CharField(max_length=100, required=False)
     area = forms.CharField(max_length=100, required=False)
 
+    # Contraseña opcional: si se deja vacía, se genera una automáticamente
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=True, attrs={
+            'class': 'form-control',
+            'style': 'width:100%; padding:6px; box-sizing:border-box;',
+            'placeholder': 'Dejar vacío para generar automáticamente'
+        }),
+        label="Contraseña",
+        help_text="Opcional. Si la dejás vacía, se genera una automáticamente."
+    )
+
     class Meta:
         model = Usuario
         fields = [
@@ -149,12 +161,26 @@ class registri_user_form(UserCreationForm):
             allowed_chars='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
         )
 
+        # Estilo del selector de rol (para que se vea la caja)
+        if 'rol' in self.fields:
+            self.fields['rol'].widget.attrs.update({
+                'class': 'form-control',
+                'style': 'width:100%; padding:6px; box-sizing:border-box;'
+            })
+
     def clean(self):
         cleaned_data = super().clean()
-        # Usar el password generado
-        cleaned_data['password1'] = self.password_generado
-        cleaned_data['password2'] = self.password_generado
+        # Si el admin escribió una contraseña, se usa esa; si no, la autogenerada
+        password_elegido = cleaned_data.get('password')
+        if password_elegido:
+            self.password_generado = password_elegido
+        # NO tocamos password1/password2 (no existen en este form)
         return cleaned_data
+
+    def _post_clean(self):
+        # Evitamos la validación de password1/password2 de UserCreationForm,
+        # porque este formulario usa un solo campo 'password'.
+        super(forms.ModelForm, self)._post_clean()
 
     def enviar_credenciales_email(self, usuario, password):
         """Envía las credenciales por email al usuario registrado"""
@@ -213,15 +239,11 @@ Sistema Educativo
             return False
 
     def save(self, commit=True):
-        usuario = super().save(commit=False)
-        rol = self.cleaned_data.get('rol', '').lower()
-        
-        # 🔑 CAMBIO PRINCIPAL: Usar el password generado, no el DNI
-        print(f"DNI del usuario: {usuario.dni}")
-        print(f"Password generado: {self.password_generado}")
-        usuario.set_password(self.password_generado)  # ← Usar password generado
-        
-        # Asignar todos los campos adicionales
+        # Creamos el Usuario directamente, sin el save() de UserCreationForm
+        # (que espera password1/password2, campos que este formulario no tiene).
+        usuario = forms.ModelForm.save(self, commit=False)
+        usuario.set_password(self.password_generado)
+
         usuario.username = self.cleaned_data.get('username', '')
         usuario.fecha_nac = self.cleaned_data.get('fecha_nac')
         usuario.direccion = self.cleaned_data.get('direccion', '')
@@ -232,100 +254,16 @@ Sistema Educativo
         usuario.telefono_2 = self.cleaned_data.get('telefono_2', '')
         usuario.estado_civil = self.cleaned_data.get('estado_civil', '')
         usuario.sexo = self.cleaned_data.get('sexo', '')
-        
-        if rol == 'estudiante':
-            estudiante = Estudiante.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                matricula=get_random_string(length=8, allowed_chars='0123456789')
-            )
-            estudiante.set_password(self.password_generado)  # ← También para estudiante
-            if self.cleaned_data.get('carrera'):
-                estudiante.carrera.set([self.cleaned_data['carrera']])
-            usuario = estudiante
-            
-        elif rol == 'profesor':
-            usuario = Profesor.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                especialidad=self.cleaned_data.get('especialidad', '')
-            )
-            usuario.set_password(self.password_generado)  # ← También para profesor
-            
-        elif rol == 'directivo':
-            usuario = Directivo.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                cargo=self.cleaned_data.get('cargo', '')
-            )
-            usuario.set_password(self.password_generado)  # ← También para directivo
-            
-        elif rol == 'preceptor':
-            usuario = Preceptor.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                area=self.cleaned_data.get('area', '')
-            )
-            usuario.set_password(self.password_generado)  # ← También para preceptor
 
-        usuario.save()
-        
-        # 📧 Enviar email con las credenciales después de guardar
         if commit:
+            usuario.save()
+            if self.cleaned_data.get('carrera'):
+                usuario.carrera.set([self.cleaned_data['carrera']])
             self.enviar_credenciales_email(usuario, self.password_generado)
-        
+
         return usuario
 
 
-# Tu formulario de perfil se mantiene igual
 class profile_students_form(forms.ModelForm):   
     class Meta:
         model = Usuario
