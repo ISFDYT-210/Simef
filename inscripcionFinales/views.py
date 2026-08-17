@@ -1583,13 +1583,6 @@ def first_login_password_change_done(request):
     return render(request, 'registration/first_login_success.html')
 
 @capacidad_requerida('ver_reportes')
-# ══════════════════════════════════════════════════════════════
-# REEMPLAZA la función imprimir_mesas_finales_pdf existente en
-# inscripcionFinales/views.py (arranca cerca de la línea 1591).
-# Solo cambian colores (paleta SIMEF) + la línea del instituto.
-# La lógica es idéntica a la tuya.
-# ══════════════════════════════════════════════════════════════
-
 def imprimir_mesas_finales_pdf(request):
     """
     Genera un PDF con el listado de mesas de finales vigentes
