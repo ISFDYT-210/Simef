@@ -3,31 +3,175 @@ name: CI - SIMEF
 
 on:
   push:
-    branches: [develop, main]
+    branches: [main, develop, testing]
   pull_request:
-    branches: [develop]
+    branches: [main, develop]
+
+# Cancela runs viejos del mismo branch/PR para no gastar minutos en builds obsoletos
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.11' # misma version que el Dockerfile
 
 jobs:
-  test:
+  lint:
+    name: Lint (flake8)
     runs-on: ubuntu-latest
-
-    env:
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
-      DEBUG: "False"
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar flake8
+        run: pip install flake8==7.1.1
+
+      - name: Errores de sintaxis y nombres indefinidos (bloqueante)
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Reporte de estilo completo (informativo)
+        run: flake8 . --count --exit-zero --max-complexity=12 --max-line-length=120 --statistics
+
+  test:
+    name: Tests (Django + PostgreSQL)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    # Misma base de datos que docker-compose.yml para no testear sobre sqlite
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: simef
+          POSTGRES_USER: simef
+          POSTGRES_PASSWORD: simef
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U simef -d simef"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Valores de prueba: el CI no necesita los secrets reales de produccion
+      SECRET_KEY: django-insecure-ci-only-key-not-for-production
+      DEBUG: 'False'
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      DATABASE_URL: postgres://simef:simef@localhost:5432/simef
+      EMAIL_HOST_USER: ci@example.com
+      EMAIL_HOST_PASSWORD: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Instalar dependencias
         run: |
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
 
-      - name: Correr tests
+      - name: Verificar el proyecto (django check)
+        run: python manage.py check
+
+      - name: Verificar que no falten migraciones
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Aplicar migraciones
+        run: python manage.py migrate --noinput
+
+      - name: Correr tests con coverage
         run: |
-          python manage.py test
+          set -o pipefail
+          coverage run manage.py test --verbosity=2 2>&1 | tee test-output.txt
+          coverage report
+          coverage xml
+
+      # La suite todavia esta vacia: sin este aviso el CI queda "verde" sin
+      # haber probado nada. Borrar este paso cuando haya tests reales.
+      - name: Avisar si no se ejecuto ningun test
+        if: always()
+        run: |
+          if [ -f test-output.txt ] && grep -qE "NO TESTS RAN|Ran 0 tests" test-output.txt; then
+            echo "::warning title=Sin tests::El CI corrio pero no encontro ningun test (inscripcionFinales/tests/ esta vacio)."
+          fi
+
+      - name: Subir reporte de coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Collectstatic (whitenoise / manifest)
+        run: python manage.py collectstatic --noinput
+
+  security-check:
+    name: Django deployment checklist
+    runs-on: ubuntu-latest
+    needs: lint
+    # Falla solo ante ERRORES de configuracion; las WARNINGS (HSTS, SSL redirect,
+    # cookies seguras) quedan visibles en el log como deuda pendiente.
+    env:
+      SECRET_KEY: django-insecure-ci-only-key-not-for-production
+      DEBUG: 'False'
+      ALLOWED_HOSTS: localhost,127.0.0.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: manage.py check --deploy
+        run: python manage.py check --deploy
+
+  docker-build:
+    name: Build imagen Docker
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (sin push, solo validar el Dockerfile)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: simef:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
