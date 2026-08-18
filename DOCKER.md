@@ -12,6 +12,72 @@ Postgres ni nada más que Docker.
   (se prueba con `docker compose version`; si da error, instalar `docker-compose-plugin`).
 - Haber clonado el repo y estar parado en su raíz.
 
+### Instalar Docker
+
+**Ubuntu / Debian**
+
+```bash
+# Quitar versiones viejas si existieran
+sudo apt-get remove docker docker-engine docker.io containerd runc
+
+# Instalar dependencias y el repo oficial de Docker
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Instalar Docker Engine + plugin de Compose
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# (opcional) usar docker sin sudo
+sudo usermod -aG docker $USER
+```
+
+Después de agregarte al grupo `docker`, cerrá sesión y volvé a entrar (o corré
+`newgrp docker`) para que tome efecto.
+
+**Fedora / RHEL / CentOS**
+
+```bash
+sudo dnf -y install dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
+
+**macOS**
+
+```bash
+brew install --cask docker
+```
+
+Abrí la app Docker Desktop una vez para que termine de inicializarse (incluye
+Docker Compose, no hace falta instalarlo aparte).
+
+**Windows**
+
+Instalar [Docker Desktop](https://docs.docker.com/desktop/install/windows-install/)
+(requiere WSL2). También se puede instalar con `winget`:
+
+```powershell
+winget install Docker.DockerDesktop
+```
+
+**Verificar la instalación** (en cualquier plataforma):
+
+```bash
+docker --version
+docker compose version
+```
+
 ## 2. Configurar las variables de entorno
 
 Docker Compose lee las variables desde un archivo `.env` en la raíz del repo
