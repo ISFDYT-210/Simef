@@ -14,7 +14,7 @@ Postgres ni nada más que Docker.
 
 ### Instalar Docker
 
-**Ubuntu / Debian**
+**Ubuntu**
 
 ```bash
 # Quitar versiones viejas si existieran
@@ -40,8 +40,43 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plu
 sudo usermod -aG docker $USER
 ```
 
-Después de agregarte al grupo `docker`, cerrá sesión y volvé a entrar (o corré
-`newgrp docker`) para que tome efecto.
+**Debian** (incluye Debian 13 "trixie")
+
+Usar el repo de Ubuntu en Debian falla (404) porque el código de la distro
+(`$VERSION_CODENAME`) no existe ahí. Hay que apuntar al repo propio de Debian:
+
+```bash
+# Quitar versiones viejas si existieran
+sudo apt-get remove docker docker-engine docker.io containerd runc
+
+# Instalar dependencias y el repo oficial de Docker
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Instalar Docker Engine + plugin de Compose
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# (opcional) usar docker sin sudo
+sudo usermod -aG docker $USER
+```
+
+> Si el `apt-get update` falla con un 404 porque el repo de Docker todavía no
+> publicó paquetes para `trixie`, forzá el código de la versión estable
+> anterior editando `/etc/apt/sources.list.d/docker.list` y reemplazando
+> `trixie` por `bookworm` (funciona igual, son binarios compatibles), luego
+> repetí `sudo apt-get update`.
+
+Después de agregarte al grupo `docker` (en cualquiera de los dos casos),
+cerrá sesión y volvé a entrar (o corré `newgrp docker`) para que tome efecto.
 
 **Fedora / RHEL / CentOS**
 
