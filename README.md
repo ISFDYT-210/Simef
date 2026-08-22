@@ -1,6 +1,6 @@
 # Proyecto Gestión de Inscripciones a Final - Instituto 210
 
-## Proyecto de articulación de materias de la carrera  
+## Proyecto de articulación de materias de la carrera
 **Tecnicatura Superior en Análisis de Sistemas**
 
 ---
@@ -13,144 +13,44 @@ Su objetivo es facilitar la administración de inscripciones, el acceso de usuar
 
 ---
 
-## Requisitos previos
+## Quick start (Docker, recomendado)
 
-Antes de comenzar, asegurate de tener instalado en tu sistema:
-
-- Python 3
-- `pip`
-- `venv`
-- Git
-
-En GNU/Linux Debian podés instalarlos con:
+La forma más rápida de levantar el proyecto es con Docker: no requiere
+instalar Python ni Postgres en tu máquina.
 
 ```bash
-sudo apt update
-sudo apt install -y git python3 python3-pip python3-venv
+cp .env.example .env      # completar con tus datos, ver ENV.md
+docker compose up -d --build
 ```
+
+La app queda en **http://localhost:8000**. Guía completa paso a paso en
+[DOCKER.md](DOCKER.md).
 
 ---
 
-## Instalación en GNU/Linux Debian
+## Documentación
 
-### 1. Clonar el repositorio
-
-Podés clonar el proyecto usando **SSH** o **HTTPS**.
-
-#### Usando SSH
-
-```bash
-git clone git@github.com:ISFDYT-210/Simef.git
-```
-
-#### Usando HTTPS
-
-```bash
-git clone https://github.com/ISFDYT-210/Simef.git
-```
-
----
-
-### 2. Ingresar al directorio del proyecto
-
-```bash
-cd Simef
-```
-
----
-
-### 3. Crear el entorno virtual
-
-```bash
-python3 -m venv env
-```
-
----
-
-### 4. Activar el entorno virtual
-
-```bash
-source env/bin/activate
-```
-
----
-
-### 5. Instalar las dependencias
-
-```bash
-pip3 install -r requirements.txt
-```
-
----
-
-### 6. Configurar el archivo de settings
-
-Ingresar a la carpeta principal del proyecto Django:
-
-```bash
-cd gestionInstituto
-```
-
-Copiar el archivo de configuración de desarrollo:
-
-```bash
-cp settings_DEV.py settings.py
-```
-
----
-
-### 7. Ejecutar las migraciones
-
-```bash
-cd ..
-python manage.py migrate
-```
-
----
-
-### 8. Crear un usuario administrador
-
-Para acceder al panel de administración (*backoffice*), es necesario crear un usuario con permisos de superusuario:
-
-```bash
-python manage.py createsuperuser
-```
-
----
-
-### 9. Ejecutar el servidor de desarrollo
-
-```bash
-python manage.py runserver
-```
+| Documento | Contenido |
+|---|---|
+| [DOCKER.md](DOCKER.md) | Levantar el proyecto completo (Django + Postgres) con Docker Compose. |
+| [ENV.md](ENV.md) | Qué es cada variable de `.env.example` y cómo armar tu `.env`. |
+| [INSTALACION_MANUAL.md](INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
+| [DESPLIEGUE.md](DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + MariaDB) en Debian. |
+| [README-tailwind.md](README-tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
 
 ---
 
 ## Acceso al sistema
 
-### Panel de administración (Backoffice)
+Una vez levantado el servidor (por cualquiera de los métodos de arriba):
 
-Una vez iniciado el servidor, podés acceder al panel de administración desde:
-
-```text
-http://127.0.0.1:8000/admin
-```
-
----
-
-### Pantalla de login
-
-Para ingresar al sistema desde el navegador:
-
-```text
-http://127.0.0.1:8000/
-```
-
----
+- Panel de administración (backoffice): `/admin/`
+- Pantalla de login: `/`
 
 ## Redirección luego del login
 
-Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista `inicio`, agregá la siguiente línea en el archivo `settings.py`:
+Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista
+`inicio`, agregá la siguiente línea en `settings.py`:
 
 ```python
 LOGIN_REDIRECT_URL = 'inicio'
