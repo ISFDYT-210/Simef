@@ -1,0 +1,219 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SIMEF{% endblock %} · ISFDyT N°210</title>
+
+  {# ── Tailwind por CDN para desarrollo. Para producción: compilar con el CLI standalone y reemplazar por <link rel="stylesheet" href="{% static 'css/simef.css' %}"> ── #}
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            tinta: {
+              50:  '#EEF3F8',
+              100: '#D6E2EE',
+              300: '#7FA0BF',
+              500: '#2E5478',
+              700: '#1D3D5C',
+              800: '#17334E',
+              900: '#14304D',
+              950: '#0D2033',
+            },
+            celeste: {
+              100: '#DDEFFA',
+              400: '#63AFDE',
+              500: '#3E9BD6',
+              600: '#2C82B8',
+            },
+          },
+          fontFamily: {
+            sans: ['Archivo', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
+
+  {# Alpine.js para interactividad liviana (sidebar, dropdowns, toasts) #}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <style>
+    .brand-expanded { font-variation-settings: 'wdth' 125; letter-spacing: 0.14em; }
+    [x-cloak] { display: none !important; }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body class="h-full bg-slate-100 font-sans text-slate-800 antialiased"
+      x-data="{ sidebar: window.innerWidth >= 1024, mobileMenu: false }">
+
+<div class="flex min-h-full">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="fixed inset-y-0 left-0 z-40 flex flex-col bg-tinta-900 text-tinta-100 transition-all duration-200"
+         :class="sidebar ? 'w-64' : 'w-0 lg:w-[4.5rem]'"
+         x-cloak>
+
+    <!-- Marca -->
+    <div class="flex h-16 items-center gap-3 border-b border-tinta-700/60 px-5 overflow-hidden">
+      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-celeste-500 text-white font-bold">S</div>
+      <div x-show="sidebar" x-transition.opacity class="leading-tight whitespace-nowrap">
+        <span class="brand-expanded block text-lg font-bold text-white">SIMEF</span>
+        <span class="text-[11px] text-tinta-300">ISFDyT N°210 · La Plata</span>
+      </div>
+    </div>
+
+    <!-- Navegación -->
+    <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">General</p>
+        <a href="{% url 'inicio' %}"
+           class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white {% block nav_inicio %}{% endblock %}">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1v-9.5Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inicio</span>
+        </a>
+      </div>
+
+      {# ── Ajustar los {% if %} a su sistema de roles/capacidades ── #}
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">Gestión académica</p>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19a4 4 0 0 0-8 0M11 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 8a4 4 0 0 0-3-3.87M15 5.1a3 3 0 0 1 0 5.8"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Estudiantes</span>
+        </a>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inscripciones</span>
+        </a>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v3m8-3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Mesas de examen</span>
+        </a>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11.5 11 13.5 15.5 9M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Calificaciones</span>
+        </a>
+      </div>
+
+      {# Sección visible solo para roles administrativos #}
+      {% comment %} Ejemplo: {% if capacidades.ver_administracion %} {% endcomment %}
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">Administración</p>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.12-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.85 1.7 1.7 0 0 0 4.3 7l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.52 1.7 1.7 0 0 0 10.03 3V3a2 2 0 1 1 4 0v.09c0 .66.39 1.26 1.03 1.51.6.27 1.3.13 1.79-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.46.49-.6 1.19-.33 1.79.25.61.85 1.02 1.51 1.03H21a2 2 0 1 1 0 4h-.09c-.66 0-1.26.4-1.51 1.03Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Usuarios y roles</span>
+        </a>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l2.5 2.5M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Auditoría</span>
+        </a>
+
+        <a href="#" class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-4m3 4V9m3 8v-6M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Reportes PDF</span>
+        </a>
+      </div>
+      {% comment %} {% endif %} {% endcomment %}
+    </nav>
+
+    <!-- Usuario + rol (firma del diseño: el rol siempre a la vista) -->
+    <div class="border-t border-tinta-700/60 p-4">
+      <div class="flex items-center gap-3 overflow-hidden">
+        <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-tinta-700 text-sm font-semibold text-white">
+          {{ request.user.first_name|slice:":1"|default:"U" }}{{ request.user.last_name|slice:":1" }}
+        </div>
+        <div x-show="sidebar" class="min-w-0 whitespace-nowrap">
+          <p class="truncate text-sm font-medium text-white">{{ request.user.get_full_name|default:request.user.username }}</p>
+          <span class="mt-0.5 inline-block rounded-full bg-celeste-500/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-celeste-400">
+            {% block rol_usuario %}{{ request.user.rol|default:"Rol" }}{% endblock %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════ ÁREA PRINCIPAL ══════════ -->
+  <div class="flex min-h-full flex-1 flex-col transition-all duration-200"
+       :class="sidebar ? 'lg:pl-64' : 'lg:pl-[4.5rem]'">
+
+    <!-- Topbar -->
+    <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
+      <button @click="sidebar = !sidebar"
+              class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-tinta-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500"
+              aria-label="Mostrar u ocultar menú">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <h1 class="truncate text-base font-semibold text-tinta-900">{% block encabezado %}Panel principal{% endblock %}</h1>
+        <p class="hidden truncate text-xs text-slate-500 sm:block">{% block subtitulo %}{% endblock %}</p>
+      </div>
+
+      <!-- Menú de usuario -->
+      <div class="relative" x-data="{ open: false }">
+        <button @click="open = !open" @click.outside="open = false"
+                class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">
+          <span class="hidden sm:inline">{{ request.user.get_full_name|default:request.user.username }}</span>
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div x-show="open" x-transition.origin.top.right x-cloak
+             class="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Mi perfil</a>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">Cerrar sesión</button>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    <!-- Mensajes de Django como toasts -->
+    {% if messages %}
+    <div class="fixed right-4 top-20 z-50 flex w-80 flex-col gap-2">
+      {% for message in messages %}
+      <div x-data="{ show: true }" x-show="show" x-transition
+           x-init="setTimeout(() => show = false, 6000)"
+           class="flex items-start gap-3 rounded-xl border p-4 shadow-lg
+                  {% if message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800
+                  {% elif message.tags == 'error' %}border-red-200 bg-red-50 text-red-800
+                  {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-800
+                  {% else %}border-celeste-100 bg-celeste-100/60 text-tinta-800{% endif %}">
+        <p class="flex-1 text-sm">{{ message }}</p>
+        <button @click="show = false" class="text-current/50 hover:text-current" aria-label="Cerrar aviso">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Contenido -->
+    <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-slate-200 px-6 py-4 text-xs text-slate-400">
+      SIMEF · Sistema Integral de Mesas de Examen y Fichas · ISFDyT N°210, La Plata
+    </footer>
+  </div>
+</div>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

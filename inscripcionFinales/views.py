@@ -155,6 +155,7 @@ class editUser(UpdateView):
     
 
 
+@capacidad_requerida('gestionar_mesas')
 def editMesa(request, pk):
     mesa = get_object_or_404(MesaFinal, pk=pk)
     
@@ -311,6 +312,7 @@ def lista_materias_inscriptas_user(request):
     
     return render(request, 'materias/lista_materias_inscriptas_user.html', {'materias': materias_inscriptas})
 
+@capacidad_requerida('ver_reportes', 'cargar_notas')
 def lista_materias_inscriptas_adm(request):
     materias_inscriptas = usuarios_materia.objects.select_related('materia')
     return render(request, 'materias/lista_materias_inscriptas_adm.html', {'materias': materias_inscriptas})
@@ -374,6 +376,7 @@ def listarMateriasFinal(request):
                 materias_final.append(mf)
     return render(request, 'listarMateriasFinal.html', {'materias_final' : materias_final})
 
+@capacidad_requerida('gestionar_mesas')
 def altaMesa(request):
     if request.method == 'POST':
         form = MesaFinalForm(request.POST)
@@ -438,6 +441,7 @@ def lista_finales_inscriptos_adm(request):
     )
     return render(request, 'finales/lista_finales_inscriptos_adm.html', {'finales': finales_inscriptos})
 
+@capacidad_requerida('abrir_inscripciones')
 def inscripcionMesa(request):
     if request.method == 'POST':
         form = InscripcionFinalForm(request.POST)
@@ -468,6 +472,7 @@ def inscripcionFinal(request):
     return render(request, 'finales/inscripcion_final_adm.html', context)
 
 
+@capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
     final = get_object_or_404(MesaFinal, id=final_id)
     
@@ -497,6 +502,7 @@ def inscripcionFinalEst(request, final_id):
     # Si es GET, mostrar el formulario de confirmación
     return render(request, 'finals/inscripcion_final_adm.html', {'final': final})
 
+@capacidad_requerida('abrir_inscripciones')
 def inscripcionMateria(request):
     if request.method == 'POST':
         inscripcion_usuario=request.POST['usuario']
@@ -512,6 +518,7 @@ def inscripcionMateria(request):
         form = InscripcionMateriaForm()
     return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form}) 
 
+@capacidad_requerida('inscribirse')
 def inscripcionMateriaEst(request, materia_id,modalidad):
     materia = get_object_or_404(Materia, id=materia_id)
     
@@ -965,6 +972,7 @@ def alta_masiva_materia(request):
 @capacidad_requerida('gestionar_materias')
 def editar_materia(request, id):
     materia = get_object_or_404(Materia, id=id)
+    
     if request.method == 'POST':
         form = MateriaForm(request.POST, instance=materia)
         if form.is_valid():
@@ -972,8 +980,10 @@ def editar_materia(request, id):
             return redirect('exito_cambios_materia')
     else:
         form = MateriaForm(instance=materia)
-        return render(request, 'materias/editar_materia.html', {'form': form})
-
+        
+    # Este return ahora ataja tanto el método GET inicial 
+    # como los POST que hayan fallado en la validación
+    return render(request, 'materias/editar_materia.html', {'form': form})
 
     
 @capacidad_requerida('gestionar_materias')
@@ -1139,6 +1149,7 @@ class MesasFinalesListView(ListView):
     template_name = 'finales/mesas_finales_list.html'
     context_object_name = 'mesas_finales'
 
+@capacidad_requerida('abrir_inscripciones')
 def inscribir_mesa_final(request):
     if request.method == 'POST':
         filtro_form = FiltroInscripcionForm(request.POST)
@@ -1156,6 +1167,7 @@ def inscribir_mesa_final(request):
     context = {'mesas_finales': mesas_finales, 'filtro_form': filtro_form}
     return render(request, 'finales/inscribir_mesa_final.html', context)
 
+@capacidad_requerida('ver_materias')
 def listar_usuarios_materia(request):
     usuarios_materia_data = usuarios_materia.objects.all()  # Recupera todos los registros de usuarios_materia
     context = {'usuarios_materia_data': usuarios_materia_data}
@@ -1163,76 +1175,59 @@ def listar_usuarios_materia(request):
 
 
 def validar_inscripcion_final(usuario_id, materia_id):
-    # Verificamos si el usuario está inscrito a la materia y su nota de cursada
+    """
+    Valida si un usuario puede inscribirse al final de una materia
+    Retorna True si puede inscribirse, False si no
+    """
     try:
+        # 1. Verificar si el usuario está inscrito a la materia
         usuario_materia_instance = usuarios_materia.objects.get(
-            usuario_id=usuario_id,  # Ajusta si el campo es diferente
-            materia_id=materia_id   # Ajusta si el campo es diferente
+            usuario_id=usuario_id,
+            materia_id=materia_id
         )
-        nota_cursada = usuario_materia_instance.nota_cursada
-        nota_final = usuario_materia_instance.nota_final
         
-        if nota_cursada is None or nota_cursada < 7:
-            return False
-            #JsonResponse({
-            #    'puede_inscribirse': False,
-            #    'mensaje': 'No tienes la nota de cursada mínima (7) para inscribirte al final.'
-            #})
+        # 2. Verificar nota de cursada (Debe ser >= 4 para regulares, no aplica a libres)
+        # ACÁ ESTABA EL ERROR: La cursada se aprueba con 4, no con 7 (el 7 es para promoción)
+        if usuario_materia_instance.modalidad != 'Libre':
+            if (usuario_materia_instance.nota_cursada is None or 
+                usuario_materia_instance.nota_cursada < 4):
+                return False
         
-        if nota_final is not None:
+        # 3. Verificar que no tenga nota final aprobada
+        if (usuario_materia_instance.nota_final is not None and 
+            usuario_materia_instance.nota_final >= 4):
             return False
-            #JsonResponse({
-            #    'puede_inscribirse': False,
-            #    'mensaje': 'Ya tienes una nota de final registrada para esta materia. No puedes inscribirte nuevamente.'
-            #})
+            
     except usuarios_materia.DoesNotExist:
-        return False 
-        #JsonResponse({
-        #    'puede_inscribirse': False,
-        #    'mensaje': 'No estás inscrito a esta materia.'
-        #})
+        # Si no está inscripto en la materia, no puede dar el final
+        return False
 
-    # Obtenemos todas las materias correlativas de la materia a la que se quiere inscribir
+    # 4. Obtener todas las materias correlativas de la materia
     correlativas = MateriaCorrelativa.objects.filter(materia_id=materia_id)
     
-    # Si no hay correlativas, el usuario puede inscribirse directamente
+    # Si no hay correlativas, puede inscribirse
     if not correlativas.exists():
         return True
-        #JsonResponse({
-        #    'puede_inscribirse': True,
-        #    'mensaje': 'Puedes inscribirte a la mesa final. Esta materia no tiene correlativas.'
-        #})
 
-    # Si hay correlativas, verificamos si el usuario ya aprobó todas
+    # 5. Verificar que haya aprobado todas las correlativas
     for correlativa in correlativas:
         try:
             correlativa_instance = usuarios_materia.objects.get(
-                usuario_id=usuario_id,  # Ajusta si el campo es diferente
-                materia_id=correlativa.materia_correlativa_id  # Ajusta si el campo es diferente
+                usuario_id=usuario_id,
+                materia_id=correlativa.materia_correlativa_id
             )
-            print(correlativa_instance.nota_final)
             
-            nota_final = correlativa_instance.nota_final
-            if nota_final is None or nota_final < 4:
+            # La correlativa debe estar aprobada con final (nota final >= 4)
+            if (correlativa_instance.nota_final is None or 
+                correlativa_instance.nota_final < 4):
                 return False
-                #return JsonResponse({
-                #    'puede_inscribirse': False,
-                #    'mensaje': f'No has aprobado la materia correlativa {correlativa.materia_correlativa.nombre_materia} con nota 4 o superior.'
-                #})
+                
         except usuarios_materia.DoesNotExist:
-            print("Nodeberiaperounonuncasabe")
+            # Si ni siquiera cursó la correlativa, no puede rendir
             return False
-        #JsonResponse({
-        #        'puede_inscribirse': False,
-        #        'mensaje': f'No has cursado la materia correlativa {correlativa.materia_correlativa.nombre_materia}.'
-        #    })
     
-    # Si llegamos aquí, el usuario puede inscribirse
+    # Si pasó todos los filtros, ¡está habilitado!
     return True
-#JsonResponse({
-#        'puede_inscribirse': True,
-#        'mensaje': 'Puedes inscribirte a la mesa final.'
-#    })
 
 def validar_inscripcion_materias(usuario_id, materia_id):
     try:
@@ -1616,7 +1611,7 @@ def imprimir_mesas_finales_pdf(request):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=22,
-            textColor=colors.HexColor('#2c3e50'),
+            textColor=colors.HexColor('#0D2033'),
             spaceAfter=20,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -1627,7 +1622,7 @@ def imprimir_mesas_finales_pdf(request):
             'Subtitle',
             parent=styles['Normal'],
             fontSize=12,
-            textColor=colors.HexColor('#7f8c8d'),
+            textColor=colors.HexColor('#64748b'),
             spaceAfter=30,
             alignment=TA_CENTER,
             fontName='Helvetica'
@@ -1635,6 +1630,12 @@ def imprimir_mesas_finales_pdf(request):
         
         # Título principal
         elements.append(Paragraph("MESAS DE EXÁMENES FINALES", title_style))
+        inst_style = ParagraphStyle(
+            'Inst', parent=styles['Normal'], fontSize=12,
+            textColor=colors.HexColor('#3E9BD6'), spaceAfter=2,
+            alignment=TA_CENTER, fontName='Helvetica-Bold'
+        )
+        elements.append(Paragraph("ISFDyT N°210 · La Plata", inst_style))
         
         # Fecha de generación
         fecha_actual = now().strftime('%d/%m/%Y %H:%M')
@@ -1662,6 +1663,11 @@ def imprimir_mesas_finales_pdf(request):
         else:
             # Crear encabezados de la tabla
             data = [['Materia', 'Carrera', 'Fecha', 'Horario', 'Profesor', 'Inscripción']]
+
+            cell_style = ParagraphStyle(
+                'CeldaCartel', parent=styles['Normal'], fontSize=9, leading=11,
+                textColor=colors.black, alignment=TA_CENTER, fontName='Helvetica'
+            )
             
             # Agregar datos de cada mesa
             for mesa in mesas:
@@ -1675,28 +1681,28 @@ def imprimir_mesas_finales_pdf(request):
                 carrera = mesa.materia.carrera.nombre_carrera if mesa.materia.carrera else '-'
                 
                 data.append([
-                    mesa.materia.nombre_materia,
-                    carrera,
-                    mesa.llamado.strftime('%d/%m/%Y'),
-                    mesa.llamado.strftime('%H:%M'),
-                    profesor,
-                    inscripcion
+                    Paragraph(mesa.materia.nombre_materia, cell_style),
+                    Paragraph(carrera, cell_style),
+                    Paragraph(mesa.llamado.strftime('%d/%m/%Y'), cell_style),
+                    Paragraph(mesa.llamado.strftime('%H:%M'), cell_style),
+                    Paragraph(profesor, cell_style),
+                    Paragraph(inscripcion, cell_style),
                 ])
             
             # Crear tabla con anchos de columna personalizados
             table = Table(data, colWidths=[
-                2.2*inch,  # Materia
-                1.8*inch,  # Carrera
-                0.9*inch,  # Fecha
-                0.7*inch,  # Horario
-                1.5*inch,  # Profesor
-                0.9*inch   # Inscripción
+                1.7*inch,   # Materia
+                1.85*inch,  # Carrera
+                0.85*inch,  # Fecha
+                0.7*inch,   # Horario
+                1.35*inch,  # Profesor
+                0.85*inch   # Inscripción
             ])
             
             # Aplicar estilos a la tabla
             table.setStyle(TableStyle([
                 # Estilo del encabezado
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0D2033')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -1710,11 +1716,11 @@ def imprimir_mesas_finales_pdf(request):
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#3498db')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#3E9BD6')),
                 
                 # Alternancia de colores en filas
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecf0f1')]),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#EEF3F8')]),
                 
                 # Padding
                 ('TOPPADDING', (0, 1), (-1, -1), 8),
@@ -1732,7 +1738,7 @@ def imprimir_mesas_finales_pdf(request):
                 'Footer',
                 parent=styles['Normal'],
                 fontSize=9,
-                textColor=colors.HexColor('#95a5a6'),
+                textColor=colors.HexColor('#94a3b8'),
                 alignment=TA_CENTER
             )
             

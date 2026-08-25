@@ -46,8 +46,8 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     localidad = models.CharField('localidad', max_length=50, null=True, blank=True)
     ciudad = models.CharField('ciudad', max_length=100, null=True, blank=True)
     nacionalidad = models.CharField('nacionalidad', max_length=50, null=True, blank=True)
-    telefono_1 = models.IntegerField('telefono_1', null=True, blank=True)
-    telefono_2 = models.IntegerField('telefono_2', null=True, blank=True)
+    telefono_1 = models.CharField('telefono_1', max_length=15, null=True, blank=True)
+    telefono_2 = models.CharField('telefono_2', max_length=15, null=True, blank=True)
     estado_civil = models.CharField('estado_civil', choices=ESTADO_CIVIL_CHOICES, max_length=50, null=True, blank=True)
     sexo = models.CharField('sexo', choices=SEXO_CHOICES, max_length=10, null=True, blank=True)
     imagen = models.ImageField('imagenPerfil', upload_to='perfil/', max_length=200, null=True, blank=True)
@@ -338,3 +338,24 @@ class RegistroAuditoria(models.Model):
     def __str__(self):
         quien = self.usuario.email if self.usuario else 'Sistema'
         return f"[{self.fecha:%Y-%m-%d %H:%M}] {quien}: {self.accion}"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Inscripción automática a PRIMER AÑO (cursada en bloque).
+# Al asignarle una carrera a un ESTUDIANTE, se lo inscribe en todas las
+# materias de primer año de esa carrera. Escucha el M2M Usuario.carrera, así
+# que cubre todos los flujos (alta individual, carga masiva, admin, etc.).
+# ══════════════════════════════════════════════════════════════════════════
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
+
+
+@receiver(m2m_changed, sender=Usuario.carrera.through)
+def inscribir_en_primer_anio(sender, instance, action, pk_set, **kwargs):
+    if action != "post_add":
+        return
+    if not instance.es_estudiante():
+        return
+    for carrera_id in (pk_set or []):
+        for materia in Materia.objects.filter(carrera_id=carrera_id, anio=1):
+            usuarios_materia.objects.get_or_create(usuario=instance, materia=materia)

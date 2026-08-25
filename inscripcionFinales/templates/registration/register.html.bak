@@ -1,0 +1,226 @@
+{% extends 'base/base.html' %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/registration/register.html (reemplaza al actual)
+
+  Migrado a Tailwind. Se conservan: dos columnas, campos condicionales según rol
+  (matrícula/especialidad/cargo/área), validaciones en vivo (solo números, formatos,
+  edad 16-100), y el aviso de contraseña automática.
+  Corrección: los campos condicionales comparaban rol en minúscula ('estudiante')
+  pero los valores del modelo son con mayúscula ('Estudiante'); ahora usan minúscula
+  vía |lower para que aparezcan bien.
+{% endcomment %}
+
+{% block title %}Registro de usuario{% endblock %}
+{% block encabezado %}Crear usuario{% endblock %}
+
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+
+<div class="mx-auto max-w-4xl">
+
+  {% if form.errors %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    No se pudo enviar el formulario. Verificá los datos, por favor.
+  </div>
+  {% endif %}
+
+  <form method="POST" id="registroForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
+
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Completá los siguientes campos</h2>
+    </div>
+
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 px-6 py-6 sm:grid-cols-2">
+
+      <!-- Columna izquierda -->
+      <div>
+        <label for="id_username" class="mb-1 block text-sm font-medium text-slate-700">Nombre de usuario</label>
+        {{ form.username }}
+        {% if form.username.errors %}<p class="mt-1 text-xs text-red-600">{{ form.username.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_ciudad" class="mb-1 block text-sm font-medium text-slate-700">Ciudad</label>
+        {{ form.ciudad }}
+      </div>
+
+      <div>
+        <label for="id_nombre_completo" class="mb-1 block text-sm font-medium text-slate-700">Nombre completo</label>
+        {{ form.nombre_completo }}
+        {% if form.nombre_completo.errors %}<p class="mt-1 text-xs text-red-600">{{ form.nombre_completo.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_nacionalidad" class="mb-1 block text-sm font-medium text-slate-700">Nacionalidad</label>
+        {{ form.nacionalidad }}
+      </div>
+
+      <div>
+        <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
+        {{ form.dni }}
+        {% if form.dni.errors %}<p class="mt-1 text-xs text-red-600">{{ form.dni.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_telefono_1" class="mb-1 block text-sm font-medium text-slate-700">Teléfono</label>
+        {{ form.telefono_1 }}
+        {% if form.telefono_1.errors %}<p class="mt-1 text-xs text-red-600">{{ form.telefono_1.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="id_rol" class="mb-1 block text-sm font-medium text-slate-700">Rol</label>
+        {{ form.rol }}
+        {% if form.rol.errors %}<p class="mt-1 text-xs text-red-600">{{ form.rol.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_telefono_2" class="mb-1 block text-sm font-medium text-slate-700">Celular</label>
+        {{ form.telefono_2 }}
+        {% if form.telefono_2.errors %}<p class="mt-1 text-xs text-red-600">{{ form.telefono_2.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}<p class="mt-1 text-xs text-red-600">El email ya existe.</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_estado_civil" class="mb-1 block text-sm font-medium text-slate-700">Estado civil</label>
+        {{ form.estado_civil }}
+      </div>
+
+      <div>
+        <label for="id_fecha_nac" class="mb-1 block text-sm font-medium text-slate-700">Fecha de nacimiento</label>
+        {{ form.fecha_nac }}
+        {% if form.fecha_nac.errors %}<p class="mt-1 text-xs text-red-600">{{ form.fecha_nac.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_sexo" class="mb-1 block text-sm font-medium text-slate-700">Sexo</label>
+        {{ form.sexo }}
+      </div>
+
+      <div>
+        <label for="id_direccion" class="mb-1 block text-sm font-medium text-slate-700">Dirección</label>
+        {{ form.direccion }}
+      </div>
+      <div>
+        <label for="id_carrera" class="mb-1 block text-sm font-medium text-slate-700">Carrera</label>
+        {{ form.carrera }}
+        {% if form.carrera.errors %}<p class="mt-1 text-xs text-red-600">{{ form.carrera.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="id_localidad" class="mb-1 block text-sm font-medium text-slate-700">Localidad</label>
+        {{ form.localidad }}
+      </div>
+      <div></div>
+
+      <!-- Campos condicionales según rol (ancho completo) -->
+      <div class="campo-condicional sm:col-span-2" id="matricula-field" style="display:none">
+        <label for="id_matricula" class="mb-1 block text-sm font-medium text-slate-700">Matrícula</label>
+        {{ form.matricula }}
+      </div>
+      <div class="campo-condicional sm:col-span-2" id="especialidad-field" style="display:none">
+        <label for="id_especialidad" class="mb-1 block text-sm font-medium text-slate-700">Especialidad</label>
+        {{ form.especialidad }}
+      </div>
+      <div class="campo-condicional sm:col-span-2" id="cargo-field" style="display:none">
+        <label for="id_cargo" class="mb-1 block text-sm font-medium text-slate-700">Cargo</label>
+        {{ form.cargo }}
+      </div>
+      <div class="campo-condicional sm:col-span-2" id="area-field" style="display:none">
+        <label for="id_area" class="mb-1 block text-sm font-medium text-slate-700">Área</label>
+        {{ form.area }}
+      </div>
+
+      <!-- Contraseña (ancho completo) -->
+      <div class="sm:col-span-2">
+        <label for="id_password" class="mb-1 block text-sm font-medium text-slate-700">Contraseña</label>
+        {{ form.password }}
+        <p class="mt-1 text-xs text-slate-500">Si la dejás vacía, se genera una automáticamente.</p>
+        {% if form.password.errors %}<p class="mt-1 text-xs text-red-600">{{ form.password.errors|striptags }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+      <button type="submit"
+              class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">
+        Registrar
+      </button>
+      <a href="/user_list/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        Volver a usuarios
+      </a>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // ── Estilo Tailwind a todos los inputs/select que genera Django ──
+    var clases = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+    document.querySelectorAll('#registroForm input:not([type=hidden]):not([type=checkbox]), #registroForm select, #registroForm textarea')
+      .forEach(function (el) { el.classList.add.apply(el.classList, clases); });
+
+    var form = document.getElementById('registroForm');
+    var g = function (id) { return document.getElementById(id); };
+    var dni = g('id_dni'), email = g('id_email'), nombre = g('id_nombre_completo'),
+        t1 = g('id_telefono_1'), t2 = g('id_telefono_2'), fecha = g('id_fecha_nac'), rol = g('id_rol');
+
+    // ── Solo números en DNI y teléfonos ──
+    [dni, t1, t2].forEach(function (f) {
+      if (f) f.addEventListener('input', function () { this.value = this.value.replace(/[^0-9]/g, ''); });
+    });
+
+    // ── Marca de error visual por campo ──
+    function marcarError(f) { if (f) { f.classList.add('border-red-500', 'bg-red-50'); f.classList.remove('border-slate-300'); } }
+    function limpiarError(f) { if (f) { f.classList.remove('border-red-500', 'bg-red-50'); f.classList.add('border-slate-300'); } }
+    document.querySelectorAll('#registroForm input, #registroForm select').forEach(function (f) {
+      f.addEventListener('input', function () { limpiarError(this); });
+    });
+
+    // ── Validadores ──
+    var esDNI = function (v) { return /^[0-9]{7,8}$/.test(v); };
+    var esEmail = function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); };
+    var esNombre = function (v) { return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,100}$/.test(v.trim()); };
+    var esTel = function (v) { return /^[0-9]{6,15}$/.test(v); };
+    var esFecha = function (v) { if (!v) return true; var e = new Date().getFullYear() - new Date(v).getFullYear(); return e >= 16 && e <= 100; };
+
+    // ── Campos condicionales según rol ──
+    function mostrarSegunRol() {
+      document.querySelectorAll('.campo-condicional').forEach(function (c) { c.style.display = 'none'; });
+      var r = (rol ? rol.value : '').toLowerCase();
+      var mapa = { estudiante: 'matricula-field', profesor: 'especialidad-field', directivo: 'cargo-field', preceptor: 'area-field' };
+      var target = g(mapa[r]);
+      if (target) target.style.display = 'block';
+    }
+    if (rol) { rol.addEventListener('change', mostrarSegunRol); mostrarSegunRol(); }
+
+    // ── Validación al enviar ──
+    form.addEventListener('submit', function (e) {
+      var errores = [];
+      if (nombre && (!nombre.value.trim() || !esNombre(nombre.value))) { errores.push('nombre'); marcarError(nombre); }
+      if (dni && (!dni.value.trim() || !esDNI(dni.value.trim()))) { errores.push('DNI'); marcarError(dni); }
+      if (email && (!email.value.trim() || !esEmail(email.value.trim()))) { errores.push('email'); marcarError(email); }
+      if (rol && !rol.value) { errores.push('rol'); marcarError(rol); }
+      if (fecha && fecha.value && !esFecha(fecha.value)) { errores.push('fecha'); marcarError(fecha); }
+      if (t1 && t1.value.trim() && !esTel(t1.value.trim())) { errores.push('teléfono'); marcarError(t1); }
+      if (t2 && t2.value.trim() && !esTel(t2.value.trim())) { errores.push('celular'); marcarError(t2); }
+      if (errores.length) {
+        e.preventDefault();
+        alert('Revisá estos campos: ' + errores.join(', ') + '.');
+        var primero = document.querySelector('.border-red-500');
+        if (primero) { primero.scrollIntoView({ behavior: 'smooth', block: 'center' }); primero.focus(); }
+      }
+    });
+  });
+</script>
+
+{% else %}
+
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.png" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No tenés permisos para acceder a esta página.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
