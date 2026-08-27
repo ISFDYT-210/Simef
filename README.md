@@ -37,6 +37,8 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 | [INSTALACION_MANUAL.md](INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
 | [DESPLIEGUE.md](DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + MariaDB) en Debian. |
 | [README-tailwind.md](README-tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
+| [TARJETAS_GH.md](TARJETAS_GH.md) | Cómo cargar tarjetas de trabajo (issues) al tablero con la CLI `gh`. |
+
 
 ---
 
