@@ -1,21 +1,20 @@
 {% extends 'base/base.html' %}
 {% comment %}
-  UBICACIÓN: inscripcionFinales/templates/finales/list_mesa.html
-  (PISA la versión original en Bootstrap — ESTE es el template que la ruta
-   'list_mesa' realmente renderiza, por el template_name='finales/list_mesa.html'
-   del urls.py. La copia registration/mesas_finales_lista.html queda sin uso.)
+  UBICACIÓN: inscripcionFinales/templates/registration/mesas_finales_lista.html
+  (es el template real que usa la vista listMesa — NO finales/list_mesa.html)
 
   Migrado a Tailwind + Alpine. Sin jQuery ni Bootstrap JS.
-  Paginación de a 10 en el cliente, igual que el original.
+  La vista listMesa no pagina en servidor: manda todo object_list y la
+  paginación es de a 10 en el cliente, igual que el original.
 {% endcomment %}
 
-{% block title %}Lista de Mesas{% endblock %}
+{% block title %}Listado de Mesas{% endblock %}
 {% block encabezado %}Listado de mesas de examen{% endblock %}
 {% block subtitulo %}Gestión de mesas finales{% endblock %}
 
 {% block content %}
 
-{% if request.user.puede_gestionar_mesas %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
 
 <div x-data="mesasFinales()" x-init="init()">
 
@@ -195,7 +194,6 @@
 
 <script>
   function mesasFinales() {
-    let raiz = null;  // contenedor raíz, cacheado en init (this.$el es contextual)
     return {
       pagina: 1,
       porPagina: 10,
@@ -210,12 +208,13 @@
       },
 
       init() {
-        raiz = this.$el;
+        // Reinicia a la página 1 cada vez que cambia la búsqueda
         this.$watch('busqueda', () => { this.pagina = 1; });
       },
 
+      // ── Filas / filtro / paginación ──────────────────────────────
       filas() {
-        return Array.from((raiz || this.$el).querySelectorAll('.fila-mesa'));
+        return Array.from(this.$root.querySelectorAll('.fila-mesa'));
       },
       coincide(fila) {
         const q = this.busqueda.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -234,9 +233,11 @@
         return idx >= inicio && idx < inicio + this.porPagina;
       },
 
-      checks() { return Array.from((raiz || this.$el).querySelectorAll('.mesa-check')); },
+      // ── Selección ────────────────────────────────────────────────
+      checks() { return Array.from(this.$root.querySelectorAll('.mesa-check')); },
       seleccionadas() { return this.checks().filter(c => c.checked); },
       toggleTodos(e) {
+        // Solo marca/desmarca las filas visibles en la página actual
         this.filasFiltradas()
           .slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina)
           .forEach(f => { const c = f.querySelector('.mesa-check'); if (c) c.checked = e.target.checked; });
@@ -247,6 +248,7 @@
         if (this.$refs.checkTodos) this.$refs.checkTodos.checked = visibles.length > 0 && todas;
       },
 
+      // ── Confirmación / acciones ──────────────────────────────────
       pedirConfirmacion(tipo) {
         const sel = this.seleccionadas();
         if (sel.length === 0) { this.avisoVacio = true; return; }
@@ -268,6 +270,7 @@
         this.modal = { abierto: true, tipo, titulo: textos[tipo].t, mensaje: textos[tipo].m };
       },
       confirmar() {
+        // La URL ya quedó bindeada al form vía :action="accionUrl"
         this.$refs.formMesas.submit();
       },
     };

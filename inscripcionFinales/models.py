@@ -212,7 +212,7 @@ class Instituto(models.Model):
 
 
 class Materia(models.Model):
-    nombre_materia = models.CharField('nombre_materia', max_length=50)
+    nombre_materia = models.CharField('nombre_materia', max_length=200)
     carrera = models.ForeignKey('Carrera', on_delete=models.CASCADE, null=True)
     profesor = models.ForeignKey('Usuario', on_delete=models.CASCADE, null=True)
     inscripcionAbierta = models.BooleanField(default=False)

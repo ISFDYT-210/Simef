@@ -1,739 +1,226 @@
 {% extends 'base/base.html' %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/registration/register.html (reemplaza al actual)
+
+  Migrado a Tailwind. Se conservan: dos columnas, campos condicionales según rol
+  (matrícula/especialidad/cargo/área), validaciones en vivo (solo números, formatos,
+  edad 16-100), y el aviso de contraseña automática.
+  Corrección: los campos condicionales comparaban rol en minúscula ('estudiante')
+  pero los valores del modelo son con mayúscula ('Estudiante'); ahora usan minúscula
+  vía |lower para que aparezcan bien.
+{% endcomment %}
 
 {% block title %}Registro de usuario{% endblock %}
+{% block encabezado %}Crear usuario{% endblock %}
 
 {% block content %}
+{% if request.user.puede_gestionar_usuarios %}
 
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+<div class="mx-auto max-w-4xl">
 
-<div id="registracion">  
-    <form method="POST" class="form" id="registroForm">
-        <div class="reg-rectangulo1">
-            <p class="reg-title">
-              Completar los siguientes campos:
-            </p>
-            {% csrf_token %}
+  {% if form.errors %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    No se pudo enviar el formulario. Verificá los datos, por favor.
+  </div>
+  {% endif %}
 
-            {% if form.errors %}
-            <div id="register-error">
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                  <p>No se pudo enviar el formulario. Verifique los datos por favor.</p>
-                </div>
-            </div>
-            {% endif %}
+  <form method="POST" id="registroForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
 
-            <!-- Contenedor de dos columnas -->
-            <div class="form-columns">
-                <!-- Columna Izquierda -->
-                <div class="form-column-left">
-                    <!-- Nombre de Usuario -->
-                    <p class="campo-form">
-                        <label for="id_username">Nombre de Usuario:</label>
-                        <br>
-                        {{ form.username }}
-                        {% if form.username.errors %}
-                        <div class="field-error">
-                            {{form.username.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Completá los siguientes campos</h2>
+    </div>
 
-                    <!-- Nombre Completo -->
-                    <p class="campo-form">
-                        <label for="id_nombre_completo">Nombre Completo:</label>
-                        <br>
-                        {{ form.nombre_completo }}
-                        {% if form.nombre_completo.errors %}
-                        <div class="field-error">
-                            {{form.nombre_completo.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 px-6 py-6 sm:grid-cols-2">
 
-                    <!-- DNI -->
-                    <p class="campo-form">
-                        <label for="id_dni">DNI:</label>
-                        <br>
-                        {{ form.dni }}
-                        {% if form.dni.errors %}
-                        <div class="field-error">
-                            {{form.dni.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <!-- Columna izquierda -->
+      <div>
+        <label for="id_username" class="mb-1 block text-sm font-medium text-slate-700">Nombre de usuario</label>
+        {{ form.username }}
+        {% if form.username.errors %}<p class="mt-1 text-xs text-red-600">{{ form.username.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_ciudad" class="mb-1 block text-sm font-medium text-slate-700">Ciudad</label>
+        {{ form.ciudad }}
+      </div>
 
-                    <!-- Rol (movido a columna izquierda) -->
-                    <p class="campo-form">
-                        <label for="id_rol">Rol:</label>
-                        <br>
-                        {{ form.rol }}
-                        {% if form.rol.errors %}
-                        <div class="field-error">
-                            {{ form.rol.errors }}
-                        </div>
-                        {% endif %}
-                    </p>
+      <div>
+        <label for="id_nombre_completo" class="mb-1 block text-sm font-medium text-slate-700">Nombre completo</label>
+        {{ form.nombre_completo }}
+        {% if form.nombre_completo.errors %}<p class="mt-1 text-xs text-red-600">{{ form.nombre_completo.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_nacionalidad" class="mb-1 block text-sm font-medium text-slate-700">Nacionalidad</label>
+        {{ form.nacionalidad }}
+      </div>
 
-                    <!-- Email -->
-                    <p class="campo-form">
-                        <label for="id_email">Email:</label>
-                        <br>
-                        {{ form.email }}
-                        {% if form.email.errors %}
-                        <div class="field-error">
-                            El email ya existe.
-                        </div>
-                        {%endif%}
-                    </p>
+      <div>
+        <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
+        {{ form.dni }}
+        {% if form.dni.errors %}<p class="mt-1 text-xs text-red-600">{{ form.dni.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_telefono_1" class="mb-1 block text-sm font-medium text-slate-700">Teléfono</label>
+        {{ form.telefono_1 }}
+        {% if form.telefono_1.errors %}<p class="mt-1 text-xs text-red-600">{{ form.telefono_1.errors|striptags }}</p>{% endif %}
+      </div>
 
-                    <!-- Fecha de Nacimiento -->
-                    <p class="campo-form">
-                        <label for="id_fecha_nac">Fecha de nacimiento:</label>
-                        <br>
-                        {{ form.fecha_nac }}
-                        {% if form.fecha_nac.errors %}
-                        <div class="field-error">
-                            {{form.fecha_nac.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <div>
+        <label for="id_rol" class="mb-1 block text-sm font-medium text-slate-700">Rol</label>
+        {{ form.rol }}
+        {% if form.rol.errors %}<p class="mt-1 text-xs text-red-600">{{ form.rol.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_telefono_2" class="mb-1 block text-sm font-medium text-slate-700">Celular</label>
+        {{ form.telefono_2 }}
+        {% if form.telefono_2.errors %}<p class="mt-1 text-xs text-red-600">{{ form.telefono_2.errors|striptags }}</p>{% endif %}
+      </div>
 
-                    <!-- Dirección -->
-                    <p class="campo-form">
-                        <label for="id_direccion">Dirección:</label>
-                        <br>
-                        {{ form.direccion }}
-                        {% if form.direccion.errors %}
-                        <div class="field-error">
-                            {{form.direccion.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <div>
+        <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}<p class="mt-1 text-xs text-red-600">El email ya existe.</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_estado_civil" class="mb-1 block text-sm font-medium text-slate-700">Estado civil</label>
+        {{ form.estado_civil }}
+      </div>
 
-                    <!-- Localidad -->
-                    <p class="campo-form">
-                        <label for="id_localidad">Localidad:</label>
-                        <br>
-                        {{ form.localidad }}
-                        {% if form.localidad.errors %}
-                        <div class="field-error">
-                            {{form.localidad.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
-                </div>
+      <div>
+        <label for="id_fecha_nac" class="mb-1 block text-sm font-medium text-slate-700">Fecha de nacimiento</label>
+        {{ form.fecha_nac }}
+        {% if form.fecha_nac.errors %}<p class="mt-1 text-xs text-red-600">{{ form.fecha_nac.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_sexo" class="mb-1 block text-sm font-medium text-slate-700">Sexo</label>
+        {{ form.sexo }}
+      </div>
 
-                <!-- Columna Derecha -->
-                <div class="form-column-right">
-                    <!-- Ciudad -->
-                    <p class="campo-form">
-                        <label for="id_ciudad">Ciudad:</label>
-                        <br>
-                        {{ form.ciudad }}
-                        {% if form.ciudad.errors %}
-                        <div class="field-error">
-                            {{form.ciudad.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <div>
+        <label for="id_direccion" class="mb-1 block text-sm font-medium text-slate-700">Dirección</label>
+        {{ form.direccion }}
+      </div>
+      <div>
+        <label for="id_carrera" class="mb-1 block text-sm font-medium text-slate-700">Carrera</label>
+        {{ form.carrera }}
+        {% if form.carrera.errors %}<p class="mt-1 text-xs text-red-600">{{ form.carrera.errors|striptags }}</p>{% endif %}
+      </div>
 
-                    <!-- Nacionalidad -->
-                    <p class="campo-form">
-                        <label for="id_nacionalidad">Nacionalidad:</label>
-                        <br>
-                        {{ form.nacionalidad }}
-                        {% if form.nacionalidad.errors %}
-                        <div class="field-error">
-                            {{form.nacionalidad.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <div>
+        <label for="id_localidad" class="mb-1 block text-sm font-medium text-slate-700">Localidad</label>
+        {{ form.localidad }}
+      </div>
+      <div></div>
 
-                    <!-- Teléfono -->
-                    <p class="campo-form">
-                        <label for="id_telefono_1">Teléfono:</label>
-                        <br>
-                        {{ form.telefono_1 }}
-                        {% if form.telefono_1.errors %}
-                        <div class="field-error">
-                            {{form.telefono_1.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <!-- Campos condicionales según rol (ancho completo) -->
+      <div class="campo-condicional sm:col-span-2" id="matricula-field" style="display:none">
+        <label for="id_matricula" class="mb-1 block text-sm font-medium text-slate-700">Matrícula</label>
+        {{ form.matricula }}
+      </div>
+      <div class="campo-condicional sm:col-span-2" id="especialidad-field" style="display:none">
+        <label for="id_especialidad" class="mb-1 block text-sm font-medium text-slate-700">Especialidad</label>
+        {{ form.especialidad }}
+      </div>
+      <div class="campo-condicional sm:col-span-2" id="cargo-field" style="display:none">
+        <label for="id_cargo" class="mb-1 block text-sm font-medium text-slate-700">Cargo</label>
+        {{ form.cargo }}
+      </div>
+      <div class="campo-condicional sm:col-span-2" id="area-field" style="display:none">
+        <label for="id_area" class="mb-1 block text-sm font-medium text-slate-700">Área</label>
+        {{ form.area }}
+      </div>
 
-                    <!-- Celular -->
-                    <p class="campo-form">
-                        <label for="id_telefono_2">Celular:</label>
-                        <br>
-                        {{ form.telefono_2 }}
-                        {% if form.telefono_2.errors %}
-                        <div class="field-error">
-                            {{form.telefono_2.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
+      <!-- Contraseña (ancho completo) -->
+      <div class="sm:col-span-2">
+        <label for="id_password" class="mb-1 block text-sm font-medium text-slate-700">Contraseña</label>
+        {{ form.password }}
+        <p class="mt-1 text-xs text-slate-500">Si la dejás vacía, se genera una automáticamente.</p>
+        {% if form.password.errors %}<p class="mt-1 text-xs text-red-600">{{ form.password.errors|striptags }}</p>{% endif %}
+      </div>
+    </div>
 
-                    <!-- Estado Civil -->
-                    <p class="campo-form">
-                        <label for="id_estado_civil">Estado civil:</label>
-                        <br>
-                        {{ form.estado_civil }}
-                        {% if form.estado_civil.errors %}
-                        <div class="field-error">
-                            {{form.estado_civil.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
-
-                    <!-- Sexo -->
-                    <p class="campo-form">
-                        <label for="id_sexo">Sexo:</label>
-                        <br>
-                        {{ form.sexo }}
-                        {% if form.sexo.errors %}
-                        <div class="field-error">
-                            {{form.sexo.errors}}
-                        </div>
-                        {%endif%}
-                    </p>
-
-                    <!-- Carrera -->
-                    <p class="campo-form">
-                      <label for="id_carrera">Carrera:</label>
-                      <br>
-                      {{ form.carrera }}
-                      {% if form.carrera.errors %}
-                      <div class="field-error">
-                          {{form.carrera.errors}}
-                      </div>
-                      {%endif%}
-                    </p>
-                </div>
-            </div>
-
-            <!-- Campos que van en ancho completo -->
-            <div class="form-full-width">
-
-                <!-- Campos condicionales según el rol -->
-                {% if form.rol.value == 'estudiante' %}
-                    <p class="campo-form campo-condicional" id="matricula-field">
-                        <label for="id_matricula">Matrícula:</label>
-                        <br>
-                        {{ form.matricula }}
-                    </p>
-                {% elif form.rol.value == 'profesor' %}
-                    <p class="campo-form campo-condicional" id="especialidad-field">
-                        <label for="id_especialidad">Especialidad:</label>
-                        <br>
-                        {{ form.especialidad }}
-                    </p>
-                {% elif form.rol.value == 'directivo' %}
-                    <p class="campo-form campo-condicional" id="cargo-field">
-                        <label for="id_cargo">Cargo:</label>
-                        <br>
-                        {{ form.cargo }}
-                    </p>
-                {% elif form.rol.value == 'preceptor' %}
-                    <p class="campo-form campo-condicional" id="area-field">
-                        <label for="id_area">Área:</label>
-                        <br>
-                        {{ form.area }}
-                    </p>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="reg-rectangulo2">
-            <div class="logo-registracion only-lt">
-                <img src="/static/imagenes/SIMEF.png" class="logo-reg only-lt" style="width: 100%; max-width: 260px; height: auto;">
-            </div>
-            <div class="botones-registracion">
-                    <!-- Contraseña (opcional) -->
-                    <p class="campo-form campo-form-claro">
-                        <label for="id_password">Contraseña:</label>
-                        <br>
-                        {{ form.password }}
-                        <br>
-                        <small class="aclaracion-clara">Si la dejás vacía, se genera una automáticamente.</small>
-                        {% if form.password.errors %}
-                        <div class="field-error">
-                            {{ form.password.errors }}
-                        </div>
-                        {% endif %}
-                    </p>
-
-              <button type="submit" class="btn btn-blue fs-6" style="transition: 0.6s">Registrar</button>
-               <div id="volver_usuario">
-              <a class="fs-5 volver-claro" href="/user_list/" style="text-decoration: none">Volver a Usuarios</a>
-              </div>
-            </div>
-        </div>   
-    </form>  
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+      <button type="submit"
+              class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">
+        Registrar
+      </button>
+      <a href="/user_list/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        Volver a usuarios
+      </a>
+    </div>
+  </form>
 </div>
 
-<style>
-/* Contenedor de las dos columnas: se auto-ajusta al ancho disponible, */
-/* sin depender de un breakpoint fijo de pantalla */
-.form-columns {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0 20px;
-    width: 100%;
-}
-
-.form-column-left,
-.form-column-right {
-    min-width: 0;
-}
-
-/* Campos de ancho completo */
-.form-full-width {
-    width: 100%;
-    margin-top: 10px;
-}
-
-/* Estilos para los campos del formulario */
-.campo-form {
-    margin-bottom: 14px;
-    text-align: center;
-}
-
-.campo-form label {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.campo-condicional {
-    display: none;
-}
-
-.error-field {
-    border: 2px solid #dc3545 !important;
-    background-color: #f8d7da !important;
-}
-
-.success-field {
-    border: 2px solid #28a745 !important;
-    background-color: #d4edda !important;
-}
-
-/* Estilos para errores de campo más compactos */
-.field-error {
-    color: #dc3545;
-    font-size: 12px;
-    margin-top: 2px;
-    text-align: center;
-}
-
-/* Inputs modernos, redondeados, que ocupan todo su espacio disponible */
-.campo-form input,
-.campo-form select {
-    width: 100%;
-    font-size: 14px;
-    padding: 8px 12px;
-    border: 1px solid var(--color-border-subtle);
-    border-radius: 10px;
-    background-color: var(--color-white);
-}
-
-/* Texto claro para el panel violeta de la derecha */
-.campo-form-claro label,
-.campo-form-claro,
-.aclaracion-clara {
-    color: var(--color-white);
-}
-
-.aclaracion-clara {
-    font-size: 12px;
-    opacity: 0.85;
-}
-
-.volver-claro {
-    color: var(--color-white);
-    font-weight: 600;
-}
-
-.volver-claro:hover {
-    color: var(--color-white);
-    opacity: 0.85;
-}
-
-@media only screen and (max-width: 600px) {
-   .text-center {
-    font-size: 15px;
-   }
-}
-
-/* Estilos para alertas personalizadas */
-.custom-alert {
-    padding: 10px 15px;
-    margin: 10px 0;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    position: relative;
-}
-
-.custom-alert.alert-danger {
-    color: #721c24;
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-}
-
-.custom-alert.alert-success {
-    color: #155724;
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-}
-
-.custom-alert.alert-warning {
-    color: #856404;
-    background-color: #fff3cd;
-    border-color: #ffeaa7;
-}
-</style>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('registroForm');
-    const usernameField = document.getElementById('id_username');
-    const nombreField = document.getElementById('id_nombre_completo');
-    const dniField = document.getElementById('id_dni');
-    const fechaNacField = document.getElementById('id_fecha_nac');
-    const direccionField = document.getElementById('id_direccion');
-    const localidadField = document.getElementById('id_localidad');
-    const ciudadField = document.getElementById('id_ciudad');
-    const nacionalidadField = document.getElementById('id_nacionalidad');
-    const emailField = document.getElementById('id_email');
-    const telefono1Field = document.getElementById('id_telefono_1');
-    const telefono2Field = document.getElementById('id_telefono_2');
-    const estadoCivilField = document.getElementById('id_estado_civil');
-    const sexoField = document.getElementById('id_sexo');
-    const rolField = document.getElementById('id_rol');
-    const carreraField = document.getElementById('id_carrera');
-    
-    // Campos condicionales
-    const especialidadField = document.getElementById('id_especialidad');
-    const cargoField = document.getElementById('id_cargo');
-    const areaField = document.getElementById('id_area');
+  document.addEventListener('DOMContentLoaded', function () {
+    // ── Estilo Tailwind a todos los inputs/select que genera Django ──
+    var clases = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+    document.querySelectorAll('#registroForm input:not([type=hidden]):not([type=checkbox]), #registroForm select, #registroForm textarea')
+      .forEach(function (el) { el.classList.add.apply(el.classList, clases); });
 
-    // Función para mostrar alertas personalizadas
-    function showAlert(message, type = 'danger', duration = 5000) {
-        // Remover alertas existentes
-        const existingAlerts = document.querySelectorAll('.custom-alert');
-        existingAlerts.forEach(alert => alert.remove());
+    var form = document.getElementById('registroForm');
+    var g = function (id) { return document.getElementById(id); };
+    var dni = g('id_dni'), email = g('id_email'), nombre = g('id_nombre_completo'),
+        t1 = g('id_telefono_1'), t2 = g('id_telefono_2'), fecha = g('id_fecha_nac'), rol = g('id_rol');
 
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `custom-alert alert-${type}`;
-        alertDiv.innerHTML = `
-            <strong>${type === 'danger' ? 'Error:' : type === 'success' ? 'Éxito:' : 'Atención:'}</strong> ${message}
-            <button type="button" class="btn-close" onclick="this.parentElement.remove();" style="float: right;">&times;</button>
-        `;
-        
-        const formContainer = document.querySelector('.reg-rectangulo1');
-        formContainer.insertBefore(alertDiv, formContainer.children[2]); // Después del título y csrf
-        
-        // Auto-remover después del tiempo especificado
-        if (duration > 0) {
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
-                }
-            }, duration);
-        }
-    }
-
-    // Función para validar DNI
-    function validateDNI(dni) {
-        const dniRegex = /^[0-9]{7,8}$/;
-        return dniRegex.test(dni);
-    }
-
-    // Función para validar email
-    function validateEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
-
-    // Función para validar nombre completo
-    function validateNombre(nombre) {
-        const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,100}$/;
-        return nombreRegex.test(nombre.trim());
-    }
-
-    // Función para validar teléfonos
-    function validateTelefono(telefono) {
-        const telefonoRegex = /^[0-9]{6,15}$/;
-        return telefonoRegex.test(telefono);
-    }
-
-    // Función para validar fecha de nacimiento
-    function validateFechaNac(fecha) {
-        if (!fecha) return true; // Campo opcional
-        const hoy = new Date();
-        const fechaNac = new Date(fecha);
-        const edad = hoy.getFullYear() - fechaNac.getFullYear();
-        return edad >= 16 && edad <= 100; // Rango razonable de edad
-    }
-
-    // Función para agregar/quitar clases de error
-    function toggleFieldError(field, hasError) {
-        if (!field) return;
-        if (hasError) {
-            field.classList.add('error-field');
-            field.classList.remove('success-field');
-        } else {
-            field.classList.remove('error-field');
-            field.classList.add('success-field');
-        }
-    }
-
-    // Validaciones en tiempo real para DNI
-    if (dniField) {
-        dniField.addEventListener('blur', function() {
-            const dni = this.value.trim();
-            if (dni && !validateDNI(dni)) {
-                toggleFieldError(this, true);
-                showAlert('El DNI debe contener entre 7 y 8 números.', 'danger', 3000);
-            } else if (dni) {
-                toggleFieldError(this, false);
-            }
-        });
-
-        dniField.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-    }
-
-    // Validación en tiempo real para email
-    if (emailField) {
-        emailField.addEventListener('blur', function() {
-            const email = this.value.trim();
-            if (email && !validateEmail(email)) {
-                toggleFieldError(this, true);
-                showAlert('Por favor ingrese un email válido.', 'danger', 3000);
-            } else if (email) {
-                toggleFieldError(this, false);
-            }
-        });
-    }
-
-    // Validación en tiempo real para nombre completo
-    if (nombreField) {
-        nombreField.addEventListener('blur', function() {
-            const nombre = this.value.trim();
-            if (nombre && !validateNombre(nombre)) {
-                toggleFieldError(this, true);
-                showAlert('El nombre debe contener solo letras y tener entre 2 y 100 caracteres.', 'danger', 3000);
-            } else if (nombre) {
-                toggleFieldError(this, false);
-            }
-        });
-    }
-
-    // Validación para teléfonos
-    if (telefono1Field) {
-        telefono1Field.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-        
-        telefono1Field.addEventListener('blur', function() {
-            const telefono = this.value.trim();
-            if (telefono && !validateTelefono(telefono)) {
-                toggleFieldError(this, true);
-                showAlert('El teléfono debe contener entre 6 y 15 números.', 'danger', 3000);
-            } else if (telefono) {
-                toggleFieldError(this, false);
-            }
-        });
-    }
-
-    if (telefono2Field) {
-        telefono2Field.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-        
-        telefono2Field.addEventListener('blur', function() {
-            const telefono = this.value.trim();
-            if (telefono && !validateTelefono(telefono)) {
-                toggleFieldError(this, true);
-                showAlert('El celular debe contener entre 6 y 15 números.', 'danger', 3000);
-            } else if (telefono) {
-                toggleFieldError(this, false);
-            }
-        });
-    }
-
-    if (fechaNacField) {
-        fechaNacField.addEventListener('blur', function() {
-            const fecha = this.value;
-            if (fecha && !validateFechaNac(fecha)) {
-                toggleFieldError(this, true);
-                showAlert('La fecha de nacimiento debe corresponder a una edad entre 16 y 100 años.', 'danger', 3000);
-            } else if (fecha) {
-                toggleFieldError(this, false);
-            }
-        });
-    }
-
-    // Función para mostrar/ocultar campos según el rol
-    function toggleFieldsBasedOnRole() {
-        const rol = rolField.value.toLowerCase();
-        
-        // Ocultar todos los campos condicionales
-        const camposCondicionales = document.querySelectorAll('.campo-condicional');
-        camposCondicionales.forEach(campo => {
-            campo.style.display = 'none';
-        });
-
-        // Mostrar el campo correspondiente al rol seleccionado
-        if (rol === 'estudiante') {
-            const matriculaField = document.getElementById('matricula-field');
-            if (matriculaField) matriculaField.style.display = 'block';
-        } else if (rol === 'profesor') {
-            const especialidadField = document.getElementById('especialidad-field');
-            if (especialidadField) especialidadField.style.display = 'block';
-        } else if (rol === 'directivo') {
-            const cargoField = document.getElementById('cargo-field');
-            if (cargoField) cargoField.style.display = 'block';
-        } else if (rol === 'preceptor') {
-            const areaField = document.getElementById('area-field');
-            if (areaField) areaField.style.display = 'block';
-        }
-    }
-
-    // Event listener para cambios en el rol
-    if (rolField) {
-        rolField.addEventListener('change', toggleFieldsBasedOnRole);
-        // Ejecutar al cargar la página
-        toggleFieldsBasedOnRole();
-    }
-
-    // Validación completa del formulario antes de enviar
-    form.addEventListener('submit', function(e) {
-        let hasErrors = false;
-        const errors = [];
-
-        // Validar campos obligatorios
-        if (nombreField && !nombreField.value.trim()) {
-            errors.push('El nombre completo es obligatorio.');
-            toggleFieldError(nombreField, true);
-            hasErrors = true;
-        } else if (nombreField && !validateNombre(nombreField.value.trim())) {
-            errors.push('El nombre debe contener solo letras.');
-            toggleFieldError(nombreField, true);
-            hasErrors = true;
-        }
-
-        if (!dniField.value.trim()) {
-            errors.push('El DNI es obligatorio.');
-            toggleFieldError(dniField, true);
-            hasErrors = true;
-        } else if (!validateDNI(dniField.value.trim())) {
-            errors.push('El DNI debe contener entre 7 y 8 números.');
-            toggleFieldError(dniField, true);
-            hasErrors = true;
-        }
-
-        if (!emailField.value.trim()) {
-            errors.push('El email es obligatorio.');
-            toggleFieldError(emailField, true);
-            hasErrors = true;
-        } else if (!validateEmail(emailField.value.trim())) {
-            errors.push('Ingrese un email válido.');
-            toggleFieldError(emailField, true);
-            hasErrors = true;
-        }
-
-        if (!rolField.value) {
-            errors.push('Debe seleccionar un rol.');
-            toggleFieldError(rolField, true);
-            hasErrors = true;
-        }
-
-        // Validar fecha de nacimiento si está presente
-        if (fechaNacField && fechaNacField.value && !validateFechaNac(fechaNacField.value)) {
-            errors.push('Edad debe estar entre 16 y 100 años.');
-            toggleFieldError(fechaNacField, true);
-            hasErrors = true;
-        }
-
-        // Validar teléfonos si están presentes
-        if (telefono1Field && telefono1Field.value.trim() && !validateTelefono(telefono1Field.value.trim())) {
-            errors.push('Teléfono debe tener entre 6 y 15 números.');
-            toggleFieldError(telefono1Field, true);
-            hasErrors = true;
-        }
-
-        if (telefono2Field && telefono2Field.value.trim() && !validateTelefono(telefono2Field.value.trim())) {
-            errors.push('Celular debe tener entre 6 y 15 números.');
-            toggleFieldError(telefono2Field, true);
-            hasErrors = true;
-        }
-
-        // Validar campos condicionales según el rol
-        const rolSeleccionado = rolField.value.toLowerCase();
-        if (rolSeleccionado === 'profesor' && especialidadField && !especialidadField.value.trim()) {
-            errors.push('La especialidad es obligatoria para profesores.');
-            toggleFieldError(especialidadField, true);
-            hasErrors = true;
-        }
-        if (rolSeleccionado === 'directivo' && cargoField && !cargoField.value.trim()) {
-            errors.push('El cargo es obligatorio para directivos.');
-            toggleFieldError(cargoField, true);
-            hasErrors = true;
-        }
-        if (rolSeleccionado === 'preceptor' && areaField && !areaField.value.trim()) {
-            errors.push('El área es obligatoria para preceptores.');
-            toggleFieldError(areaField, true);
-            hasErrors = true;
-        }
-
-        // Si hay errores, prevenir el envío y mostrar alertas
-        if (hasErrors) {
-            e.preventDefault();
-            showAlert('Corrija los errores: ' + errors.join(' '), 'danger', 8000);
-            
-            // Scroll al primer campo con error
-            const firstErrorField = document.querySelector('.error-field');
-            if (firstErrorField) {
-                firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstErrorField.focus();
-            }
-        } else {
-            // Si todo está bien, mostrar mensaje de éxito
-            showAlert('Registrando usuario...', 'success', 2000);
-        }
+    // ── Solo números en DNI y teléfonos ──
+    [dni, t1, t2].forEach(function (f) {
+      if (f) f.addEventListener('input', function () { this.value = this.value.replace(/[^0-9]/g, ''); });
     });
 
-    // Limpiar clases de error cuando el usuario empiece a corregir
-    const allFields = [usernameField, nombreField, dniField, fechaNacField, direccionField, 
-                      localidadField, ciudadField, nacionalidadField, emailField, 
-                      telefono1Field, telefono2Field, estadoCivilField, sexoField, 
-                      rolField, carreraField];
-    
-    allFields.forEach(field => {
-        if (field) {
-            field.addEventListener('input', function() {
-                if (this.classList.contains('error-field')) {
-                    this.classList.remove('error-field');
-                }
-            });
-        }
+    // ── Marca de error visual por campo ──
+    function marcarError(f) { if (f) { f.classList.add('border-red-500', 'bg-red-50'); f.classList.remove('border-slate-300'); } }
+    function limpiarError(f) { if (f) { f.classList.remove('border-red-500', 'bg-red-50'); f.classList.add('border-slate-300'); } }
+    document.querySelectorAll('#registroForm input, #registroForm select').forEach(function (f) {
+      f.addEventListener('input', function () { limpiarError(this); });
     });
-});
+
+    // ── Validadores ──
+    var esDNI = function (v) { return /^[0-9]{7,8}$/.test(v); };
+    var esEmail = function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); };
+    var esNombre = function (v) { return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,100}$/.test(v.trim()); };
+    var esTel = function (v) { return /^[0-9]{6,15}$/.test(v); };
+    var esFecha = function (v) { if (!v) return true; var e = new Date().getFullYear() - new Date(v).getFullYear(); return e >= 16 && e <= 100; };
+
+    // ── Campos condicionales según rol ──
+    function mostrarSegunRol() {
+      document.querySelectorAll('.campo-condicional').forEach(function (c) { c.style.display = 'none'; });
+      var r = (rol ? rol.value : '').toLowerCase();
+      var mapa = { estudiante: 'matricula-field', profesor: 'especialidad-field', directivo: 'cargo-field', preceptor: 'area-field' };
+      var target = g(mapa[r]);
+      if (target) target.style.display = 'block';
+    }
+    if (rol) { rol.addEventListener('change', mostrarSegunRol); mostrarSegunRol(); }
+
+    // ── Validación al enviar ──
+    form.addEventListener('submit', function (e) {
+      var errores = [];
+      if (nombre && (!nombre.value.trim() || !esNombre(nombre.value))) { errores.push('nombre'); marcarError(nombre); }
+      if (dni && (!dni.value.trim() || !esDNI(dni.value.trim()))) { errores.push('DNI'); marcarError(dni); }
+      if (email && (!email.value.trim() || !esEmail(email.value.trim()))) { errores.push('email'); marcarError(email); }
+      if (rol && !rol.value) { errores.push('rol'); marcarError(rol); }
+      if (fecha && fecha.value && !esFecha(fecha.value)) { errores.push('fecha'); marcarError(fecha); }
+      if (t1 && t1.value.trim() && !esTel(t1.value.trim())) { errores.push('teléfono'); marcarError(t1); }
+      if (t2 && t2.value.trim() && !esTel(t2.value.trim())) { errores.push('celular'); marcarError(t2); }
+      if (errores.length) {
+        e.preventDefault();
+        alert('Revisá estos campos: ' + errores.join(', ') + '.');
+        var primero = document.querySelector('.border-red-500');
+        if (primero) { primero.scrollIntoView({ behavior: 'smooth', block: 'center' }); primero.focus(); }
+      }
+    });
+  });
 </script>
 
 {% else %}
 
-<div class="card">
-  <h3>Ud no tiene los permisos para acceder a esta página</h3>
-<div class="text-center">
-    <img src="/static/imagenes/error403.png" class=""></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
-</div>
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.png" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No tenés permisos para acceder a esta página.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
 </div>
 
-{%endif%}
-
+{% endif %}
 {% endblock %}

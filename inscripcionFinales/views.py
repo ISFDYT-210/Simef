@@ -950,16 +950,144 @@ def cargar_usuarios(request):
 
 @capacidad_requerida('gestionar_materias')
 def alta_masiva_materia(request):
-    if request.method == 'POST' and request.Files['archivo_csv']:
-        archivo_csv = request.FILES['archivo_csv']
-        decoded_file = archivo_csv.read().decode('utf-8').splitlines() 
-        archivo_csv= csv.DictReader(decoded_file) 
+    if request.method == 'POST':
+        form = ArchivoForm(request.POST, request.FILES)
 
-        for fila in archivo_csv:
-            nombre = fila['nombre']
-            profesor = fila['profesor']
-            carrera = fila ['carrera']
-        return HttpResponse ('Materias importadas correctamente')
+        if 'csv_file' not in request.FILES:
+            messages.error(request, 'Por favor seleccione un archivo CSV.')
+            return render(request, 'materias/alta_masiva_materia.html', {'form': ArchivoForm()})
+
+        if not form.is_valid():
+            return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+        archivo_csv = request.FILES['csv_file']
+
+        try:
+            contenido = None
+            for encoding in ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']:
+                try:
+                    archivo_csv.seek(0)
+                    contenido = archivo_csv.read().decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+            if contenido is None:
+                messages.error(request, 'No se pudo leer el archivo. Verifique la codificación.')
+                return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+            reader = csv.DictReader(contenido.splitlines(), delimiter=',')
+
+            campos_requeridos = ['Nombre materia', 'Carrera']
+            if not reader.fieldnames or not all(campo in reader.fieldnames for campo in campos_requeridos):
+                messages.error(request, f'El archivo debe contener las columnas: {", ".join(campos_requeridos)}')
+                return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+            anios_validos = [str(v) for v, _ in Materia.ANIO_CHOICES]
+            dias_validos = [v for v, _ in Materia.DIA_CHOICES]
+            horarios_validos = [v for v, _ in Materia.HORARIO_CHOICES]
+
+            materias_creadas = 0
+            materias_duplicadas = 0
+            errores = []
+
+            for numero_fila, fila in enumerate(reader, start=2):
+                try:
+                    nombre_materia = fila.get('Nombre materia', '').strip()
+                    nombre_carrera = fila.get('Carrera', '').strip()
+
+                    if not nombre_materia or not nombre_carrera:
+                        errores.append(f'Fila {numero_fila}: Campos obligatorios faltantes (Nombre materia, Carrera)')
+                        continue
+
+                    try:
+                        carrera_obj = Carrera.objects.get(nombre_carrera__iexact=nombre_carrera)
+                    except Carrera.DoesNotExist:
+                        errores.append(f'Fila {numero_fila}: Carrera no encontrada ({nombre_carrera})')
+                        continue
+
+                    if Materia.objects.filter(nombre_materia__iexact=nombre_materia, carrera=carrera_obj).exists():
+                        materias_duplicadas += 1
+                        continue
+
+                    profesor_obj = None
+                    dni_profesor = fila.get('Profesor DNI', '').strip()
+                    if dni_profesor:
+                        try:
+                            profesor_obj = Usuario.objects.get(dni=int(dni_profesor), rol='Profesor')
+                        except (ValueError, Usuario.DoesNotExist):
+                            errores.append(f'Fila {numero_fila}: Profesor no encontrado (DNI {dni_profesor})')
+                            continue
+
+                    anio = fila.get('Año', '').strip() or '1'
+                    if anio not in anios_validos:
+                        errores.append(f'Fila {numero_fila}: Año inválido. Opciones: {", ".join(anios_validos)}')
+                        continue
+
+                    dia = fila.get('Día', '').strip() or 'Lunes'
+                    if dia not in dias_validos:
+                        errores.append(f'Fila {numero_fila}: Día inválido. Opciones: {", ".join(dias_validos)}')
+                        continue
+
+                    horario = fila.get('Horario', '').strip() or '12:00'
+                    if horario not in horarios_validos:
+                        errores.append(f'Fila {numero_fila}: Horario inválido. Opciones: {", ".join(horarios_validos)}')
+                        continue
+
+                    inscripcion_str = fila.get('Inscripcion abierta', '').strip().lower()
+                    inscripcion_abierta = inscripcion_str in ['si', 'sí', 'true', '1']
+
+                    Materia.objects.create(
+                        nombre_materia=nombre_materia,
+                        carrera=carrera_obj,
+                        profesor=profesor_obj,
+                        anio=int(anio),
+                        dia=dia,
+                        Horario=horario,
+                        inscripcionAbierta=inscripcion_abierta,
+                    )
+                    materias_creadas += 1
+
+                except IntegrityError as e:
+                    errores.append(f'Fila {numero_fila}: Error de integridad - {str(e)}')
+                except Exception as e:
+                    errores.append(f'Fila {numero_fila}: Error inesperado - {str(e)}')
+
+            if materias_creadas > 0 and not errores:
+                messages.success(request, f'Se crearon {materias_creadas} materias exitosamente')
+                return render(request, 'materias/exito_carga_masiva.html', {
+                    'materias_creadas': materias_creadas,
+                    'materias_duplicadas': materias_duplicadas,
+                })
+            elif materias_creadas > 0:
+                messages.warning(request, f'Se crearon {materias_creadas} materias con algunas advertencias')
+                return render(request, 'materias/warning_carga_masiva.html', {
+                    'materias_creadas': materias_creadas,
+                    'materias_duplicadas': materias_duplicadas,
+                    'errores': errores[:20],
+                })
+            elif materias_duplicadas > 0 and not errores:
+                messages.warning(request, f'{materias_duplicadas} materias ya existían en el sistema')
+                return render(request, 'materias/warning_carga_masiva.html', {
+                    'materias_creadas': 0,
+                    'materias_duplicadas': materias_duplicadas,
+                    'errores': [],
+                })
+            else:
+                messages.error(request, 'No se pudieron crear materias')
+                return render(request, 'materias/alta_masiva_materia.html', {
+                    'form': form,
+                    'errores': errores[:20],
+                })
+
+        except Exception as e:
+            messages.error(request, f'Error procesando archivo: {str(e)}')
+            return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+    else:
+        form = ArchivoForm()
+
+    return render(request, 'materias/alta_masiva_materia.html', {'form': form})
     return render(request, 'alta_masiva_materia.html') 
     
 @capacidad_requerida('gestionar_materias')
