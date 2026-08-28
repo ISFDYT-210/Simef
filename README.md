@@ -19,12 +19,12 @@ La forma más rápida de levantar el proyecto es con Docker: no requiere
 instalar Python ni Postgres en tu máquina.
 
 ```bash
-cp .env.example .env      # completar con tus datos, ver ENV.md
+cp .env.example .env      # completar con tus datos, ver docs/ENV.md
 docker compose up -d --build
 ```
 
 La app queda en **http://localhost:8000**. Guía completa paso a paso en
-[DOCKER.md](DOCKER.md).
+[docs/DOCKER.md](docs/DOCKER.md).
 
 ---
 
@@ -32,12 +32,12 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 
 | Documento | Contenido |
 |---|---|
-| [DOCKER.md](DOCKER.md) | Levantar el proyecto completo (Django + Postgres) con Docker Compose. |
-| [ENV.md](ENV.md) | Qué es cada variable de `.env.example` y cómo armar tu `.env`. |
-| [INSTALACION_MANUAL.md](INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
-| [DESPLIEGUE.md](DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + MariaDB) en Debian. |
-| [README-tailwind.md](README-tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
-| [TARJETAS_GH.md](TARJETAS_GH.md) | Cómo cargar tarjetas de trabajo (issues) al tablero con la CLI `gh`. |
+| [docs/DOCKER.md](docs/DOCKER.md) | Levantar el proyecto completo (Django + Postgres) con Docker Compose. |
+| [docs/ENV.md](docs/ENV.md) | Qué es cada variable de `.env.example` y cómo armar tu `.env`. |
+| [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
+| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + MariaDB) en Debian. |
+| [docs/README-tailwind.md](docs/README-tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
+| [docs/TARJETAS_GH.md](docs/TARJETAS_GH.md) | Cómo cargar tarjetas de trabajo (issues) al tablero con la CLI `gh`. |
 
 
 ---
@@ -62,5 +62,5 @@ LOGIN_REDIRECT_URL = 'inicio'
 
 ## Notas
 
-- Para desarrollo local, Docker ([DOCKER.md](DOCKER.md)) es el camino recomendado.
-- Para producción, ver [DESPLIEGUE.md](DESPLIEGUE.md).
+- Para desarrollo local, Docker ([docs/DOCKER.md](docs/DOCKER.md)) es el camino recomendado.
+- Para producción, ver [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
