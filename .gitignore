@@ -10,3 +10,7 @@ venv/
 .env
 tailwindcss
 tailwindcss.exe
+.claude/
+graft
+.ignore
+.mcp.json
