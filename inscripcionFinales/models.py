@@ -1,144 +1,180 @@
-from django.contrib.auth.models import (AbstractBaseUser, BaseUserManager, Group, PermissionsMixin, AbstractUser, User,)
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
-from django.utils.timezone import now
-from .choices import ESTADO_CIVIL_CHOICES,SEXO_CHOICES,MODALIDAD_CHOICES
-import random
-#from django.contrib.auth.forms import PasswordChangeForm
+from .choices import ESTADO_CIVIL_CHOICES, SEXO_CHOICES, MODALIDAD_CHOICES
+
+
+# === Matriz de capacidades por rol ===========================================
+# Única fuente de verdad del "alcance" de cada rol. Para cambiar qué puede
+# hacer un rol, se edita SOLO este diccionario.
+CAPACIDADES_POR_ROL = {
+    'Directivo':  {'gestionar_usuarios', 'gestionar_materias', 'ver_materias',
+                   'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes'},
+    'Secretario': {'gestionar_usuarios', 'gestionar_materias', 'ver_materias',
+                   'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes'},
+    'Preceptor':  {'ver_materias', 'gestionar_mesas', 'abrir_inscripciones',
+                   'cargar_notas', 'ver_reportes'},
+    'Profesor':   {'cargar_notas', 'ver_reportes'},
+    'Estudiante': {'inscribirse'},
+}
 
 
 class UsuarioManager(BaseUserManager):
-    
-    def create_user(self ,email, password, **extra_fields):
-        if not email:
-            raise ValueError('Los usuarios deben tener una direccion de email')
 
-        user =self.model(
-          email= self.normalize_email(email),
-          
-        )
-        user = self.model(email=email, **extra_fields)
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Los usuarios deben tener una dirección de email')
+        user = self.model(email=self.normalize_email(email), **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
-    
-        
-    def create_superuser(self, email, password, **extra_fields):
-        user = self.create_user(
-          email = self.normalize_email(email),
-          password = password,
-        )
-        user.is_superuser = True
-        user.is_admin = True
-        user.is_staff = True
-        user.save(using=self._db)
-        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_admin', True)
+        return self.create_user(email, password, **extra_fields)
 
 
-class Usuario(AbstractBaseUser,PermissionsMixin):
-      
-    email = models.EmailField('email', max_length=254, unique = True)
-    username = models.CharField('username',unique = True,null = True, max_length=100, blank=False)
+class Usuario(AbstractBaseUser, PermissionsMixin):
+
+    email = models.EmailField('email', max_length=254, unique=True)
+    username = models.CharField('username', unique=True, null=True, max_length=100, blank=False)
     nombre_completo = models.CharField('nombre_completo', max_length=200, null=True, blank=True)
     fecha_nac = models.DateField('fecha_nac', null=True, blank=True)
-    dni = models.IntegerField('dni',unique = True, null= True, blank=True)
+    dni = models.IntegerField('dni', unique=True, null=True, blank=True)
     direccion = models.CharField('direccion', max_length=50, null=True, blank=True)
     localidad = models.CharField('localidad', max_length=50, null=True, blank=True)
     ciudad = models.CharField('ciudad', max_length=100, null=True, blank=True)
-    nacionalidad = models.CharField('nacionalidad',max_length=50, null=True, blank=True)
-    telefono_1 = models.IntegerField('telefono_1', null=True, blank=True)
-    telefono_2 = models.IntegerField('telefono_2', null=True, blank=True)
-    estado_civil=models.CharField('estado_civil', choices=ESTADO_CIVIL_CHOICES,max_length=50, null=True, blank=True)
-    sexo=models.CharField('sexo',choices=SEXO_CHOICES,max_length=10, null=True, blank=True)
+    nacionalidad = models.CharField('nacionalidad', max_length=50, null=True, blank=True)
+    telefono_1 = models.CharField('telefono_1', max_length=15, null=True, blank=True)
+    telefono_2 = models.CharField('telefono_2', max_length=15, null=True, blank=True)
+    estado_civil = models.CharField('estado_civil', choices=ESTADO_CIVIL_CHOICES, max_length=50, null=True, blank=True)
+    sexo = models.CharField('sexo', choices=SEXO_CHOICES, max_length=10, null=True, blank=True)
     imagen = models.ImageField('imagenPerfil', upload_to='perfil/', max_length=200, null=True, blank=True)
     is_admin = models.BooleanField('is_admin', default=False)
-    is_superuser = models.BooleanField('is_superuser', default=False)
-    is_active = models.BooleanField(default = True)
-    is_staff = models.BooleanField(default = False)
-    carrera = models.ManyToManyField('Carrera',blank=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    carrera = models.ManyToManyField('Carrera', blank=True)
     first_login = models.BooleanField(default=True, help_text="True si es el primer login del usuario")
-    Estudiante = 'Estudiante'          
-    Preceptor = 'Preceptor'
-    Profesor = 'Profesor'
-    Directivo = 'Directivo'
-    Administrador = 'Administrador'
-    Bibliotecario = 'Bibliotecario'
-    
+
+    # === Roles ===============================================================
+    DIRECTIVO = 'Directivo'
+    SECRETARIO = 'Secretario'
+    PRECEPTOR = 'Preceptor'
+    PROFESOR = 'Profesor'
+    ESTUDIANTE = 'Estudiante'
 
     ROL_CHOICES = (
-        (Directivo, 'Directivo'),
-        (Preceptor, 'Preceptor'),
-        (Profesor, 'Profesor'),
-        (Estudiante, 'Estudiante'),
-        (Administrador, 'Administrador'),
-        (Bibliotecario, 'Bibliotecario'),
+        (DIRECTIVO, 'Director'),
+        (SECRETARIO, 'Secretario'),
+        (PRECEPTOR, 'Preceptor'),
+        (PROFESOR, 'Profesor'),
+        (ESTUDIANTE, 'Estudiante'),
+    )
+    rol = models.CharField(max_length=20, choices=ROL_CHOICES, default=ESTUDIANTE)
 
-        
-     )
-    rol = models.CharField(max_length=20, choices=ROL_CHOICES, default=Estudiante)
     objects = UsuarioManager()
-    
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['password']
 
-    
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
     def __str__(self):
-        if self.nombre_completo: 
-            return self.nombre_completo
-        else:
-            return self.email
-        
+        return self.nombre_completo or self.email
+
+    # === Identidad por rol ===================================================
     def es_estudiante(self):
-        """Verifica si el usuario es estudiante"""
-        return self.rol == 'Estudiante'
-    
+        return self.rol == self.ESTUDIANTE
+
     def es_profesor(self):
-        """Verifica si el usuario es profesor"""
-        return self.rol == 'Profesor'
-    
+        return self.rol == self.PROFESOR
+
     def es_directivo(self):
-        """Verifica si el usuario es directivo"""
-        return self.rol == 'Directivo'
-    
+        return self.rol == self.DIRECTIVO
+
+    def es_secretario(self):
+        return self.rol == self.SECRETARIO
+
     def es_preceptor(self):
-        """Verifica si el usuario es preceptor"""
-        return self.rol == 'Preceptor'
-    
-    def es_administrador(self):
-        """Verifica si el usuario es administrador"""
-        return self.rol == 'Administrador'
-    
-    def es_bibliotecario(self):
-        """Verifica si el usuario es bibliotecario"""
-        return self.rol == 'Bibliotecario'
-    
-    def puede_ensenar(self):
-        """Verifica si el usuario puede enseñar materias"""
-        return self.es_profesor() or self.is_staff or self.is_superuser
-    
-    def puede_inscribirse_materias(self):
-        """Verifica si el usuario puede inscribirse en materias"""
-        return self.es_estudiante()
-    
+        return self.rol == self.PRECEPTOR
+
+    def es_super_admin(self):
+        return self.is_superuser
+
+    # === Alcance: capacidades ===============================================
+    def tiene_capacidad(self, capacidad):
+        """El super admin puede todo; el resto, según la matriz de su rol."""
+        if self.is_superuser:
+            return True
+        return capacidad in CAPACIDADES_POR_ROL.get(self.rol, set())
+
+    def puede_gestionar_usuarios(self):
+        return self.tiene_capacidad('gestionar_usuarios')
+
+    def puede_gestionar_materias(self):
+        return self.tiene_capacidad('gestionar_materias')
+
+    def puede_ver_materias(self):
+        return self.tiene_capacidad('ver_materias')
+
+    def puede_gestionar_mesas(self):
+        return self.tiene_capacidad('gestionar_mesas')
+
+    def puede_abrir_inscripciones(self):
+        return self.tiene_capacidad('abrir_inscripciones')
+
+    def puede_cargar_notas(self):
+        return self.tiene_capacidad('cargar_notas')
+
+    def puede_ver_reportes(self):
+        return self.tiene_capacidad('ver_reportes')
+
     def puede_administrar(self):
-        """Verifica si el usuario puede realizar tareas administrativas"""
-        return self.es_directivo() or self.es_preceptor() or self.is_staff or self.is_superuser
-    
+        """Atajo: ¿es personal administrativo (no estudiante ni profesor)?"""
+        return self.is_superuser or self.rol in (self.DIRECTIVO, self.SECRETARIO, self.PRECEPTOR)
+
+    # === Consultas por rol ===================================================
+    def puede_cargar_notas_de(self, materia):
+        """True si puede cargar notas de ESTA materia en particular."""
+        if not self.tiene_capacidad('cargar_notas'):
+            return False
+        # El super admin siempre puede; el preceptor gestiona todas las materias
+        if self.is_superuser or self.es_preceptor():
+            return True
+        # El profesor, solo las materias que dicta
+        if self.es_profesor():
+            return materia.profesor_id == self.id
+        return False
+
+    def puede_ver_reporte_de(self, estudiante):
+        """True si puede ver el reporte/constancia de ESTE estudiante."""
+        if self.is_superuser:
+            return True
+        # Cada usuario puede ver su propio reporte
+        if self.id == estudiante.id:
+            return True
+        if not self.tiene_capacidad('ver_reportes'):
+            return False
+        # Personal administrativo: cualquier estudiante
+        if self.rol in (self.DIRECTIVO, self.SECRETARIO, self.PRECEPTOR):
+            return True
+        # Profesor: solo estudiantes inscriptos en sus materias
+        if self.es_profesor():
+            return usuarios_materia.objects.filter(
+                usuario=estudiante, materia__profesor=self
+            ).exists()
+        return False
+
     @classmethod
     def obtener_profesores(cls):
-        """Método de clase para obtener todos los profesores"""
-        return cls.objects.filter(rol='Profesor').order_by('nombre_completo')
-    
+        return cls.objects.filter(rol=cls.PROFESOR).order_by('nombre_completo')
+
     @classmethod
     def obtener_estudiantes(cls):
-        """Método de clase para obtener todos los estudiantes"""
-        return cls.objects.filter(rol='Estudiante').order_by('nombre_completo')
-    
+        return cls.objects.filter(rol=cls.ESTUDIANTE).order_by('nombre_completo')
+
     @classmethod
     def obtener_por_rol(cls, rol):
-        """Método de clase para obtener usuarios por rol específico"""
         return cls.objects.filter(rol=rol).order_by('nombre_completo')
-
-    
 
 
 class Carrera(models.Model):
@@ -176,7 +212,7 @@ class Instituto(models.Model):
 
 
 class Materia(models.Model):
-    nombre_materia = models.CharField('nombre_materia', max_length=50)
+    nombre_materia = models.CharField('nombre_materia', max_length=200)
     carrera = models.ForeignKey('Carrera', on_delete=models.CASCADE, null=True)
     profesor = models.ForeignKey('Usuario', on_delete=models.CASCADE, null=True)
     inscripcionAbierta = models.BooleanField(default=False)
@@ -283,3 +319,22 @@ class Directivo(Usuario):
 
 class Preceptor(Usuario):
     area = models.CharField(max_length=100)
+
+
+class RegistroAuditoria(models.Model):
+    """Registro de acciones importantes: quién hizo qué y cuándo."""
+    usuario = models.ForeignKey('Usuario', on_delete=models.SET_NULL,
+                                null=True, blank=True, related_name='acciones_auditoria')
+    accion = models.CharField('Acción', max_length=255)
+    modelo_afectado = models.CharField('Modelo', max_length=100, blank=True)
+    objeto_id = models.CharField('ID del objeto', max_length=100, blank=True)
+    fecha = models.DateTimeField('Fecha', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = 'Registro de auditoría'
+        verbose_name_plural = 'Registros de auditoría'
+
+    def __str__(self):
+        quien = self.usuario.email if self.usuario else 'Sistema'
+        return f"[{self.fecha:%Y-%m-%d %H:%M}] {quien}: {self.accion}"

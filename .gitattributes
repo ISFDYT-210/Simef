@@ -1,3 +1,6 @@
 * linguist-vendored
 
 *.py linguist-vendored=false
+
+entrypoint.sh text eol=lf
+*.sh text eol=lf
