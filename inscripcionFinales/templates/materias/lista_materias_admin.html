@@ -18,18 +18,43 @@
       <div class="flex flex-wrap items-center gap-2">
         <!-- Filtro cascada carrera → año (GET) -->
         <form method="get" class="flex items-center gap-2">
-          <select name="carrera" x-ref="carrera" @change="cargarAnios()"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
-            <option value="">Filtrar por carrera</option>
-            {% for carrera in carreras %}
-            <option value="{{ carrera.id }}" data-duracion="{{ carrera.duracion_carrera }}" {% if request.GET.carrera == carrera.id|stringformat:"s" %}selected{% endif %}>{{ carrera.nombre_carrera }}</option>
-            {% endfor %}
-          </select>
-          <select name="anio" x-ref="anio"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100 disabled:bg-slate-100"
-                  :disabled="!$refs.carrera.value">
-            <option value="">Seleccioná carrera</option>
-          </select>
+          <input type="hidden" name="carrera" :value="carreraId">
+          <input type="hidden" name="anio" :value="anioValor">
+
+          <!-- Dropdown carrera (custom, no usa <select> nativo para evitar el click-and-hold de Linux) -->
+          <div class="relative" @click.outside="carreraAbierta=false">
+            <button type="button" @click="carreraAbierta=!carreraAbierta"
+                    class="flex w-48 items-center justify-between gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100"
+                    :class="!carreraId && 'text-slate-500'">
+              <span class="truncate" x-text="carreraNombre()"></span>
+              <svg class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div x-show="carreraAbierta" x-cloak x-transition.origin.top.left
+                 class="absolute left-0 z-30 mt-1 max-h-96 w-48 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg">
+              <button type="button" @click="elegirCarrera('')" class="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Filtrar por carrera</button>
+              <template x-for="c in carreras" :key="c.id">
+                <button type="button" @click="elegirCarrera(c.id)" class="block w-full px-3 py-1.5 text-left hover:bg-slate-50" :class="carreraId===c.id && 'bg-celeste-50 font-medium text-celeste-600'" x-text="c.nombre"></button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Dropdown año (custom, depende de la carrera elegida) -->
+          <div class="relative" @click.outside="anioAbierta=false">
+            <button type="button" @click="carreraId && (anioAbierta=!anioAbierta)" :disabled="!carreraId"
+                    class="flex w-48 items-center justify-between gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100 disabled:bg-slate-100"
+                    :class="!carreraId ? 'text-slate-400' : (!anioValor && 'text-slate-500')">
+              <span class="truncate" x-text="anioValor || (carreraId ? 'Filtrar por año' : 'Seleccioná carrera')"></span>
+              <svg class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div x-show="anioAbierta" x-cloak x-transition.origin.top.left
+                 class="absolute left-0 z-30 mt-1 max-h-96 w-48 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg">
+              <button type="button" @click="elegirAnio('')" class="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Filtrar por año</button>
+              <template x-for="a in opcionesAnio()" :key="a">
+                <button type="button" @click="elegirAnio(a)" class="block w-full px-3 py-1.5 text-left hover:bg-slate-50" :class="anioValor===a && 'bg-celeste-50 font-medium text-celeste-600'" x-text="a"></button>
+              </template>
+            </div>
+          </div>
+
           <button type="submit" title="Buscar" class="grid h-[34px] w-10 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z"/></svg>
           </button>
@@ -139,17 +164,34 @@
       modal: { abierto:false, tipo:'', titulo:'', mensaje:'' },
       urls: { eliminar:"{% url 'eliminar_materias_seleccionadas' %}", abrir:"{% url 'abrir_materias_seleccionadas' %}", cerrar:"{% url 'cerrar_materias_seleccionadas' %}" },
 
+      carreras: [
+        {% for carrera in carreras %}
+        { id: "{{ carrera.id }}", nombre: "{{ carrera.nombre_carrera|escapejs }}", duracion: {{ carrera.duracion_carrera|default:0 }} }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      carreraId: "{{ request.GET.carrera|default:'' }}",
+      anioValor: "{{ request.GET.anio|default:'' }}",
+      carreraAbierta: false,
+      anioAbierta: false,
+
+      carreraNombre(){
+        var c = this.carreras.find(c => c.id === this.carreraId);
+        return c ? c.nombre : 'Filtrar por carrera';
+      },
+      opcionesAnio(){
+        var c = this.carreras.find(c => c.id === this.carreraId);
+        if(!c || !c.duracion) return [];
+        var arr = [];
+        for(var i=1; i<=c.duracion; i++) arr.push(String(i));
+        return arr;
+      },
+      elegirCarrera(id){ this.carreraId = id; this.anioValor = ''; this.carreraAbierta = false; },
+      elegirAnio(a){ this.anioValor = a; this.anioAbierta = false; },
+
       checks(){ return Array.from(document.querySelectorAll('.materia-check')); },
       seleccionadas(){ return this.checks().filter(c=>c.checked); },
       toggleTodos(e){ this.checks().forEach(c=>c.checked=e.target.checked); },
       sincronizar(){ if(this.$refs.checkTodos){ var t=this.checks(); this.$refs.checkTodos.checked = t.length>0 && t.every(c=>c.checked); } },
-
-      cargarAnios(){
-        var sel=this.$refs.carrera, anio=this.$refs.anio;
-        var dur=sel.options[sel.selectedIndex]?.getAttribute('data-duracion');
-        anio.innerHTML='<option value="">Filtrar por año</option>';
-        if(dur){ for(var i=1;i<=dur;i++){ var o=document.createElement('option'); o.value=i; o.text=i; anio.add(o); } }
-      },
 
       pedir(tipo){
         var sel=this.seleccionadas();
