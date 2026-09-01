@@ -94,6 +94,10 @@
           <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4 2 9l10 5 10-5-10-5Zm0 5v6m6-3v4a6 3 0 0 1-12 0v-4"/></svg>
           <span x-show="sidebar" class="whitespace-nowrap">Crear carrera</span>
         </a>
+        <a href="{% url 'lista_carreras' %}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Listado de carreras</span>
+        </a>
         {% endif %}
         {% if request.user.puede_ver_materias %}
         <a href="/lista_materias_admin/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">

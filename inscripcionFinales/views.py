@@ -242,9 +242,26 @@ class carreraView(CreateView):
         form.save()
         Carrera = form.cleaned_data.get('nombre_carrera')
         Resolucion = form.cleaned_data.get('num_resolucion')
-      
-        
+
+
         return redirect('/')
+
+@capacidad_requerida('gestionar_materias')
+def lista_carreras(request):
+    carreras = Carrera.objects.all().order_by('nombre_carrera')
+    return render(request, 'carreras/lista_carreras.html', {'carreras': carreras})
+
+@capacidad_requerida('gestionar_materias')
+def editar_carrera(request, id):
+    carrera = get_object_or_404(Carrera, id=id)
+    if request.method == 'POST':
+        form = carreraForm(request.POST, instance=carrera)
+        if form.is_valid():
+            form.save()
+            return redirect('lista_carreras')
+    else:
+        form = carreraForm(instance=carrera)
+    return render(request, 'carreras/editar_carrera.html', {'form': form, 'carrera': carrera})
 
 class listUser(CapacidadRequeridaMixin, ListView):
     capacidades_requeridas = ('gestionar_usuarios',)

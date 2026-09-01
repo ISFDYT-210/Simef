@@ -18,6 +18,8 @@ urlpatterns = [
     path("password_reset_done/", auth_views.PasswordResetDoneView.as_view(template_name="registration/password_reset_send.html"), name='password_reset_done'),
     path("create_user/",login_required(registerView.as_view(template_name= 'registration/register.html')), name='register'),
     path("career/", login_required(carreraView.as_view(template_name= 'carrera.html')), name='carrera'),
+    path('lista_carreras/', lista_carreras, name='lista_carreras'),
+    path('editar_carrera/<int:id>/', login_required(editar_carrera), name='editar_carrera'),
     path("institut/", login_required(carreraView.as_view(template_name= 'instituto.html')), name='instituto'),
     path("show_profile/", login_required(profileviews.as_view(template_name= 'registration/profile.html')), name='profile'),
     path("change_password/", auth_views.PasswordChangeView.as_view(template_name = 'registration/change_password.html'),name = 'cambiar_contraseña'),

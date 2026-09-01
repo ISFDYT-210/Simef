@@ -27,7 +27,7 @@ class institutoForms(forms.ModelForm):
 
 class carreraForm(forms.ModelForm):
       nombre_carrera = forms.CharField( max_length=100)
-      num_resolucion = forms.CharField(max_length=100)
+      num_resolucion = forms.CharField(max_length=100, required=False)
       class Meta:
         model = Carrera
         fields =(
