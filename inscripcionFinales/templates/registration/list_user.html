@@ -23,7 +23,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
       <div>
         <h2 class="text-sm font-semibold text-tinta-900">Usuarios registrados</h2>
-        <p class="text-xs text-slate-500"><span x-text="seleccionados().length"></span> seleccionado(s)</p>
+        <p class="text-xs text-slate-500"><span x-text="contador"></span> seleccionado(s)</p>
       </div>
 
       <div class="flex items-center gap-2">
@@ -182,7 +182,7 @@
 <script>
   function listaUsuarios() {
     return {
-      pagina: 1, porPagina: 10,
+      pagina: 1, porPagina: 10, contador: 0,
       dni: '', avisoDni: false, errorDni: false,
       modalEliminar: false, modalVacio: false, modalReporte: false,
       mensajeEliminar: '', rolReporte: '',
@@ -201,11 +201,13 @@
       toggleTodos(e) {
         this.filas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina)
           .forEach(f => { const c = f.querySelector('.usuario-check'); if (c) c.checked = e.target.checked; });
+        this.contador = this.seleccionados().length;
       },
       sincronizar() {
         const visibles = this.filas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina);
         const todas = visibles.every(f => f.querySelector('.usuario-check')?.checked);
         if (this.$refs.checkTodos) this.$refs.checkTodos.checked = visibles.length > 0 && todas;
+        this.contador = this.seleccionados().length;
       },
 
       buscarPorDni() {

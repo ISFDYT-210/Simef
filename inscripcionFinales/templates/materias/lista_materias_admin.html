@@ -12,7 +12,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
       <div>
         <h2 class="text-sm font-semibold text-tinta-900">Listado de materias</h2>
-        <p class="text-xs text-slate-500"><span x-text="seleccionadas().length"></span> seleccionada(s)</p>
+        <p class="text-xs text-slate-500"><span x-text="contador"></span> seleccionada(s)</p>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
@@ -160,7 +160,7 @@
 <script>
   function materiasAdmin() {
     return {
-      avisoVacio: false, accionUrl: '',
+      avisoVacio: false, accionUrl: '', contador: 0,
       modal: { abierto:false, tipo:'', titulo:'', mensaje:'' },
       urls: { eliminar:"{% url 'eliminar_materias_seleccionadas' %}", abrir:"{% url 'abrir_materias_seleccionadas' %}", cerrar:"{% url 'cerrar_materias_seleccionadas' %}" },
 
@@ -190,8 +190,8 @@
 
       checks(){ return Array.from(document.querySelectorAll('.materia-check')); },
       seleccionadas(){ return this.checks().filter(c=>c.checked); },
-      toggleTodos(e){ this.checks().forEach(c=>c.checked=e.target.checked); },
-      sincronizar(){ if(this.$refs.checkTodos){ var t=this.checks(); this.$refs.checkTodos.checked = t.length>0 && t.every(c=>c.checked); } },
+      toggleTodos(e){ this.checks().forEach(c=>c.checked=e.target.checked); this.contador=this.seleccionadas().length; },
+      sincronizar(){ if(this.$refs.checkTodos){ var t=this.checks(); this.$refs.checkTodos.checked = t.length>0 && t.every(c=>c.checked); } this.contador=this.seleccionadas().length; },
 
       pedir(tipo){
         var sel=this.seleccionadas();

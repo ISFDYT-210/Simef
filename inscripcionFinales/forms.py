@@ -250,8 +250,8 @@ Sistema Educativo
         usuario.localidad = self.cleaned_data.get('localidad', '')
         usuario.ciudad = self.cleaned_data.get('ciudad', '')
         usuario.nacionalidad = self.cleaned_data.get('nacionalidad', '')
-        usuario.telefono_1 = self.cleaned_data.get('telefono_1', '')
-        usuario.telefono_2 = self.cleaned_data.get('telefono_2', '')
+        usuario.telefono_1 = self.cleaned_data.get('telefono_1') or None
+        usuario.telefono_2 = self.cleaned_data.get('telefono_2') or None
         usuario.estado_civil = self.cleaned_data.get('estado_civil', '')
         usuario.sexo = self.cleaned_data.get('sexo', '')
 
