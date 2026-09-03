@@ -267,8 +267,7 @@ class listUser(CapacidadRequeridaMixin, ListView):
     capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     template_name = 'registration/list_user.html'
-    paginate_by = 20  # Agregar paginación
-    
+
     def get_queryset(self):
         queryset = Usuario.objects.all().order_by('rol', 'nombre_completo')
         

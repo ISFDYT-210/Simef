@@ -14,9 +14,15 @@ from pathlib import Path
 from django.contrib.messages import constants as message_constants
 import os
 import dj_database_url
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Carga variables de entorno desde .env cuando se corre fuera de docker
+# (docker-compose ya las inyecta via env_file, pero manage.py/runserver
+# en venv local no las carga automáticamente).
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -85,6 +91,7 @@ WSGI_APPLICATION = 'gestionInstituto.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
+
 
 
 DATABASES = {
