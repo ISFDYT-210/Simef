@@ -378,6 +378,26 @@ class MateriaForm(forms.ModelForm):
            'inscripcionAbierta': 'Inscripción abierta',
         }
 
+class MateriaConFiltroSelect(forms.Select):
+    """
+    Select de materias que agrega data-carrera/data-anio a cada <option>.
+    Permite que el filtro visual de carrera/año en alta_mesa_final.html
+    muestre u oculte opciones en el cliente sin volver a consultar la DB.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.materias_info = {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        clave = value.value if hasattr(value, 'value') else value
+        info = self.materias_info.get(clave)
+        if info:
+            option['attrs']['data-carrera'] = info[0] or ''
+            option['attrs']['data-anio'] = info[1]
+        return option
+
+
 class MesaFinalForm(forms.ModelForm):
     class Meta:
         model = MesaFinal
@@ -391,19 +411,25 @@ class MesaFinalForm(forms.ModelForm):
                 format='%Y-%m-%dT%H:%M'
             ),
             'inscripcionAbierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'materia': forms.Select(attrs={'class': 'form-control'})
+            'materia': MateriaConFiltroSelect(attrs={'class': 'form-control'})
         }
         labels = {
             'materia': 'Materia',
             'llamado': 'Fecha y Hora del Llamado',
             'inscripcionAbierta': 'Inscripción Abierta'
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Configurar el campo llamado para usar datetime-local
         self.fields['llamado'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
-        
+
+        # Una sola query para poblar el data-carrera/data-anio de cada <option> (evita N+1)
+        self.fields['materia'].widget.materias_info = {
+            id_: (carrera_id, anio)
+            for id_, carrera_id, anio in Materia.objects.values_list('id', 'carrera_id', 'anio')
+        }
+
         # Hacer que la materia sea de solo lectura en edición
         if self.instance and self.instance.pk:
             self.fields['materia'].disabled = True

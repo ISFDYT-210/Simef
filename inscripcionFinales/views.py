@@ -463,8 +463,13 @@ def altaMesa(request):
             return JsonResponse({'status': 'error', 'message': 'Formato de fecha inválido'})
     else:
         form = MesaFinalForm()
-    
-    return render(request, 'finales/alta_mesa_final.html', {'form': form})
+
+    context = {
+        'form': form,
+        'carreras': Carrera.objects.all().order_by('nombre_carrera'),
+        'anios': Materia.ANIO_CHOICES,
+    }
+    return render(request, 'finales/alta_mesa_final.html', context)
 
 def lista_finales_user(request):
     usuario = request.user.id
