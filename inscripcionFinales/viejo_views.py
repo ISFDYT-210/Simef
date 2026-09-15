@@ -121,40 +121,26 @@ class editUser(UpdateView):
         if not es_perfil_propio and not request.user.tiene_capacidad('gestionar_usuarios'):
             return render(request, '403_forbidden.html', status=403)
         return super().dispatch(request, *args, **kwargs)
-
-    def puede_editar_rol(self):
-        return self.request.user.is_superuser or self.request.user.es_directivo()
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['puede_editar_rol'] = self.puede_editar_rol()
-        return kwargs
-
     def form_valid(self, form):
         # Validaciones adicionales antes de guardar
         dni = form.cleaned_data.get('dni')
         telefono_1 = form.cleaned_data.get('telefono_1')
         telefono_2 = form.cleaned_data.get('telefono_2')
-
+        
         # Validar DNI único (excluyendo el usuario actual)
         if dni and Usuario.objects.filter(dni=dni).exclude(id=self.object.id).exists():
             messages.error(self.request, 'Ya existe un usuario con ese DNI.')
             return self.form_invalid(form)
-
+        
         # Validar teléfonos si están presentes
         if telefono_1 and (len(str(telefono_1)) < 6 or len(str(telefono_1)) > 15):
             messages.error(self.request, 'El teléfono debe tener entre 6 y 15 dígitos.')
             return self.form_invalid(form)
-
+            
         if telefono_2 and (len(str(telefono_2)) < 6 or len(str(telefono_2)) > 15):
             messages.error(self.request, 'El celular debe tener entre 6 y 15 dígitos.')
             return self.form_invalid(form)
-
-        # El campo 'rol' es dinámico y no forma parte de Meta.fields, así que
-        # ModelForm no lo aplica solo: lo asignamos a mano si el usuario tiene permiso.
-        if self.puede_editar_rol() and 'rol' in form.cleaned_data:
-            form.instance.rol = form.cleaned_data['rol']
-
+        
         # Si todo está bien, guardar y mostrar mensaje de éxito
         response = super().form_valid(form)
         messages.success(self.request, 'El usuario se ha editado correctamente.')
@@ -324,39 +310,12 @@ class showUser(ListView):
 
 
 def lista_materias_user(request):
-    usuario_id = request.user.id
-    materias = Materia.objects.filter(inscripcionAbierta=True)
-
-    # Una sola consulta: todas las inscripciones/notas del usuario
-    notas_por_materia = dict(
-        usuarios_materia.objects.filter(usuario_id=usuario_id)
-        .values_list('materia_id', 'nota_final')
-    )
-    materias_inscriptas = set(notas_por_materia.keys())
-
-    # Una sola consulta: todas las correlativas de las materias candidatas
-    correlativas_por_materia = {}
-    for c in MateriaCorrelativa.objects.filter(materia_id__in=materias.values_list('id', flat=True)):
-        correlativas_por_materia.setdefault(c.materia_id, []).append(c.materia_correlativa_id)
-
+    usuario = request.user.id
     materias_disponibles = []
+    materias = Materia.objects.all()
     for materia in materias:
-        if materia.id in materias_inscriptas:
-            continue  # ya inscripto, igual que devolvía False validar_inscripcion_materias
-
-        correlativas = correlativas_por_materia.get(materia.id)
-        if not correlativas:
+        if validar_inscripcion_materias(usuario, materia.id) and materia.inscripcionAbierta:
             materias_disponibles.append(materia)
-            continue
-
-        cumple_todas = all(
-            notas_por_materia.get(correlativa_id) is not None
-            and notas_por_materia.get(correlativa_id) >= 4
-            for correlativa_id in correlativas
-        )
-        if cumple_todas:
-            materias_disponibles.append(materia)
-
     return render(request, 'materias/lista_materias_disponibles_user.html', {'materias': materias_disponibles})
 
 def lista_materias_inscriptas_user(request):

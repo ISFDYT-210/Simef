@@ -98,6 +98,12 @@
         <label for="id_sexo" class="mb-1 block text-sm font-medium text-slate-700">Sexo</label>
         {{ form.sexo }}
       </div>
+      {% if form.rol %}
+      <div>
+        <label for="id_rol" class="mb-1 block text-sm font-medium text-slate-700">Rol</label>
+        {{ form.rol }}
+      </div>
+      {% endif %}
     </div>
 
     <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">

@@ -285,9 +285,16 @@ class profile_students_form(forms.ModelForm):
     dni = forms.CharField(max_length=15, validators=[validador])
     telefono_1 = forms.CharField(max_length=15, validators=[validador])
     telefono_2 = forms.CharField(max_length=15, validators=[validador])
-  
-    
-class mesa_form(forms.ModelForm):   
+
+    def __init__(self, *args, puede_editar_rol=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if puede_editar_rol:
+            self.fields['rol'] = forms.ChoiceField(choices=Usuario.ROL_CHOICES, label='Rol')
+            if self.instance and self.instance.pk:
+                self.initial['rol'] = self.instance.rol
+
+
+class mesa_form(forms.ModelForm):
   class Meta:
     model = MesaFinal
     fields = (

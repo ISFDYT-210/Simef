@@ -29,6 +29,12 @@ def resumen_anio(materias):
 
 
 @register.filter
+def concatenate(value, arg):
+    """Concatena value y arg como strings."""
+    return f"{value}{arg}"
+
+
+@register.filter
 def restar(value, arg):
     """Resta arg a value, tolerando que lleguen como string."""
     try:
