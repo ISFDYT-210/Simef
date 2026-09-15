@@ -3,21 +3,21 @@
 {% block encabezado %}Lista de finales{% endblock %}
 {% block subtitulo %}Inscripciones y calificaciones de exámenes finales{% endblock %}
 {% block content %}
-<div x-data="listaFinalesAdm()">
+<div x-data="listaFinalesAdm()" x-init="init()">
 
   <!-- Barra superior: total + buscador + acciones -->
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <span class="inline-flex items-center gap-2 rounded-lg bg-tinta-900 px-3 py-1.5 text-sm font-semibold text-white">
-      Total: <span x-text="totalFiltrados()"></span> inscripciones
+      Total: <span x-text="total"></span> inscripciones
     </span>
     <div class="flex flex-wrap items-center gap-2">
       <div class="relative">
         <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z"/></svg>
-        <input type="text" x-model="term" @input="pagina = 1" placeholder="Buscar estudiante o materia…"
+        <input type="text" x-model="term" placeholder="Buscar estudiante o materia…"
                class="w-64 rounded-lg border border-slate-300 py-1.5 pl-9 pr-3 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
       </div>
       <button @click="exportar()" class="rounded-lg border border-tinta-900 px-3 py-1.5 text-sm font-semibold text-tinta-900 hover:bg-tinta-50">Exportar</button>
-      <button @click="actualizar()" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-tinta-800">Actualizar</button>
+      <button @click="cargar()" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-tinta-800">Actualizar</button>
     </div>
   </div>
 
@@ -26,103 +26,93 @@
       <h2 class="text-sm font-semibold text-tinta-900">Inscripciones a exámenes finales</h2>
     </div>
 
-    {% if finales %}
-    <!-- Tabla (desktop) -->
-    <div class="hidden overflow-x-auto lg:block">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
-            <th class="px-5 py-3 font-semibold">Materia</th>
-            <th class="px-5 py-3 font-semibold">Fecha del llamado</th>
-            <th class="px-5 py-3 font-semibold">Estudiante</th>
-            <th class="px-5 py-3 font-semibold text-center">Calificación</th>
-            <th class="px-5 py-3 font-semibold text-right">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for final in finales %}
-          <tr class="final-row hover:bg-slate-50" data-search="{{ final.llamado.materia|lower }} {{ final.usuario.nombre_completo|lower }}" x-show="filaVisible($el)">
-            <td class="px-5 py-3">
-              <p class="font-medium text-tinta-900">{{ final.llamado.materia }}</p>
-              <p class="text-xs text-slate-400">{{ final.llamado.materia.anio }}° año</p>
-            </td>
-            <td class="px-5 py-3">
-              <p class="text-tinta-900">{{ final.llamado.llamado|date:"d/m/Y" }}</p>
-              <p class="text-xs text-slate-400">{{ final.llamado.llamado|date:"H:i" }} hs</p>
-            </td>
-            <td class="px-5 py-3">
-              <p class="font-medium text-tinta-900">{{ final.usuario.nombre_completo }}</p>
-              <p class="text-xs text-slate-400">DNI: {{ final.usuario.dni }}</p>
-            </td>
-            <td class="px-5 py-3 text-center">{% for nota in final.notas %}
-              {% if nota.nota_final %}
-                {% if nota.nota_final >= 4 %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{{ nota.nota_final }}</span>
-                {% else %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>{{ nota.nota_final }}</span>
-                {% endif %}
-              {% else %}
-                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Pendiente</span>
-              {% endif %}
-              {% empty %}
-              <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Pendiente</span>
-              {% endfor %}</td>
-            <td class="px-5 py-3">
-              <div class="flex items-center justify-end gap-2">
-                <a href="/cargar_nota_final/{{ final.id }}" class="rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Calificar</a>
-                <a href="/eliminar_inscripcion_final/{{ final.id }}" onclick="return confirm('¿Está seguro de dar de baja esta inscripción?')" class="rounded-lg border border-red-500 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Dar de baja</a>
+    <!-- Estado de carga -->
+    <div x-show="cargando" class="space-y-2 p-5">
+      <div class="h-14 animate-pulse rounded-lg bg-slate-100"></div>
+      <div class="h-14 animate-pulse rounded-lg bg-slate-100"></div>
+      <div class="h-14 animate-pulse rounded-lg bg-slate-100"></div>
+    </div>
+
+    <!-- Error -->
+    <div x-show="!cargando && error" x-cloak class="px-5 py-10 text-center text-sm text-red-600">
+      No se pudieron cargar los finales. <button @click="cargar()" class="font-semibold underline">Reintentar</button>
+    </div>
+
+    <template x-if="!cargando && !error && filas.length > 0">
+      <div>
+        <!-- Tabla (desktop) -->
+        <div class="hidden overflow-x-auto lg:block">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+                <th class="px-5 py-3 font-semibold">Materia</th>
+                <th class="px-5 py-3 font-semibold">Fecha del llamado</th>
+                <th class="px-5 py-3 font-semibold">Estudiante</th>
+                <th class="px-5 py-3 font-semibold text-center">Calificación</th>
+                <th class="px-5 py-3 font-semibold text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <template x-for="final in filas" :key="final.id">
+                <tr class="hover:bg-slate-50">
+                  <td class="px-5 py-3">
+                    <p class="font-medium text-tinta-900" x-text="final.materia"></p>
+                    <p class="text-xs text-slate-400" x-text="final.anio + '° año'"></p>
+                  </td>
+                  <td class="px-5 py-3">
+                    <p class="text-tinta-900" x-text="final.fecha"></p>
+                    <p class="text-xs text-slate-400" x-text="final.hora + ' hs'"></p>
+                  </td>
+                  <td class="px-5 py-3">
+                    <p class="font-medium text-tinta-900" x-text="final.estudiante"></p>
+                    <p class="text-xs text-slate-400" x-text="'DNI: ' + final.dni"></p>
+                  </td>
+                  <td class="px-5 py-3 text-center" x-html="notaBadge(final)"></td>
+                  <td class="px-5 py-3">
+                    <div class="flex items-center justify-end gap-2">
+                      <a :href="final.calificar_url" class="rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Calificar</a>
+                      <a :href="final.baja_url" onclick="return confirm('¿Está seguro de dar de baja esta inscripción?')" class="rounded-lg border border-red-500 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Dar de baja</a>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tarjetas (mobile) -->
+        <div class="space-y-3 p-4 lg:hidden">
+          <template x-for="final in filas" :key="final.id">
+            <div class="rounded-xl border border-slate-200 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-semibold text-tinta-900" x-text="final.materia"></p>
+                  <p class="mt-1 text-sm text-slate-500" x-text="final.estudiante"></p>
+                  <p class="text-xs text-slate-400" x-text="final.fecha + ' ' + final.hora"></p>
+                </div>
+                <div x-html="notaBadge(final)"></div>
               </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+              <div class="mt-3 flex gap-2">
+                <a :href="final.calificar_url" class="flex-1 rounded-lg bg-celeste-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-celeste-500">Calificar</a>
+                <a :href="final.baja_url" onclick="return confirm('¿Está seguro?')" class="rounded-lg border border-red-500 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Baja</a>
+              </div>
+            </div>
+          </template>
+        </div>
 
-    <!-- Tarjetas (mobile) -->
-    <div class="space-y-3 p-4 lg:hidden">
-      {% for final in finales %}
-      <div class="final-card rounded-xl border border-slate-200 p-4" data-search="{{ final.llamado.materia|lower }} {{ final.usuario.nombre_completo|lower }}" x-show="cardVisible($el)">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="font-semibold text-tinta-900">{{ final.llamado.materia }}</p>
-            <p class="mt-1 text-sm text-slate-500">{{ final.usuario.nombre_completo }}</p>
-            <p class="text-xs text-slate-400">{{ final.llamado.llamado|date:"d/m/Y H:i" }}</p>
+        <!-- Paginación -->
+        <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm" x-show="numPaginas > 1">
+          <p class="text-slate-500">Página <span x-text="pagina"></span> de <span x-text="numPaginas"></span></p>
+          <div class="flex gap-1">
+            <button @click="irA(pagina - 1)" :disabled="pagina === 1" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
+            <button @click="irA(pagina + 1)" :disabled="pagina === numPaginas" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
           </div>
-          <div>{% for nota in final.notas %}
-              {% if nota.nota_final %}
-                {% if nota.nota_final >= 4 %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>{{ nota.nota_final }}</span>
-                {% else %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>{{ nota.nota_final }}</span>
-                {% endif %}
-              {% else %}
-                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Pendiente</span>
-              {% endif %}
-              {% empty %}
-              <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Pendiente</span>
-              {% endfor %}</div>
-        </div>
-        <div class="mt-3 flex gap-2">
-          <a href="/cargar_nota_final/{{ final.id }}" class="flex-1 rounded-lg bg-celeste-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-celeste-500">Calificar</a>
-          <a href="/eliminar_inscripcion_final/{{ final.id }}" onclick="return confirm('¿Está seguro?')" class="rounded-lg border border-red-500 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Baja</a>
         </div>
       </div>
-      {% endfor %}
-    </div>
+    </template>
 
-    <!-- Paginación -->
-    <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm" x-show="totalPaginas() > 1">
-      <p class="text-slate-500">Página <span x-text="pagina"></span> de <span x-text="totalPaginas()"></span></p>
-      <div class="flex gap-1">
-        <button @click="pagina = Math.max(1, pagina - 1)" :disabled="pagina === 1" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
-        <button @click="pagina = Math.min(totalPaginas(), pagina + 1)" :disabled="pagina === totalPaginas()" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
-      </div>
-    </div>
-
-    {% else %}
     <!-- Empty state -->
-    <div class="px-5 py-16 text-center">
+    <div x-show="!cargando && !error && filas.length === 0" x-cloak class="px-5 py-16 text-center">
       <div class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-slate-100 text-slate-400">
         <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9h4l2 3h6l2-3h4M3 9v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M3 9l3-5h12l3 5"/></svg>
       </div>
@@ -130,33 +120,72 @@
       <p class="mt-1 text-sm text-slate-500">No se encontraron inscripciones a exámenes finales.</p>
       <a href="/inscripcionFinal/" class="mt-4 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Nueva inscripción</a>
     </div>
-    {% endif %}
   </div>
 </div>
 
 <script>
   function listaFinalesAdm() {
     return {
-      term: '', pagina: 1, porPagina: 10,
-      norm(s) { return (s || '').toString().toLowerCase(); },
-      matched(selector) {
-        var t = this.norm(this.term);
-        return Array.from(document.querySelectorAll(selector)).filter(function (el) {
-          return !t || (el.dataset.search || '').includes(t);
+      cargando: true,
+      error: false,
+      filas: [],
+      pagina: 1,
+      numPaginas: 1,
+      total: 0,
+      term: '',
+      _debounce: null,
+
+      init() {
+        this.cargar();
+        this.$watch('term', () => {
+          clearTimeout(this._debounce);
+          this._debounce = setTimeout(() => { this.pagina = 1; this.cargar(); }, 300);
         });
       },
-      totalFiltrados() { return this.matched('.final-row').length; },
-      totalPaginas() { return Math.max(1, Math.ceil(this.totalFiltrados() / this.porPagina)); },
-      _visible(el, selector) {
-        var m = this.matched(selector), idx = m.indexOf(el);
-        if (idx === -1) return false;
-        var ini = (this.pagina - 1) * this.porPagina;
-        return idx >= ini && idx < ini + this.porPagina;
+
+      async cargar() {
+        this.cargando = true;
+        this.error = false;
+        try {
+          const params = new URLSearchParams({ page: this.pagina, q: this.term });
+          const resp = await fetch(`{% url 'api_finales_inscriptos_adm' %}?${params}`);
+          if (!resp.ok) throw new Error('status ' + resp.status);
+          const data = await resp.json();
+          this.filas = data.results;
+          this.pagina = data.page;
+          this.numPaginas = data.num_pages;
+          this.total = data.count;
+        } catch (e) {
+          this.error = true;
+        } finally {
+          this.cargando = false;
+        }
       },
-      filaVisible(el) { return this._visible(el, '.final-row'); },
-      cardVisible(el) { return this._visible(el, '.final-card'); },
+
+      irA(pagina) {
+        if (pagina < 1 || pagina > this.numPaginas) return;
+        this.pagina = pagina;
+        this.cargar();
+      },
+
+      notaBadge(final) {
+        const notas = final.notas_final || [];
+        if (notas.length === 0) {
+          return this._pendiente();
+        }
+        return notas.map((nota) => {
+          if (nota === null || nota === undefined) return this._pendiente();
+          if (nota >= 4) {
+            return `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>${nota}</span>`;
+          }
+          return `<span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>${nota}</span>`;
+        }).join('');
+      },
+      _pendiente() {
+        return '<span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Pendiente</span>';
+      },
+
       exportar() { alert('Función de exportación próximamente…'); },
-      actualizar() { location.reload(); },
     };
   }
 </script>

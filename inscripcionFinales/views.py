@@ -27,6 +27,7 @@ from io import BytesIO
 
 from django.utils import timezone
 from datetime import datetime
+from collections import defaultdict
 
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -280,15 +281,69 @@ class listUser(CapacidadRequeridaMixin, ListView):
         context['search_actual'] = self.request.GET.get('search', '')
         return context
     
-class listInscripcion(ListView):
-    model = InscripcionFinal
+class listInscripcion(TemplateView):
     template_name = 'registration/list_inscripcion.html'
 
-class listMesa(ListView):
-    model = MesaFinal
+class listMesa(TemplateView):
     template_name = 'registration/mesas_finales_lista.html'
-   
-   
+
+
+def api_lista_inscripciones(request):
+    """Datos paginados para list_inscripcion.html, consumido vía fetch()."""
+    if not request.user.puede_administrar():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = InscripcionFinal.objects.select_related('usuario', 'llamado__materia').order_by('-id')
+
+    paginator = Paginator(qs, 10)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    resultados = [{
+        'id': insc.id,
+        'usuario': str(insc.usuario),
+        'llamado': str(insc.llamado),
+        'edit_url': f'/edit_inscr/{insc.id}',
+        'delete_url': f'/delete_inscripcion/{insc.id}',
+    } for insc in page.object_list]
+
+    return JsonResponse({
+        'results': resultados,
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
+
+
+def api_lista_mesas(request):
+    """Datos paginados y filtrados para list_mesa.html, consumido vía fetch()."""
+    if not request.user.puede_gestionar_mesas():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = MesaFinal.objects.select_related('materia').order_by('-id')
+
+    busqueda = request.GET.get('q', '').strip()
+    if busqueda:
+        qs = qs.filter(materia__nombre_materia__icontains=busqueda)
+
+    paginator = Paginator(qs, 10)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    resultados = [{
+        'id': mesa.id,
+        'materia': str(mesa.materia),
+        'fecha': mesa.llamado.strftime('%d/%m/%Y'),
+        'hora': mesa.llamado.strftime('%H:%M'),
+        'inscripcion_abierta': mesa.inscripcionAbierta,
+    } for mesa in page.object_list]
+
+    return JsonResponse({
+        'results': resultados,
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
+
+
 class showUser(ListView):
     model = Usuario
     template_name = 'registration/show_user.html'
@@ -431,15 +486,59 @@ def lista_finales_inscriptos_user(request):
     return render(request, 'finales/lista_finales_inscriptos_user.html', {'finales': finales_inscriptos})
 
 def lista_finales_inscriptos_adm(request):
-    finales_inscriptos = InscripcionFinal.objects.filter(
+    return render(request, 'finales/lista_finales_inscriptos_adm.html')
+
+
+def api_finales_inscriptos_adm(request):
+    """Datos paginados y filtrados para lista_finales_inscriptos_adm.html, consumido vía fetch()."""
+    if not request.user.puede_administrar():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = InscripcionFinal.objects.filter(
         Q(aprobada=False) | Q(aprobada__isnull=True)
-    ).select_related('llamado__materia', 'usuario')
-    for final in finales_inscriptos:
-        final.notas = usuarios_materia.objects.filter(
-            usuario=final.usuario,
-            materia=final.llamado.materia
-    )
-    return render(request, 'finales/lista_finales_inscriptos_adm.html', {'finales': finales_inscriptos})
+    ).select_related('llamado__materia', 'usuario').order_by('-id')
+
+    busqueda = request.GET.get('q', '').strip()
+    if busqueda:
+        qs = qs.filter(
+            Q(llamado__materia__nombre_materia__icontains=busqueda) |
+            Q(usuario__nombre_completo__icontains=busqueda)
+        )
+
+    paginator = Paginator(qs, 10)
+    page = paginator.get_page(request.GET.get('page', 1))
+    finales_pagina = list(page.object_list)
+
+    # Una sola query para todas las notas de la página en vez de una por inscripción (evita N+1)
+    pares = {(final.usuario_id, final.llamado.materia_id) for final in finales_pagina}
+    notas_por_par = defaultdict(list)
+    if pares:
+        usuario_ids = {p[0] for p in pares}
+        materia_ids = {p[1] for p in pares}
+        for nota in usuarios_materia.objects.filter(usuario_id__in=usuario_ids, materia_id__in=materia_ids):
+            notas_por_par[(nota.usuario_id, nota.materia_id)].append(nota.nota_final)
+
+    resultados = []
+    for final in finales_pagina:
+        resultados.append({
+            'id': final.id,
+            'materia': str(final.llamado.materia),
+            'anio': final.llamado.materia.anio,
+            'fecha': final.llamado.llamado.strftime('%d/%m/%Y'),
+            'hora': final.llamado.llamado.strftime('%H:%M'),
+            'estudiante': final.usuario.nombre_completo,
+            'dni': final.usuario.dni,
+            'notas_final': notas_por_par.get((final.usuario_id, final.llamado.materia_id), []),
+            'calificar_url': f'/cargar_nota_final/{final.id}',
+            'baja_url': f'/eliminar_inscripcion_final/{final.id}',
+        })
+
+    return JsonResponse({
+        'results': resultados,
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
 
 @capacidad_requerida('abrir_inscripciones')
 def inscripcionMesa(request):
