@@ -2,7 +2,6 @@ asgiref==3.11.1
 Django==4.2.7
 sqlparse==0.5.5
 django-extensions==3.2.3
-dj-database-url==2.1.0
 python-dotenv==1.0.1
 whitenoise==6.6.0
 requests==2.31.0
