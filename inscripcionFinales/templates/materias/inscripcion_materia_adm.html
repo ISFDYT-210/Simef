@@ -69,6 +69,26 @@
           this.evaluar(mod);
           mod.addEventListener('change', () => this.evaluar(mod));
         }
+
+        // filtrar materias según la carrera del estudiante seleccionado
+        var userSel = document.getElementById('id_usuario');
+        var matSel = document.getElementById('id_materia');
+        if (userSel && matSel) {
+          userSel.addEventListener('change', () => this.cargarMaterias(userSel.value, matSel));
+          if (userSel.value) this.cargarMaterias(userSel.value, matSel, matSel.value);
+        }
+      },
+      cargarMaterias(estudianteId, matSel, preseleccionar) {
+        matSel.innerHTML = '';
+        matSel.appendChild(new Option('Seleccione una materia', ''));
+        if (!estudianteId) return;
+        fetch('/obtener_materias_estudiante/?estudiante_id=' + encodeURIComponent(estudianteId), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(r => r.json())
+          .then(d => {
+            if (d.status !== 'success') return;
+            d.materias.forEach((m) => matSel.appendChild(new Option(m.nombre, m.id)));
+            if (preseleccionar) matSel.value = preseleccionar;
+          });
       },
       evaluar(sel) {
         var txt = (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '').toLowerCase();

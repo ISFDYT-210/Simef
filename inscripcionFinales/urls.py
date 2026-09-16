@@ -76,6 +76,7 @@ path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_est
 
     # Y AGREGAR solo estas dos nuevas rutas después de la línea 73:
 path('obtener_finales_estudiante/', obtener_finales_estudiante, name='obtener_finales_estudiante'),
+path('obtener_materias_estudiante/', obtener_materias_estudiante, name='obtener_materias_estudiante'),
 path('inscribir_final/', inscribir_final, name='inscribir_final'),
 
 #     path('acta_volante/<int:final_id>/', login_required(acta_volante), name='acta_volante'),

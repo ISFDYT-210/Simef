@@ -324,15 +324,20 @@ class showUser(ListView):
 
 
 def lista_materias_user(request):
-    usuario_id = request.user.id
-    materias = Materia.objects.filter(inscripcionAbierta=True)
+    usuario = request.user
+    materias = Materia.objects.filter(
+        inscripcionAbierta=True,
+        carrera__in=usuario.carrera.all()
+    )
 
     # Una sola consulta: todas las inscripciones/notas del usuario
-    notas_por_materia = dict(
-        usuarios_materia.objects.filter(usuario_id=usuario_id)
-        .values_list('materia_id', 'nota_final')
-    )
-    materias_inscriptas = set(notas_por_materia.keys())
+    notas_por_materia = {}
+    materias_inscriptas = set()
+    for materia_id, nota_cursada, nota_final in usuarios_materia.objects.filter(
+        usuario_id=usuario.id
+    ).values_list('materia_id', 'nota_cursada', 'nota_final'):
+        notas_por_materia[materia_id] = (nota_cursada, nota_final)
+        materias_inscriptas.add(materia_id)
 
     # Una sola consulta: todas las correlativas de las materias candidatas
     correlativas_por_materia = {}
@@ -349,12 +354,17 @@ def lista_materias_user(request):
             materias_disponibles.append(materia)
             continue
 
-        cumple_todas = all(
-            notas_por_materia.get(correlativa_id) is not None
-            and notas_por_materia.get(correlativa_id) >= 4
-            for correlativa_id in correlativas
-        )
-        if cumple_todas:
+        def cumple_correlativa(correlativa_id):
+            nota_cursada, nota_final = notas_por_materia.get(correlativa_id, (None, None))
+            # Para cursar hace falta la cursada aprobada (>=4) de la correlativa,
+            # y si ya rindió el final, que también esté aprobado (>=4).
+            if nota_cursada is None or nota_cursada < 4:
+                return False
+            if nota_final is not None and nota_final < 4:
+                return False
+            return True
+
+        if all(cumple_correlativa(correlativa_id) for correlativa_id in correlativas):
             materias_disponibles.append(materia)
 
     return render(request, 'materias/lista_materias_disponibles_user.html', {'materias': materias_disponibles})
@@ -426,7 +436,7 @@ def listarMateriasFinal(request):
     materias_final = []
     materias_disponibles=usuarios_materia.objects.filter(usuario=request.user,aprobada=False)
     for m in materias_disponibles:
-        if m.puede_inscribirse_en_mesa_final() and MesaFinal.objects.filter(materia=m.materia,vigente=True).exist():
+        if m.puede_inscribirse_en_mesa_final() and MesaFinal.objects.filter(materia=m.materia,vigente=True).exists():
             for mf in MesaFinal.objects.filter(materia=m.materia,vigente=True):
                 materias_final.append(mf)
     return render(request, 'listarMateriasFinal.html', {'materias_final' : materias_final})
@@ -553,6 +563,23 @@ def inscripcionFinalEst(request, final_id):
     
     # Si es GET, mostrar el formulario de confirmación
     return render(request, 'finals/inscripcion_final_adm.html', {'final': final})
+
+def obtener_materias_estudiante(request):
+    """Vista AJAX: materias con inscripción abierta que pertenecen a la carrera del estudiante"""
+    estudiante_id = request.GET.get('estudiante_id')
+    if not estudiante_id:
+        return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
+
+    estudiante = get_object_or_404(Usuario, id=estudiante_id)
+    materias = Materia.objects.filter(
+        inscripcionAbierta=True,
+        carrera__in=estudiante.carrera.all()
+    ).order_by('nombre_materia')
+
+    return JsonResponse({
+        'status': 'success',
+        'materias': [{'id': m.id, 'nombre': m.nombre_materia} for m in materias]
+    })
 
 def inscripcionMateria(request):
     if request.method == 'POST':
@@ -1265,6 +1292,9 @@ def eliminar_inscripcion_materia(request, id):
     es_admin = request.user.tiene_capacidad('gestionar_materias')
     if not (es_titular or es_admin):
         return render(request, '403_forbidden.html', status=403)
+    if not es_admin and materia.nota_cursada is not None and materia.nota_cursada >= 4:
+        messages.error(request, 'No podés darte de baja de una materia con la cursada aprobada.')
+        return redirect('lista_materias_inscriptas_user')
     if request.method == 'POST':
         InscripcionFinal.objects.filter(
             Q(usuario=materia.usuario) & Q(llamado__materia=materia.materia)
@@ -1440,12 +1470,17 @@ def validar_inscripcion_materias(usuario_id, materia_id):
         try:
             correlativa_instance = usuarios_materia.objects.get(
                 usuario_id=usuario_id,
-                materia_id=correlativa.materia_correlativa_id  
+                materia_id=correlativa.materia_correlativa_id
             )
-            
+
+            nota_cursada = correlativa_instance.nota_cursada
             nota_final = correlativa_instance.nota_final
-            if nota_final is None or nota_final < 4:
-                return False #No se aprobó final de la correlativa
+            # Para cursar hace falta la cursada aprobada (>=4) de la correlativa,
+            # y si ya rindió el final, que también esté aprobado (>=4).
+            if nota_cursada is None or nota_cursada < 4:
+                return False #No aprobó la cursada de la correlativa
+            if nota_final is not None and nota_final < 4:
+                return False #Rindió el final de la correlativa y lo desaprobó
         except usuarios_materia.DoesNotExist:
             return False #No se curso correlativa
     return True #Se puede inscribir

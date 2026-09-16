@@ -15,12 +15,12 @@
           <td class="px-5 py-3 font-medium text-tinta-900">{{ materia.materia }}</td>
           <td class="px-5 py-3">{{ materia.get_modalidad_display }}</td>
           <td class="px-5 py-3 text-right">
-            {% if materia.nota_cursada < 7 or materia.nota_cursada is None %}
-              <a href="/eliminar_inscripcion_materia/{{ materia.id }}" class="inline-block rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Dar de baja</a>
-            {% elif materia.nota_cursada >= 7 and materia.nota_final < 4 or materia.nota_cursada >= 7 and materia.nota_final is None %}
-              <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Cursada aprobada</span>
-            {% elif materia.nota_final >= 4 %}
+            {% if materia.nota_final >= 4 %}
               <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Final aprobado: {{ materia.nota_final }}</span>
+            {% elif materia.nota_cursada >= 4 %}
+              <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Cursada aprobada</span>
+            {% else %}
+              <a href="{% url 'eliminar_inscripcion_materia' id=materia.id %}" class="inline-block rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Dar de baja</a>
             {% endif %}
           </td>
         </tr>
