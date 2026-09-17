@@ -170,6 +170,7 @@ class editUser(UpdateView):
     
 
 
+@capacidad_requerida('gestionar_mesas')
 def editMesa(request, pk):
     mesa = get_object_or_404(MesaFinal, pk=pk)
     
@@ -380,7 +381,12 @@ def lista_materias_inscriptas_user(request):
     return render(request, 'materias/lista_materias_inscriptas_user.html', {'materias': materias_inscriptas})
 
 def lista_materias_inscriptas_adm(request):
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return render(request, '403_forbidden.html', status=403)
     materias_inscriptas = usuarios_materia.objects.select_related('materia')
+    if request.user.es_profesor() and not request.user.is_superuser:
+        # El profesor solo ve a sus propios alumnos, no los de toda la escuela
+        materias_inscriptas = materias_inscriptas.filter(materia__profesor=request.user)
     return render(request, 'materias/lista_materias_inscriptas_adm.html', {'materias': materias_inscriptas})
 
 @capacidad_requerida('ver_materias')
@@ -501,9 +507,14 @@ def lista_finales_inscriptos_user(request):
     return render(request, 'finales/lista_finales_inscriptos_user.html', {'finales': finales_inscriptos})
 
 def lista_finales_inscriptos_adm(request):
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return render(request, '403_forbidden.html', status=403)
     finales_inscriptos = InscripcionFinal.objects.filter(
         Q(aprobada=False) | Q(aprobada__isnull=True)
     ).select_related('llamado__materia', 'usuario')
+    if request.user.es_profesor() and not request.user.is_superuser:
+        # El profesor solo ve a sus propios alumnos, no los de toda la escuela
+        finales_inscriptos = finales_inscriptos.filter(llamado__materia__profesor=request.user)
     for final in finales_inscriptos:
         final.notas = usuarios_materia.objects.filter(
             usuario=final.usuario,

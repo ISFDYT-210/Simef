@@ -13,7 +13,7 @@
 {% block encabezado %}Editar usuario{% endblock %}
 
 {% block content %}
-{% if request.path == "/edit_user/"|concatenate:request.user.id or request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+{% if request.path == "/edit_user/"|concatenate:request.user.id or request.user.puede_gestionar_usuarios %}
 
 <div class="mx-auto max-w-3xl">
 
@@ -44,7 +44,7 @@
         {% if form.username.errors %}<p class="mt-1 text-xs text-red-600">El usuario ya está en uso.</p>{% endif %}
       </div>
 
-      {% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+      {% if request.user.puede_gestionar_usuarios %}
       <div>
         <label for="id_nombre_completo" class="mb-1 block text-sm font-medium text-slate-700">Nombre completo</label>
         {{ form.nombre_completo }}
