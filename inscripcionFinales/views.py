@@ -1,3 +1,4 @@
+import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.views import LoginView, LogoutView    
 from .models import *
@@ -62,7 +63,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas
 import io
 from django.utils.timezone import now
-from .permissions import capacidad_requerida, CapacidadRequeridaMixin
+from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
 from .audit import registrar_auditoria
 
 # ... aquí van tus otros imports existentes
@@ -142,12 +143,12 @@ class editUser(UpdateView):
             return self.form_invalid(form)
 
         # Validar teléfonos si están presentes
-        if telefono_1 and (len(str(telefono_1)) < 6 or len(str(telefono_1)) > 15):
-            messages.error(self.request, 'El teléfono debe tener entre 6 y 15 dígitos.')
+        if telefono_1 and not re.fullmatch(r'\d{10}', telefono_1):
+            messages.error(self.request, 'El teléfono debe tener exactamente 10 dígitos.')
             return self.form_invalid(form)
 
-        if telefono_2 and (len(str(telefono_2)) < 6 or len(str(telefono_2)) > 15):
-            messages.error(self.request, 'El celular debe tener entre 6 y 15 dígitos.')
+        if telefono_2 and not re.fullmatch(r'\d{10}', telefono_2):
+            messages.error(self.request, 'El celular debe tener exactamente 10 dígitos.')
             return self.form_invalid(form)
 
         # El campo 'rol' es dinámico y no forma parte de Meta.fields, así que
@@ -472,15 +473,20 @@ def altaMesa(request):
             return JsonResponse({'status': 'error', 'message': 'Formato de fecha inválido'})
     else:
         form = MesaFinalForm()
-    
-    return render(request, 'finales/alta_mesa_final.html', {'form': form})
+
+    context = {
+        'form': form,
+        'carreras': Carrera.objects.all().order_by('nombre_carrera'),
+        'anios': Materia.ANIO_CHOICES,
+    }
+    return render(request, 'finales/alta_mesa_final.html', context)
 
 def lista_finales_user(request):
     usuario = request.user.id
     finales_disponibles = []
     finales = MesaFinal.objects.all()
     for final in finales:
-        if validar_inscripcion_final(usuario, final.materia.id) and final.inscripcionAbierta and InscripcionFinal.objects.filter(usuario=usuario, llamado__materia_id=final.materia.id).count()<1:
+        if validar_inscripcion_final(usuario, final.materia.id) and final.inscripcion_vigente() and InscripcionFinal.objects.filter(usuario=usuario, llamado__materia_id=final.materia.id).count()<1:
             print(final.materia)
             print(validar_inscripcion_final(usuario, final.materia.id))
             finales_disponibles.append(final)
@@ -545,7 +551,12 @@ def inscripcionFinalEst(request, final_id):
         if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
             messages.warning(request, 'Ya estás inscrito en este final.')
             return redirect('/inscripcionFinalEst/')
-        
+
+        # Verificar que la mesa esté dentro de su período de inscripción
+        if not final.inscripcion_vigente():
+            messages.error(request, 'La inscripción para esta mesa de final está cerrada.')
+            return redirect('/inscripcionFinalEst/')
+
         # Validar la inscripción
         if validar_inscripcion_final(inscripcion_usuario.id, final.materia):
             # Crear el objeto InscripcionFinal
@@ -814,23 +825,15 @@ def cargar_usuarios(request):
                         telefono_2 = None
                         
                         if fila.get('Telefono 1', '').strip():
-                            try:
-                                telefono_1 = int(fila['Telefono 1'].strip())
-                                if len(str(telefono_1)) < 6 or len(str(telefono_1)) > 15:
-                                    errores.append(f'Fila {numero_fila}: Teléfono 1 debe tener entre 6 y 15 dígitos')
-                                    continue
-                            except ValueError:
-                                errores.append(f'Fila {numero_fila}: Teléfono 1 inválido')
+                            telefono_1 = fila['Telefono 1'].strip()
+                            if not re.fullmatch(r'\d{10}', telefono_1):
+                                errores.append(f'Fila {numero_fila}: Teléfono 1 debe tener exactamente 10 dígitos')
                                 continue
-                        
+
                         if fila.get('Telefono 2', '').strip():
-                            try:
-                                telefono_2 = int(fila['Telefono 2'].strip())
-                                if len(str(telefono_2)) < 6 or len(str(telefono_2)) > 15:
-                                    errores.append(f'Fila {numero_fila}: Teléfono 2 debe tener entre 6 y 15 dígitos')
-                                    continue
-                            except ValueError:
-                                errores.append(f'Fila {numero_fila}: Teléfono 2 inválido')
+                            telefono_2 = fila['Telefono 2'].strip()
+                            if not re.fullmatch(r'\d{10}', telefono_2):
+                                errores.append(f'Fila {numero_fila}: Teléfono 2 debe tener exactamente 10 dígitos')
                                 continue
                         
                         # Estado civil (validar que sea una opción válida)
@@ -869,7 +872,7 @@ def cargar_usuarios(request):
                                 continue
                         
                         # Crear usuario según el rol
-                        password = str(dni)  # Usar DNI como contraseña inicial
+                        password = PASSWORD_PREDETERMINADA  # Contraseña inicial antes del primer login
                         
                         if rol == 'Estudiante':
                             matricula = fila.get('Matricula', str(dni))  # Usar DNI como matrícula por defecto
@@ -1371,6 +1374,43 @@ def inscribir_mesa_final(request):
     context = {'mesas_finales': mesas_finales, 'filtro_form': filtro_form}
     return render(request, 'finales/inscribir_mesa_final.html', context)
 
+@capacidad_requerida('gestionar_mesas')
+def acta_volante(request, final_id):
+    """Genera el acta volante (planilla de examen) de una mesa de final, paginada de a 25 alumnos."""
+    pages = []
+    finales_inscriptos = InscripcionFinal.objects.filter(llamado=final_id).order_by('usuario__nombre_completo')
+    final = get_object_or_404(MesaFinal, id=final_id)
+    if finales_inscriptos.count() <= 25:
+        context = {
+            'finales_inscriptos': finales_inscriptos,
+            'final': final,
+            'cant_inscriptos': finales_inscriptos.count(),
+            'piso': 0
+        }
+        return render(request, 'finales/acta_volante.html', context)
+    else:
+        for i in range(1, ceil(finales_inscriptos.count() / 25) + 1):
+            inscriptos = []
+            for inscripto in range(25 * (i - 1), 25 * (i - 1) + 25):
+                try:
+                    inscriptos.append(finales_inscriptos[inscripto])
+                except IndexError:
+                    pass
+            context = {
+                'finales_inscriptos': inscriptos,
+                'final': final,
+                'cant_inscriptos': finales_inscriptos.count(),
+                'piso': 25 * (i - 1),
+            }
+            html = render(request, 'finales/acta_volante.html', context).content.decode('utf-8')
+            pages.append({
+                'id': f'page_{i}',
+                'title': f'Acta volante {i}: {final.materia}',
+                'content': html
+            })
+        pages_json = dumps(pages)
+        return render(request, 'finales/lista_acta_volante.html', {'pages_json': pages_json})
+
 def listar_usuarios_materia(request):
     usuarios_materia_data = usuarios_materia.objects.all()  # Recupera todos los registros de usuarios_materia
     context = {'usuarios_materia_data': usuarios_materia_data}
@@ -1631,8 +1671,22 @@ def eliminar_usuarios(request):
                 messages.error(request, f'Error al eliminar usuarios: {str(e)}')
         else:
             messages.warning(request, 'No se seleccionaron usuarios para eliminar.')
-    
+
     return redirect('list_user')
+
+@rol_requerido('Directivo')
+def blanquear_password(request, usuario_id):
+    """Restablece la contraseña de un usuario a la predeterminada. Solo el Director (o super admin)."""
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if request.method == 'POST':
+        usuario.set_password(PASSWORD_PREDETERMINADA)
+        usuario.first_login = True
+        usuario.save()
+        registrar_auditoria(request, f'Blanqueó la contraseña de {usuario.email}', 'Usuario', usuario.pk)
+        messages.success(request, f'Se blanqueó la contraseña de {usuario.nombre_completo or usuario.email}. Ahora es "{PASSWORD_PREDETERMINADA}" y deberá cambiarla en su próximo inicio de sesión.')
+        return redirect('list_user')
+    return render(request, 'registration/blanquear_password.html', {'usuario': usuario})
+
 @csrf_exempt  # TEMPORAL - solo para debugging
 def inscribir_final(request):
     """Vista AJAX para realizar la inscripción al final"""
@@ -1656,8 +1710,8 @@ def inscribir_final(request):
                 'message': 'Solo los estudiantes pueden inscribirse'
             })
         
-        # Verificar que la mesa tenga inscripción abierta
-        if not mesa_final.inscripcionAbierta:
+        # Verificar que la mesa tenga inscripción abierta (dentro de su período)
+        if not mesa_final.inscripcion_vigente():
             return JsonResponse({
                 'status': 'error',
                 'message': 'La inscripción para esta mesa está cerrada'

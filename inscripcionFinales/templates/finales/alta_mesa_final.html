@@ -9,6 +9,28 @@
       <h2 class="text-sm font-semibold text-tinta-900">Completá los siguientes campos</h2>
     </div>
     <div class="space-y-4 px-6 py-6">
+      <div class="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+        <div>
+          <label for="filtroCarrera" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por carrera</label>
+          <select id="filtroCarrera" x-model="filtroCarrera" @change="filtrarMaterias()"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+            <option value="">Todas las carreras</option>
+            {% for carrera in carreras %}
+            <option value="{{ carrera.id }}">{{ carrera.nombre_carrera }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="filtroAnio" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por año</label>
+          <select id="filtroAnio" x-model="filtroAnio" @change="filtrarMaterias()"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+            <option value="">Todos los años</option>
+            {% for valor, etiqueta in anios %}
+            <option value="{{ valor }}">{{ etiqueta }}° año</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
       <div>
         <label for="{{ form.materia.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Materia</label>
         {{ form.materia }}
@@ -35,6 +57,8 @@
       errores: { materia: '', llamado: '' },
       idMateria: '{{ form.materia.id_for_label }}',
       idLlamado: '{{ form.llamado.id_for_label }}',
+      filtroCarrera: '',
+      filtroAnio: '',
       init() {
         var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
         var mat = document.getElementById(this.idMateria);
@@ -46,6 +70,20 @@
           var man = new Date(); man.setDate(man.getDate() + 1);
           ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
         }
+      },
+      filtrarMaterias() {
+        var mat = document.getElementById(this.idMateria);
+        if (!mat) return;
+        var seleccionActualOculta = false;
+        Array.from(mat.options).forEach(function (opt) {
+          if (!opt.value) return; // opción vacía "---------"
+          var coincideCarrera = !this.filtroCarrera || opt.dataset.carrera === this.filtroCarrera;
+          var coincideAnio = !this.filtroAnio || opt.dataset.anio === this.filtroAnio;
+          var visible = coincideCarrera && coincideAnio;
+          opt.hidden = !visible;
+          if (opt.selected && !visible) seleccionActualOculta = true;
+        }, this);
+        if (seleccionActualOculta) mat.value = '';
       },
       validar(e) {
         this.errores = { materia: '', llamado: '' };

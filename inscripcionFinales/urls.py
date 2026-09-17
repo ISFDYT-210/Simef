@@ -29,6 +29,7 @@ urlpatterns = [
     path("delete_user/<int:pk>",login_required(deleteUser.as_view(template_name='registration/delete_user.html')),name='delete_user'),
     path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),
     path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),
+    path('blanquear_password/<int:usuario_id>/', login_required(blanquear_password), name='blanquear_password'),
     path("show_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/show_user.html')), name='show_user'),
     path('password_reset/',auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html',email_template_name='registration/password_reset_email.html',success_url='/password_reset/done/'),name='password_reset'),
     path('password_reset/done/', CustomPasswordResetDoneView.as_view(), name='password_reset_done'),
@@ -79,7 +80,7 @@ path('obtener_finales_estudiante/', obtener_finales_estudiante, name='obtener_fi
 path('obtener_materias_estudiante/', obtener_materias_estudiante, name='obtener_materias_estudiante'),
 path('inscribir_final/', inscribir_final, name='inscribir_final'),
 
-#     path('acta_volante/<int:final_id>/', login_required(acta_volante), name='acta_volante'),
+    path('acta_volante/<int:final_id>', login_required(acta_volante), name='acta_volante'),
     path('exito_final_eliminado_est/', exito_final_eliminado_est, name='exito_final_eliminado_est'),
     path('exito_final_eliminado_adm/', exito_final_eliminado_adm, name='exito_final_eliminado_adm'),
     path('TESTINGlistamateriasfinal/',listarMateriasFinal,name='listarMesas'),

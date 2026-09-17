@@ -1,5 +1,5 @@
 {% block content %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+{% if request.user.puede_gestionar_mesas %}
 <!DOCTYPE html>
 <html lang="es">
 <head>

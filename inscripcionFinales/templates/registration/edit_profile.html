@@ -149,8 +149,8 @@
       var user = document.getElementById('id_username');
       var nombre = document.getElementById('id_nombre_completo');
       if (dni && dni.value && (dni.value.trim().length < 7 || dni.value.trim().length > 8)) { alert('El DNI debe tener entre 7 y 8 dígitos.'); errores = true; }
-      if (t1 && t1.value && (t1.value.trim().length < 6 || t1.value.trim().length > 15)) { alert('El teléfono debe tener entre 6 y 15 dígitos.'); errores = true; }
-      if (t2 && t2.value && (t2.value.trim().length < 6 || t2.value.trim().length > 15)) { alert('El celular debe tener entre 6 y 15 dígitos.'); errores = true; }
+      if (t1 && t1.value && t1.value.trim().length !== 10) { alert('El teléfono debe tener exactamente 10 dígitos.'); errores = true; }
+      if (t2 && t2.value && t2.value.trim().length !== 10) { alert('El celular debe tener exactamente 10 dígitos.'); errores = true; }
       if (user && user.value && user.value.trim().length < 3) { alert('El nombre de usuario debe tener al menos 3 caracteres.'); errores = true; }
       if (nombre && nombre.value && nombre.value.trim().length < 2) { alert('El nombre completo debe tener al menos 2 caracteres.'); errores = true; }
       if (errores) e.preventDefault();

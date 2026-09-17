@@ -179,7 +179,7 @@
     var esDNI = function (v) { return /^[0-9]{7,8}$/.test(v); };
     var esEmail = function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); };
     var esNombre = function (v) { return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,100}$/.test(v.trim()); };
-    var esTel = function (v) { return /^[0-9]{6,15}$/.test(v); };
+    var esTel = function (v) { return /^[0-9]{10}$/.test(v); };
     var esFecha = function (v) { if (!v) return true; var e = new Date().getFullYear() - new Date(v).getFullYear(); return e >= 16 && e <= 100; };
 
     // ── Campos condicionales según rol ──

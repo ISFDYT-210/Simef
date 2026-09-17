@@ -1,6 +1,17 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.core.validators import RegexValidator
 from django.db import models
+from django.utils import timezone
 from .choices import ESTADO_CIVIL_CHOICES, SEXO_CHOICES, MODALIDAD_CHOICES
+
+validador_telefono = RegexValidator(
+    r'^\d{10}$',
+    'El teléfono debe tener exactamente 10 dígitos (código de área + número, sin espacios ni guiones). Ej: 2211234567'
+)
+
+# Contraseña con la que se crea todo usuario nuevo, antes de su primer login
+# (después se lo obliga a cambiarla vía FirstLoginPasswordChangeView).
+PASSWORD_PREDETERMINADA = '12345678'
 
 
 # === Matriz de capacidades por rol ===========================================
@@ -46,8 +57,8 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     localidad = models.CharField('localidad', max_length=50, null=True, blank=True)
     ciudad = models.CharField('ciudad', max_length=100, null=True, blank=True)
     nacionalidad = models.CharField('nacionalidad', max_length=50, null=True, blank=True)
-    telefono_1 = models.IntegerField('telefono_1', null=True, blank=True)
-    telefono_2 = models.IntegerField('telefono_2', null=True, blank=True)
+    telefono_1 = models.CharField('telefono_1', max_length=10, null=True, blank=True, validators=[validador_telefono])
+    telefono_2 = models.CharField('telefono_2', max_length=10, null=True, blank=True, validators=[validador_telefono])
     estado_civil = models.CharField('estado_civil', choices=ESTADO_CIVIL_CHOICES, max_length=50, null=True, blank=True)
     sexo = models.CharField('sexo', choices=SEXO_CHOICES, max_length=10, null=True, blank=True)
     imagen = models.ImageField('imagenPerfil', upload_to='perfil/', max_length=200, null=True, blank=True)
@@ -65,10 +76,10 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     ESTUDIANTE = 'Estudiante'
 
     ROL_CHOICES = (
-        (DIRECTIVO, 'Director'),
-        (SECRETARIO, 'Secretario'),
-        (PRECEPTOR, 'Preceptor'),
-        (PROFESOR, 'Profesor'),
+        (DIRECTIVO, 'Director/a'),
+        (SECRETARIO, 'Secretario/a'),
+        (PRECEPTOR, 'Preceptor/a'),
+        (PROFESOR, 'Profesor/a'),
         (ESTUDIANTE, 'Estudiante'),
     )
     rol = models.CharField(max_length=20, choices=ROL_CHOICES, default=ESTUDIANTE)
@@ -296,11 +307,20 @@ class usuarios_materia(models.Model):
     
 class MesaFinal(models.Model):
     materia = models.ForeignKey('Materia', on_delete=models.CASCADE, blank=False, null=False)
-    llamado= models.DateTimeField('Llamado', null=False, blank=False) 
+    llamado= models.DateTimeField('Llamado', null=False, blank=False)
     vigente= models.BooleanField(default=True)
-    inscripcionAbierta = models.BooleanField(default=False) 
+    inscripcionAbierta = models.BooleanField(default=False)
     def __str__(self):
         return f"{self.materia} -> {self.llamado}"
+
+    def inscripcion_vigente(self):
+        """
+        Ventana real de inscripción: desde que el preceptor habilita la mesa
+        (inscripcionAbierta=True) hasta el mismo día en que se rinde (llamado),
+        inclusive. Después de esa fecha se considera cerrada aunque nadie la
+        haya apagado a mano.
+        """
+        return self.inscripcionAbierta and timezone.now().date() <= self.llamado.date()
 
 class InscripcionFinal(models.Model):
     usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, blank=False, null=False)  # 'Usuario' con mayúscula

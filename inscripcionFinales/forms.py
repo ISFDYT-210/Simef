@@ -97,14 +97,14 @@ class registri_user_form(UserCreationForm):
     
     # Teléfonos
     telefono_1 = forms.CharField(
-        max_length=15, 
-        validators=[validador], 
+        max_length=10,
+        validators=[validador_telefono],
         required=False,
         label="Teléfono"
     )
     telefono_2 = forms.CharField(
-        max_length=15, 
-        validators=[validador], 
+        max_length=10,
+        validators=[validador_telefono],
         required=False,
         label="Celular"
     )
@@ -132,16 +132,16 @@ class registri_user_form(UserCreationForm):
     cargo = forms.CharField(max_length=100, required=False)
     area = forms.CharField(max_length=100, required=False)
 
-    # Contraseña opcional: si se deja vacía, se genera una automáticamente
+    # Contraseña opcional: si se deja vacía, se usa la predeterminada (12345678)
     password = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=True, attrs={
             'class': 'form-control',
             'style': 'width:100%; padding:6px; box-sizing:border-box;',
-            'placeholder': 'Dejar vacío para generar automáticamente'
+            'placeholder': 'Dejar vacío para usar la predeterminada (12345678)'
         }),
         label="Contraseña",
-        help_text="Opcional. Si la dejás vacía, se genera una automáticamente."
+        help_text="Opcional. Si la dejás vacía, se usa la contraseña predeterminada (12345678)."
     )
 
     class Meta:
@@ -155,11 +155,8 @@ class registri_user_form(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Generar el password al inicializar el formulario
-        self.password_generado = get_random_string(
-            length=10, 
-            allowed_chars='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-        )
+        # Contraseña predeterminada antes del primer login (si el admin no elige otra)
+        self.password_generado = PASSWORD_PREDETERMINADA
 
         # Estilo del selector de rol (para que se vea la caja)
         if 'rol' in self.fields:
@@ -283,8 +280,8 @@ class profile_students_form(forms.ModelForm):
         )
     
     dni = forms.CharField(max_length=15, validators=[validador])
-    telefono_1 = forms.CharField(max_length=15, validators=[validador])
-    telefono_2 = forms.CharField(max_length=15, validators=[validador])
+    telefono_1 = forms.CharField(max_length=10, validators=[validador_telefono])
+    telefono_2 = forms.CharField(max_length=10, validators=[validador_telefono])
 
     def __init__(self, *args, puede_editar_rol=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -385,6 +382,26 @@ class MateriaForm(forms.ModelForm):
            'inscripcionAbierta': 'Inscripción abierta',
         }
 
+class MateriaConFiltroSelect(forms.Select):
+    """
+    Select de materias que agrega data-carrera/data-anio a cada <option>.
+    Permite que el filtro visual de carrera/año en alta_mesa_final.html
+    muestre u oculte opciones en el cliente sin volver a consultar la DB.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.materias_info = {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        clave = value.value if hasattr(value, 'value') else value
+        info = self.materias_info.get(clave)
+        if info:
+            option['attrs']['data-carrera'] = info[0] or ''
+            option['attrs']['data-anio'] = info[1]
+        return option
+
+
 class MesaFinalForm(forms.ModelForm):
     class Meta:
         model = MesaFinal
@@ -398,19 +415,25 @@ class MesaFinalForm(forms.ModelForm):
                 format='%Y-%m-%dT%H:%M'
             ),
             'inscripcionAbierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'materia': forms.Select(attrs={'class': 'form-control'})
+            'materia': MateriaConFiltroSelect(attrs={'class': 'form-control'})
         }
         labels = {
             'materia': 'Materia',
             'llamado': 'Fecha y Hora del Llamado',
             'inscripcionAbierta': 'Inscripción Abierta'
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Configurar el campo llamado para usar datetime-local
         self.fields['llamado'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
-        
+
+        # Una sola query para poblar el data-carrera/data-anio de cada <option> (evita N+1)
+        self.fields['materia'].widget.materias_info = {
+            id_: (carrera_id, anio)
+            for id_, carrera_id, anio in Materia.objects.values_list('id', 'carrera_id', 'anio')
+        }
+
         # Hacer que la materia sea de solo lectura en edición
         if self.instance and self.instance.pk:
             self.fields['materia'].disabled = True
