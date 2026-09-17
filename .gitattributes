@@ -1,3 +1,9 @@
 * linguist-vendored
 
 *.py linguist-vendored=false
+
+# Los scripts de shell tienen que quedar con fin de linea LF aunque se
+# clonen desde Windows: si entrypoint.sh llega con CRLF, el contenedor no
+# arranca (el shebang queda como "#!/bin/sh\r" y falla al ejecutarse).
+entrypoint.sh text eol=lf
+*.sh text eol=lf

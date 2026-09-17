@@ -1,0 +1,9 @@
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  web:
+    volumes:
+      - .:/app
+    command: ["gunicorn", "gestionInstituto.wsgi:application", "--bind", "0.0.0.0:8000", "--reload"]
