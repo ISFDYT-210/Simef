@@ -358,3 +358,24 @@ class RegistroAuditoria(models.Model):
     def __str__(self):
         quien = self.usuario.email if self.usuario else 'Sistema'
         return f"[{self.fecha:%Y-%m-%d %H:%M}] {quien}: {self.accion}"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Inscripción automática a PRIMER AÑO (cursada en bloque).
+# Al asignarle una carrera a un ESTUDIANTE, se lo inscribe en todas las
+# materias de primer año de esa carrera. Escucha el M2M Usuario.carrera, así
+# que cubre todos los flujos (alta individual, carga masiva, admin, etc.).
+# ══════════════════════════════════════════════════════════════════════════
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
+
+
+@receiver(m2m_changed, sender=Usuario.carrera.through)
+def inscribir_en_primer_anio(sender, instance, action, pk_set, **kwargs):
+    if action != "post_add":
+        return
+    if not instance.es_estudiante():
+        return
+    for carrera_id in (pk_set or []):
+        for materia in Materia.objects.filter(carrera_id=carrera_id, anio=1):
+            usuarios_materia.objects.get_or_create(usuario=instance, materia=materia)
