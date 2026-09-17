@@ -213,8 +213,8 @@ class Instituto(models.Model):
     direccion=models.CharField('direccion', max_length=50)
     localidad=models.CharField('localidad', max_length=50)
     ciudad=models.CharField('ciudad', max_length=100)
-    telefono_1 = models.IntegerField('telefono_1')
-    telefono_2 = models.IntegerField('telefono_2')
+    telefono_1 = models.CharField('telefono_1', max_length=15, null=True, blank=True)
+    telefono_2 = models.CharField('telefono_2', max_length=15, null=True, blank=True)
     
     imagen = models.ImageField('imagenPerfil', upload_to='perfil/', max_length=200,blank = True,null = True)
     
