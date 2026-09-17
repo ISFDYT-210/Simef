@@ -10,3 +10,4 @@ venv/
 .env
 tailwindcss
 tailwindcss.exe
+graft
