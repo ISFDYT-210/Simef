@@ -1,31 +1,19 @@
 # Despliegue de SIMEF en producción (Debian)
 
-Stack: **Apache → Gunicorn → Django (Python) + Tailwind → MariaDB**
+Stack: **Apache → Gunicorn → Django (Python) + Tailwind → Postgres en Neon**
 
 Este documento describe cómo se sirve SIMEF en un servidor Debian y cómo
 desplegar/actualizar el sistema. Está pensado para el instituto (ISFDyT N°210).
 
-> ### ⚠️ La parte de base de datos NO coincide con el código actual
->
-> Esta guía describe un despliegue sobre **MariaDB**, pero el proyecto hoy
-> **no soporta MariaDB/MySQL**:
->
-> - `gestionInstituto/settings.py` arma `DATABASES` con
->   `django.db.backends.postgresql` cuando existe la variable `DATABASE_URL`,
->   y cae a SQLite si no está. No hay ninguna rama para MySQL.
-> - `requirements.txt` trae `psycopg2-binary` (Postgres). **No** incluye
->   `mysqlclient` ni ningún driver de MariaDB.
->
-> En particular, **no sigas el paso 4.2**: reemplazar el bloque `DATABASES`
-> por uno de MySQL rompería la lectura de variables de entorno.
->
-> Lo que sí está vigente y es correcto en este documento: la compilación de
-> Tailwind (4.3), el servicio de Gunicorn con systemd (5), la configuración de
-> Apache como proxy inverso (6) y el checklist de actualización (7) — salvo las
-> menciones puntuales a `mariadb.service`.
->
-> Antes de usar esta guía para un despliegue nuevo, hay que reescribir las
-> secciones de base de datos para Postgres.
+La base de datos **no vive en el servidor**: es una Postgres gestionada en
+[Neon](https://neon.tech). El servidor solo corre la aplicación y se conecta
+por red a Neon. Eso implica dos cosas que conviene tener presentes desde el
+principio:
+
+- No hay que instalar, respaldar ni actualizar un motor de base de datos en el
+  server. Ese trabajo lo hace Neon.
+- Si el servidor se queda sin internet, SIMEF deja de funcionar aunque Apache
+  siga levantado. No es como tener la base en la misma máquina.
 
 ---
 
@@ -57,11 +45,12 @@ El recorrido de una petición del navegador hasta la base de datos:
  │  • Lógica, vistas, plantillas, permisos                  │
  │  • El CSS lo genera Tailwind en un paso previo (build)   │
  └───────────────┬─────────────────────────────────────────┘
-                 │  SQL
+                 │  SQL sobre TLS  (puerto 5432, sale a internet)
                  ▼
  ┌─────────────────────────────────────────────────────────┐
- │ MARIADB  (base de datos)                                │
+ │ NEON  (Postgres gestionada, región sa-east-1)           │
  │  • Usuarios, materias, mesas, inscripciones, notas       │
+ │  • Backups, réplicas y actualizaciones: las hace Neon    │
  └─────────────────────────────────────────────────────────┘
 ```
 
@@ -75,7 +64,7 @@ Reparto de responsabilidades, en una frase cada uno:
 - **Apache**: atiende al público, hace HTTPS y sirve archivos estáticos rápido.
 - **Gunicorn**: mantiene la app Python viva y maneja varias peticiones a la vez.
 - **Django/Tailwind**: es SIMEF; Tailwind arma el CSS antes de arrancar.
-- **MariaDB**: guarda todos los datos.
+- **Neon**: guarda todos los datos, fuera del servidor.
 
 ---
 
@@ -85,39 +74,59 @@ En Debian 12 (bookworm), como root:
 
 ```bash
 apt update
-apt install -y apache2 mariadb-server \
+apt install -y apache2 \
                python3 python3-venv python3-dev \
-               build-essential pkg-config libmariadb-dev \
-               git curl
+               git curl ca-certificates
 ```
 
 - `apache2` → servidor web.
-- `mariadb-server` → base de datos.
 - `python3-venv` → entornos virtuales de Python.
-- `build-essential`, `pkg-config`, `libmariadb-dev` → necesarios para compilar
-  el conector `mysqlclient` de Python.
+- `ca-certificates` → certificados raíz; sin esto falla el TLS contra Neon.
+
+> No hace falta instalar Postgres ni compilar un conector: `requirements.txt`
+> trae `psycopg2-binary`, que viene como *wheel* precompilada, y `gunicorn`.
+> No instales `postgresql-server` en esta máquina: la base es la de Neon y
+> tener otra al lado solo genera confusión sobre cuál es la buena.
 
 ---
 
-## 3. Base de datos (MariaDB)
+## 3. Base de datos (Neon)
 
-Asegurar la instalación y crear la base + usuario:
+### 3.1 Obtener la cadena de conexión
 
-```bash
-mysql_secure_installation      # poné contraseña de root, quitá accesos anónimos
+En la consola de Neon, dentro del proyecto de SIMEF: **Connect** → copiar la
+*connection string* de la rama `main` (la de producción). Tiene esta forma:
+
+```
+postgresql://USUARIO:CONTRASEÑA@ep-xxxx-xxxx.sa-east-1.aws.neon.tech/neondb?sslmode=require
 ```
 
-Entrar como root y crear todo (usá utf8mb4 para acentos y emojis):
+Tres detalles que importan:
 
-```sql
-sudo mysql -u root -p
+- **`?sslmode=require` no es opcional.** Neon solo acepta conexiones cifradas.
+  Todo lo que venga después del `?` en la URL, `settings.py` se lo pasa tal cual
+  a psycopg2 como `OPTIONS`, así que la cadena se copia entera, sin recortar.
+- **Endpoint directo vs *pooled*.** Neon ofrece además un host con `-pooler` en
+  el nombre. Para este despliegue usamos el **directo**: Gunicorn mantiene una
+  cantidad chica y fija de procesos, que es justamente el caso donde el pooler
+  no aporta. El pooler está pensado para entornos serverless que abren cientos
+  de conexiones efímeras.
+- **Ramas de Neon.** Neon permite crear ramas de la base. Es la forma prolija de
+  tener una base de pruebas con datos realistas sin tocar producción: se crea
+  una rama, se usa *su* cadena de conexión en el `.env` de la máquina de
+  desarrollo, y lo que se rompa ahí no afecta a `main`.
 
-CREATE DATABASE simef CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'simef_user'@'localhost' IDENTIFIED BY 'PONER_UNA_CLAVE_FUERTE';
-GRANT ALL PRIVILEGES ON simef.* TO 'simef_user'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
+### 3.2 Cuidado con apuntar a producción desde una máquina de desarrollo
+
+La base es accesible desde cualquier lado con esa URL. Un `python manage.py
+migrate` o un `flush` corrido desde una notebook con el `.env` de producción
+pega contra los datos reales del instituto, sin red de contención. Dos reglas:
+
+- En las máquinas de desarrollo, el `.env` apunta a una **rama** de Neon o a
+  SQLite (basta con no definir `DATABASE_URL`), nunca a `main`.
+- Los tests se corren siempre con `--settings=gestionInstituto.settings_TEST`,
+  que usa SQLite en memoria. Sin ese parámetro, Django intenta crear una base
+  `test_neondb` **en Neon**. Ver [INSTALACION_MANUAL.md](INSTALACION_MANUAL.md).
 
 ---
 
@@ -136,43 +145,56 @@ git clone <URL_DE_TU_REPO> .        # o copiar el proyecto acá
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt      # Django, etc.
-pip install gunicorn mysqlclient     # si no están en requirements
+pip install -r requirements.txt      # Django, psycopg2, gunicorn, etc.
 ```
 
-### 4.2 Conectar Django a MariaDB
+### 4.2 Configurar el `.env` (no se toca `settings.py`)
 
-En `gestionInstituto/settings.py`, el bloque `DATABASES`:
+**`settings.py` está versionado y ya sirve para producción**: lee todo de
+variables de entorno. No hay que editarlo ni copiarle encima un `settings_*.py`
+—hacerlo rompería justamente esa lectura—. Toda la configuración del despliegue
+vive en `/opt/simef/.env`:
 
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'simef',
-        'USER': 'simef_user',
-        'PASSWORD': 'PONER_UNA_CLAVE_FUERTE',
-        'HOST': '127.0.0.1',
-        'PORT': '3306',
-        'OPTIONS': {'charset': 'utf8mb4'},
-    }
-}
+```ini
+SECRET_KEY=<una clave larga y secreta, distinta de la del repo>
+DEBUG=False
+ALLOWED_HOSTS=simef.tu-dominio.edu.ar,127.0.0.1
+
+DATABASE_URL=postgresql://USUARIO:CONTRASEÑA@ep-xxxx.sa-east-1.aws.neon.tech/neondb?sslmode=require
+
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=<cuenta que envía los mails>
+EMAIL_HOST_PASSWORD=<contraseña de aplicación>
+EMAIL_USE_TLS=True
 ```
 
-Y para producción, en el mismo `settings.py`:
+Para generar una `SECRET_KEY` nueva:
 
-```python
-DEBUG = False
-ALLOWED_HOSTS = ['tu-dominio-o-ip', 'localhost', '127.0.0.1']
-
-STATIC_URL = '/static/'
-STATIC_ROOT = '/opt/simef/staticfiles'     # donde collectstatic junta todo
-# Si usás subidas de archivos (imágenes de perfil, etc.):
-MEDIA_URL = '/media/'
-MEDIA_ROOT = '/opt/simef/media'
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-> Consejo: no dejes `SECRET_KEY`, la clave de la base ni credenciales de correo
-> escritas en el código. Pasalas por variables de entorno.
+Comprobaciones que vale la pena hacer una sola vez, con calma:
+
+- `DEBUG` se compara como texto contra `'True'`. Cualquier otra cosa
+  (`False`, `false`, `0`, o la variable ausente) deja `DEBUG` apagado, que es lo
+  que queremos; pero escribir `DEBUG=true` en minúscula también apaga el modo
+  debug, no lo enciende. Si alguna vez necesitás encenderlo, va `True` exacto.
+- `ALLOWED_HOSTS` se parte por comas y **sin espacios** alrededor de cada host.
+  Si queda vacío y `DEBUG=False`, Django rechaza todas las peticiones con
+  `DisallowedHost`.
+- Si `DATABASE_URL` falta, la app **no falla**: cae silenciosamente a un SQLite
+  local vacío y parece que se perdieron todos los datos. Ante un "desapareció
+  todo" después de un deploy, esto es lo primero a revisar.
+
+El archivo tiene la contraseña de la base, así que no queda legible para todo
+el mundo:
+
+```bash
+sudo chown www-data:www-data /opt/simef/.env
+sudo chmod 640 /opt/simef/.env
+```
 
 ### 4.3 Compilar el CSS con Tailwind
 
@@ -195,7 +217,8 @@ chmod +x tailwindcss
 
 > En una máquina Windows de desarrollo (Git Bash), el binario es
 > `...download/v3.4.17/tailwindcss-windows-x64.exe` y se ejecuta como
-> `./tailwindcss.exe`.
+> `./tailwindcss.exe`. **No lo commitees**: son ~40 MB que quedarían para
+> siempre en el historial del repo.
 
 > Hay que recompilar cada vez que se agregan **clases nuevas** de Tailwind en las
 > plantillas. Si no cambiaste plantillas, no hace falta.
@@ -204,10 +227,20 @@ chmod +x tailwindcss
 
 ```bash
 source venv/bin/activate
-python manage.py migrate
-python manage.py collectstatic --noinput   # junta todo en STATIC_ROOT
+python manage.py migrate                    # corre CONTRA NEON
+python manage.py collectstatic --noinput    # junta todo en staticfiles/
 python manage.py createsuperuser            # primer usuario admin
 ```
+
+`STATIC_ROOT` y `MEDIA_ROOT` ya vienen definidos en `settings.py`
+(`/opt/simef/staticfiles` y `/opt/simef/media` con la ubicación sugerida), no
+hay que agregarlos.
+
+> `collectstatic` no es opcional ni siquiera "para probar": el proyecto usa
+> `CompressedManifestStaticFilesStorage`, que resuelve cada `{% static %}`
+> contra un manifiesto generado en ese paso. Si no se corre —o si se corre
+> antes del build de Tailwind— las páginas revientan con
+> `ValueError: Missing staticfiles manifest entry`.
 
 ---
 
@@ -226,7 +259,9 @@ Crear `/etc/systemd/system/simef.service`:
 ```ini
 [Unit]
 Description=SIMEF - Gunicorn
-After=network.target mariadb.service
+# La base es remota: esperamos a tener red de verdad, no solo la interfaz
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=www-data
@@ -251,6 +286,11 @@ sudo systemctl status simef
 ```
 
 > `--workers 3` es un punto de partida razonable (regla común: 2 × núcleos + 1).
+
+> **`WorkingDirectory` tiene que ser la raíz del proyecto.** El `.env` lo lee
+> `python-dotenv` desde ahí; si el directorio de trabajo es otro, Gunicorn
+> arranca igual pero sin `DATABASE_URL`, y la app termina hablándole a un
+> SQLite vacío en vez de a Neon.
 
 ---
 
@@ -338,14 +378,74 @@ sudo systemctl restart simef               # 6. reiniciar la app
 
 Apache normalmente no hay que reiniciarlo salvo que cambies su config.
 
+> **El paso 4 modifica la base real.** Antes de una migración que borre o
+> transforme columnas, conviene sacar una rama en Neon (sección 8): tarda
+> segundos y deja un punto exacto al que volver.
+
 ---
 
-## 8. Diagnóstico rápido
+## 8. Copias de seguridad
 
-- App caída / error 502 → `sudo systemctl status simef` y
+Neon guarda un historial de la base y permite **restaurar a un momento
+anterior** (*point-in-time restore*) dentro de la ventana de retención del
+plan. Eso cubre el accidente típico: un borrado masivo o una migración que
+salió mal.
+
+Dos cosas que ese historial **no** cubre, y conviene resolver aparte:
+
+1. **Antes de tocar la estructura de la base**, crear una rama desde `main` en
+   la consola de Neon. Queda como una copia consistente e independiente del
+   momento previo, con nombre propio.
+2. **Una copia fuera de Neon.** Si se pierde el acceso a la cuenta, el historial
+   no sirve de nada. Un volcado periódico a un disco del instituto:
+
+   ```bash
+   pg_dump "postgresql://USUARIO:CONTRASEÑA@ep-xxxx.sa-east-1.aws.neon.tech/neondb?sslmode=require" \
+     --no-owner --format=custom \
+     --file=/ruta/al/backup/simef-$(date +%F).dump
+   ```
+
+   Requiere `postgresql-client` (`apt install -y postgresql-client`), que es
+   solo el cliente: no levanta ningún servidor de base en la máquina.
+
+Aparte de la base, hay un directorio que Neon no ve y que también hay que
+respaldar: **`/opt/simef/media`**, donde van los archivos subidos.
+
+---
+
+## 9. Diagnóstico rápido
+
+- **App caída / error 502** → `sudo systemctl status simef` y
   `sudo journalctl -u simef -n 50` (logs de Gunicorn/Django).
-- Estilos rotos → ¿corriste el build de Tailwind y `collectstatic`?
-  ¿`STATIC_ROOT` y el `Alias /static/` coinciden?
-- Error de base → revisar credenciales del bloque `DATABASES` y que
-  `mariadb.service` esté activo.
-- Logs de Apache → `/var/log/apache2/simef_error.log`.
+- **Estilos rotos o `Missing staticfiles manifest entry`** → ¿corriste el build
+  de Tailwind y después `collectstatic`? ¿`STATIC_ROOT` y el `Alias /static/`
+  apuntan al mismo directorio?
+- **"Se perdieron todos los datos"** → casi siempre es que la app no está viendo
+  `DATABASE_URL` y cayó al SQLite de respaldo. Revisar que exista
+  `/opt/simef/.env`, que `www-data` pueda leerlo y que `WorkingDirectory` del
+  servicio sea `/opt/simef`. Para confirmar a qué base está hablando:
+
+  ```bash
+  sudo -u www-data /opt/simef/venv/bin/python /opt/simef/manage.py shell \
+    -c "from django.db import connection; print(connection.settings_dict['ENGINE'], connection.settings_dict['HOST'])"
+  ```
+
+- **Error de conexión a la base** → probar la salida a internet desde el server
+  (`curl -sS https://neon.tech > /dev/null && echo ok`) y la conexión en sí:
+
+  ```bash
+  sudo -u www-data /opt/simef/venv/bin/python /opt/simef/manage.py shell \
+    -c "from django.db import connection; connection.ensure_connection(); print('conexion OK')"
+  ```
+
+  Si el error menciona el certificado, falta `ca-certificates`. Si menciona
+  SSL, revisar que la URL conserve `?sslmode=require`.
+- **La primera visita del día tarda unos segundos** → es normal si el proyecto
+  de Neon tiene el *autosuspend* activo: la base se apaga cuando no se usa y
+  tarda en despertar. Se desactiva en la configuración del proyecto en Neon.
+- **Lentitud pareja en todas las páginas** → la base está en São Paulo, así que
+  cada consulta cruza internet. Hoy `settings.py` no define `CONN_MAX_AGE`, con
+  lo cual Django **abre y cierra una conexión nueva en cada petición** (nuevo
+  handshake TLS incluido). Si el uso crece, definir `CONN_MAX_AGE` (por ejemplo
+  60 segundos) es la mejora más barata disponible.
+- **Logs de Apache** → `/var/log/apache2/simef_error.log`.

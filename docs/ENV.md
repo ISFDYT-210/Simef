@@ -21,7 +21,7 @@ credenciales reales: cada persona/entorno tiene el suyo.
 | `DEBUG` | `True` en desarrollo, `False` en producción. |
 | `ALLOWED_HOSTS` | Hosts/dominios permitidos, separados por coma. |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Credenciales de la base Postgres que levanta Docker. |
-| `DATABASE_URL` | URL de conexión a la base. Tiene que coincidir con los `POSTGRES_*` de arriba. |
+| `DATABASE_URL` | URL de conexión a la base. Con Docker tiene que coincidir con los `POSTGRES_*` de arriba. Si no la definís, Django usa un SQLite local. En producción apunta a Neon (ver [DESPLIEGUE.md](DESPLIEGUE.md)). |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | Credenciales SMTP, solo necesarias si vas a probar el envío de mails (recuperar contraseña, etc.). |
 
 ## 2. Crear tu `.env`
