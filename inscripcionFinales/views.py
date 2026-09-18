@@ -1536,77 +1536,11 @@ def listar_usuarios_materia(request):
     return render(request, 'registration/ver_usuarios_materia.html', context)
 
 
-def validar_inscripcion_final(usuario_id, materia_id):
-    # Verificamos si el usuario está inscrito a la materia y su nota de cursada
-    try:
-        usuario_materia_instance = usuarios_materia.objects.get(
-            usuario_id=usuario_id,  # Ajusta si el campo es diferente
-            materia_id=materia_id   # Ajusta si el campo es diferente
-        )
-        nota_cursada = usuario_materia_instance.nota_cursada
-        nota_final = usuario_materia_instance.nota_final
-        
-        if nota_cursada is None or nota_cursada < 7:
-            return False
-            #JsonResponse({
-            #    'puede_inscribirse': False,
-            #    'mensaje': 'No tienes la nota de cursada mínima (7) para inscribirte al final.'
-            #})
-        
-        if nota_final is not None:
-            return False
-            #JsonResponse({
-            #    'puede_inscribirse': False,
-            #    'mensaje': 'Ya tienes una nota de final registrada para esta materia. No puedes inscribirte nuevamente.'
-            #})
-    except usuarios_materia.DoesNotExist:
-        return False 
-        #JsonResponse({
-        #    'puede_inscribirse': False,
-        #    'mensaje': 'No estás inscrito a esta materia.'
-        #})
-
-    # Obtenemos todas las materias correlativas de la materia a la que se quiere inscribir
-    correlativas = MateriaCorrelativa.objects.filter(materia_id=materia_id)
-    
-    # Si no hay correlativas, el usuario puede inscribirse directamente
-    if not correlativas.exists():
-        return True
-        #JsonResponse({
-        #    'puede_inscribirse': True,
-        #    'mensaje': 'Puedes inscribirte a la mesa final. Esta materia no tiene correlativas.'
-        #})
-
-    # Si hay correlativas, verificamos si el usuario ya aprobó todas
-    for correlativa in correlativas:
-        try:
-            correlativa_instance = usuarios_materia.objects.get(
-                usuario_id=usuario_id,  # Ajusta si el campo es diferente
-                materia_id=correlativa.materia_correlativa_id  # Ajusta si el campo es diferente
-            )
-            print(correlativa_instance.nota_final)
-            
-            nota_final = correlativa_instance.nota_final
-            if nota_final is None or nota_final < 4:
-                return False
-                #return JsonResponse({
-                #    'puede_inscribirse': False,
-                #    'mensaje': f'No has aprobado la materia correlativa {correlativa.materia_correlativa.nombre_materia} con nota 4 o superior.'
-                #})
-        except usuarios_materia.DoesNotExist:
-            print("Nodeberiaperounonuncasabe")
-            return False
-        #JsonResponse({
-        #        'puede_inscribirse': False,
-        #        'mensaje': f'No has cursado la materia correlativa {correlativa.materia_correlativa.nombre_materia}.'
-        #    })
-    
-    # Si llegamos aquí, el usuario puede inscribirse
-    return True
-#JsonResponse({
-#        'puede_inscribirse': True,
-#        'mensaje': 'Puedes inscribirte a la mesa final.'
-#    })
+# NOTA: la validación de inscripción a finales vive más abajo, en
+# validar_inscripcion_final(). Acá había una segunda definición con el mismo
+# nombre que Python descartaba (gana la última), y que además se comportaba
+# distinto: ignoraba la modalidad Libre y bloqueaba a quien tuviera cualquier
+# nota de final, incluso desaprobada. Se eliminó para que no se edite por error.
 
 def validar_inscripcion_materias(usuario_id, materia_id):
     try:
