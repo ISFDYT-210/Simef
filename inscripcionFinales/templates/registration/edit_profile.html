@@ -1,313 +1,172 @@
 {% extends 'base/base.html' %}
+{% load inscripcionfinales_extras %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/registration/edit_profile.html (reemplaza al actual)
+
+  El logo SIMEF gigante venía de un CSS viejo (.logo-edit-user al 50% de alto) que
+  ya no existe, por eso tapaba todo. Se reemplazó por un formulario en tarjeta.
+  Se conservan: permisos, campos, validaciones en vivo (solo números y longitudes),
+  y la lógica del campo fecha_nac oculto con su espejo visible.
+{% endcomment %}
 
 {% block title %}Editar usuario{% endblock %}
+{% block encabezado %}Editar usuario{% endblock %}
 
 {% block content %}
-{% load inscripcionfinales_extras %}
-{% if request.path == "/edit_user/"|concatenate:request.user.id or request.user.is_staff or request.user.is_superuser or request.user.admin %}
+{% if request.path == "/edit_user/"|concatenate:request.user.id or request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
 
-<!-- Mensajes de éxito y error -->
-{% if messages %}
-    <div class="messages-container">
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        {% endfor %}
+<div class="mx-auto max-w-3xl">
+
+  {% if form.errors %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <p class="font-semibold">Por favor corregí los siguientes errores:</p>
+    <ul class="mt-2 list-inside list-disc space-y-0.5">
+      {% for field, errors in form.errors.items %}
+        {% for error in errors %}<li>{{ field|title }}: {{ error }}</li>{% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="POST" id="editUserForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
+
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Datos del usuario</h2>
+      <p class="text-xs text-slate-500">Los campos vacíos se pueden completar más tarde.</p>
     </div>
-{% endif %}
 
-<div id="edit-user"> 
-  <form method="POST" class="form" id="editUserForm">
-      <div class="edit-rectangulo1">
-          {% csrf_token %}
-          
-          <!-- Mensajes de error del formulario -->
-          {% if form.errors %}
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              <strong>Error:</strong> Por favor corrige los siguientes errores:
-              <ul>
-                {% for field, errors in form.errors.items %}
-                  {% for error in errors %}
-                    <li>{{ field|title }}: {{ error }}</li>
-                  {% endfor %}
-                {% endfor %}
-              </ul>
-            </div>
-          {% endif %}
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 px-6 py-6 sm:grid-cols-2">
 
-          <p class="text-center form-item">
-            <label for="id_username" class="Nu">Nombre de Usuario:</label>
-            <br>
-            {{ form.username }}
-            {% if form.username.errors %}
-                <div id="register-error">
-                  <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    <p>El usuario ya está en uso.</p>
-                  </div>
-                </div>
-            {%endif%}
-          </p>
-          {% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
-            <p class="text-center form-item">
-              <label for="id_username">Nombre Completo:</label>
-              <br>  
-              {{ form.nombre_completo }}
-            </p>
-            <p class="text-center form-item">
-              <label for="id_username">DNI:</label>
-              <br>
-              {{ form.dni }}
-              {% if form.dni.errors %}
-              <div id="register-error">
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                  {{form.dni.errors}}
-                </div>
-              </div>
-              {%endif%}
-            </p>
-          {% endif %}
-          <p class="text-center form-item">
-            <label for="id_fecha_nac">Fecha de nacimiento:</label>
-            <br>
-            <input type="date" class="form-edit_profile" id='retroll_fecha_nac' name="fecha_nac">
-            {{ form.fecha_nac }}
-            <script>
-              document.getElementById("id_fecha_nac").hidden=true
-              document.getElementById("retroll_fecha_nac").value = document.getElementById("id_fecha_nac").value
-              function guarda_fecha()
-              {
-                document.getElementById("id_fecha_nac").value = document.getElementById("retroll_fecha_nac").value;
-              }
-            </script>
-            {% if form.fecha_nac.errors %}
-            <div id="register-error">
-              <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                <p>Fecha de nacimiento mal ingresada, verifique formato. dd/mm/aaaa.</p>
-              </div>
-            </div>
-            {%endif%}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_direccion">Dirección:</label>
-            <br>
-            {{ form.direccion }}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_localidad">Localidad:</label>
-            <br>
-            {{ form.localidad }}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_ciudad">Ciudad:</label>
-            <br>
-            {{ form.ciudad }}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_nacionalidad">Nacionalidad:</label>
-            <br>
-            {{ form.nacionalidad }}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_telefono_1">Telefono:</label>
-            <br>
-            {{ form.telefono_1 }}
-            {% if form.telefono_1.errors %}
-            <div id="register-error">
-              <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                {{form.telefono_1.errors}}
-              </div>
-            </div>
-            {%endif%}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_telefono_2">Celular:</label>
-            <br>
-            {{ form.telefono_2 }}
-            {% if form.telefono_2.errors %}
-            <div id="register-error">
-              <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                {{form.telefono_2.errors}}
-              </div>
-            </div>
-            {%endif%}
-          </p>
-          <p class="text-center form-item">
-            <label for="id_estado_civil">Estado civil:</label>
-            <br>
-            {{ form.estado_civil }}
-          </p>
-          <p class="text-center form-item last-form-item">
-            <label for="id_sexo">Sexo:</label>
-            <br>
-            {{ form.sexo }}
-          </p>
-        </div>
+      <div>
+        <label for="id_username" class="mb-1 block text-sm font-medium text-slate-700">Nombre de usuario</label>
+        {{ form.username }}
+        {% if form.username.errors %}<p class="mt-1 text-xs text-red-600">El usuario ya está en uso.</p>{% endif %}
+      </div>
 
-        <div class = "edit-rectangulo2">
-          <div class="logo-edit-user only-lt">
-            <img src="/static/imagenes/SIMEF.png" style="height: 50%;">
-          </div>
-          <div class="botones-edituser" style="margin-top:-200px">
-            <button onclick="guarda_fecha()" type="submit" class="btn btn-blue" style="transition: 0.6s">Guardar</button>
+      {% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+      <div>
+        <label for="id_nombre_completo" class="mb-1 block text-sm font-medium text-slate-700">Nombre completo</label>
+        {{ form.nombre_completo }}
+      </div>
+      <div>
+        <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
+        {{ form.dni }}
+        {% if form.dni.errors %}<p class="mt-1 text-xs text-red-600">{{ form.dni.errors|striptags }}</p>{% endif %}
+      </div>
+      {% endif %}
 
-          <div id="volver_usuario">
-            <a href="/user_list/" style="font-size: 20px; text-decoration: none">Volver a usuarios</a>
-          </div>
-        </div>
-    </form>
+      <div>
+        <label for="retroll_fecha_nac" class="mb-1 block text-sm font-medium text-slate-700">Fecha de nacimiento</label>
+        <input type="date" id="retroll_fecha_nac" name="fecha_nac"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+        {{ form.fecha_nac }}
+        {% if form.fecha_nac.errors %}<p class="mt-1 text-xs text-red-600">Fecha mal ingresada, verificá el formato (dd/mm/aaaa).</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="id_direccion" class="mb-1 block text-sm font-medium text-slate-700">Dirección</label>
+        {{ form.direccion }}
+      </div>
+      <div>
+        <label for="id_localidad" class="mb-1 block text-sm font-medium text-slate-700">Localidad</label>
+        {{ form.localidad }}
+      </div>
+      <div>
+        <label for="id_ciudad" class="mb-1 block text-sm font-medium text-slate-700">Ciudad</label>
+        {{ form.ciudad }}
+      </div>
+      <div>
+        <label for="id_nacionalidad" class="mb-1 block text-sm font-medium text-slate-700">Nacionalidad</label>
+        {{ form.nacionalidad }}
+      </div>
+      <div>
+        <label for="id_telefono_1" class="mb-1 block text-sm font-medium text-slate-700">Teléfono</label>
+        {{ form.telefono_1 }}
+        {% if form.telefono_1.errors %}<p class="mt-1 text-xs text-red-600">{{ form.telefono_1.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_telefono_2" class="mb-1 block text-sm font-medium text-slate-700">Celular</label>
+        {{ form.telefono_2 }}
+        {% if form.telefono_2.errors %}<p class="mt-1 text-xs text-red-600">{{ form.telefono_2.errors|striptags }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="id_estado_civil" class="mb-1 block text-sm font-medium text-slate-700">Estado civil</label>
+        {{ form.estado_civil }}
+      </div>
+      <div>
+        <label for="id_sexo" class="mb-1 block text-sm font-medium text-slate-700">Sexo</label>
+        {{ form.sexo }}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+      <button type="submit" onclick="guarda_fecha()"
+              class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">
+        Guardar
+      </button>
+      <a href="/user_list/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        Volver a usuarios
+      </a>
+    </div>
+  </form>
 </div>
-
-<style>
-  .messages-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    max-width: 400px;
-  }
-  
-  .alert {
-    margin-bottom: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  .alert-success {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
-  }
-  
-  .alert-error {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
-  }
-
-  @media only screen and (max-width: 600px) {
-    .edit-rectangulo1 {
-      width: 70%;
-    } 
-    .edit-rectangulo2 {
-      margin-top: 50%;
-      margin-right: 10%;
-    }
-    .messages-container {
-      position: relative;
-      top: auto;
-      right: auto;
-      max-width: 100%;
-      margin: 10px;
-    }
-  }
-</style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('editUserForm');
-    const dniField = document.getElementById('id_dni');
-    const telefono1Field = document.getElementById('id_telefono_1');
-    const telefono2Field = document.getElementById('id_telefono_2');
-    const usernameField = document.getElementById('id_username');
-    const nombreField = document.getElementById('id_nombre_completo');
+  // Estiliza todos los inputs/select que genera Django dentro del form
+  document.addEventListener('DOMContentLoaded', function () {
+    var clases = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+    document.querySelectorAll('#editUserForm input:not([type=date]):not([type=hidden]):not([type=checkbox]), #editUserForm select, #editUserForm textarea')
+      .forEach(function (el) { el.classList.add.apply(el.classList, clases); });
 
-    // Validaciones en tiempo real
-    if (dniField) {
-        dniField.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
+    // ── Campo fecha: el de Django queda oculto y el visible (date) lo espeja ──
+    var djangoFecha = document.getElementById('id_fecha_nac');
+    var visible = document.getElementById('retroll_fecha_nac');
+    if (djangoFecha) {
+      djangoFecha.hidden = true;
+      if (visible && djangoFecha.value) visible.value = djangoFecha.value;
     }
 
-    if (telefono1Field) {
-        telefono1Field.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-    }
-
-    if (telefono2Field) {
-        telefono2Field.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-    }
-
-    // Validación antes de enviar
-    form.addEventListener('submit', function(e) {
-        let hasErrors = false;
-        
-        // Validar DNI
-        if (dniField && dniField.value) {
-            const dni = dniField.value.trim();
-            if (dni.length < 7 || dni.length > 8) {
-                alert('El DNI debe tener entre 7 y 8 dígitos.');
-                hasErrors = true;
-            }
-        }
-
-        // Validar teléfonos
-        if (telefono1Field && telefono1Field.value) {
-            const telefono = telefono1Field.value.trim();
-            if (telefono.length < 6 || telefono.length > 15) {
-                alert('El teléfono debe tener entre 6 y 15 dígitos.');
-                hasErrors = true;
-            }
-        }
-
-        if (telefono2Field && telefono2Field.value) {
-            const celular = telefono2Field.value.trim();
-            if (celular.length < 6 || celular.length > 15) {
-                alert('El celular debe tener entre 6 y 15 dígitos.');
-                hasErrors = true;
-            }
-        }
-
-        // Validar nombre de usuario
-        if (usernameField && usernameField.value) {
-            const username = usernameField.value.trim();
-            if (username.length < 3) {
-                alert('El nombre de usuario debe tener al menos 3 caracteres.');
-                hasErrors = true;
-            }
-        }
-
-        // Validar nombre completo
-        if (nombreField && nombreField.value) {
-            const nombre = nombreField.value.trim();
-            if (nombre.length < 2) {
-                alert('El nombre completo debe tener al menos 2 caracteres.');
-                hasErrors = true;
-            }
-        }
-
-        if (hasErrors) {
-            e.preventDefault();
-        }
+    // ── Validaciones en vivo: solo números en DNI y teléfonos ──
+    ['id_dni', 'id_telefono_1', 'id_telefono_2'].forEach(function (id) {
+      var f = document.getElementById(id);
+      if (f) f.addEventListener('input', function () { this.value = this.value.replace(/[^0-9]/g, ''); });
     });
 
-    // Auto-dismiss alerts after 5 seconds
-    setTimeout(function() {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(function(alert) {
-            if (alert.classList.contains('alert-success')) {
-                alert.style.opacity = '0';
-                setTimeout(() => alert.remove(), 300);
-            }
-        });
-    }, 5000);
-});
+    // ── Validación al enviar (longitudes) ──
+    var form = document.getElementById('editUserForm');
+    form.addEventListener('submit', function (e) {
+      var errores = false;
+      var dni = document.getElementById('id_dni');
+      var t1 = document.getElementById('id_telefono_1');
+      var t2 = document.getElementById('id_telefono_2');
+      var user = document.getElementById('id_username');
+      var nombre = document.getElementById('id_nombre_completo');
+      if (dni && dni.value && (dni.value.trim().length < 7 || dni.value.trim().length > 8)) { alert('El DNI debe tener entre 7 y 8 dígitos.'); errores = true; }
+      if (t1 && t1.value && (t1.value.trim().length < 6 || t1.value.trim().length > 15)) { alert('El teléfono debe tener entre 6 y 15 dígitos.'); errores = true; }
+      if (t2 && t2.value && (t2.value.trim().length < 6 || t2.value.trim().length > 15)) { alert('El celular debe tener entre 6 y 15 dígitos.'); errores = true; }
+      if (user && user.value && user.value.trim().length < 3) { alert('El nombre de usuario debe tener al menos 3 caracteres.'); errores = true; }
+      if (nombre && nombre.value && nombre.value.trim().length < 2) { alert('El nombre completo debe tener al menos 2 caracteres.'); errores = true; }
+      if (errores) e.preventDefault();
+    });
+  });
+
+  // Copia la fecha visible al campo real de Django justo antes de guardar
+  function guarda_fecha() {
+    var djangoFecha = document.getElementById('id_fecha_nac');
+    var visible = document.getElementById('retroll_fecha_nac');
+    if (djangoFecha && visible) djangoFecha.value = visible.value;
+  }
 </script>
 
-{%else%}
-<div class="text-center">
-  <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-<h3>No deberías estar acá. Para volver , <a href="/">hace click acá</a></h3>
+{% else %}
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
 </div>
-{%endif%}
+{% endif %}
 
 {% endblock %}

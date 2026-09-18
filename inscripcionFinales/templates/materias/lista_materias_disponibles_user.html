@@ -1,68 +1,40 @@
-<!-- lista_materias_user.html -->
 {% extends 'base/base.html' %}
-
-{% block title %}Lista de Materias{% endblock %}
-
+{% block title %}Lista de materias{% endblock %}
+{% block encabezado %}Materias disponibles{% endblock %}
 {% block content %}
-<div class="card">
-    <div class="card-headers" style="border-radius: 5px;">
-     <h4 class="card-title" style="text-align: center;margin-bottom: 25px;">Lista de Materias</h4>
-    </div>
-        <div class="card-body"> 
-             {% if materias %}
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th class="h5">Nombre</th>
-                        <th class="h5">Año</th>
-                        <th class="h5">Carrera</th>
-                        <th class="h5">Profesor</th>
-                        <th class="h5">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                        {% for materia in materias %}
-                            <tr>
-                                <td class="h6">{{materia.nombre_materia}}</td>
-                                <td class="h6">{{materia.anio}}</td>
-                                <td class="h6">{{materia.carrera.nombre_carrera}}</td>
-                                <td class="h6">{{materia.profesor.nombres}}</td>
-                                <td>
-                                    <a name="" id="{{materia.id}}inscribirse" class="btn btn-primary" onclick="mostrarBotones({{materia.id}})" role="button">Inscribirme</a>
-                                    <a name="" id="{{materia.id}}regular" class="btn btn-primary" href="/inscribirse_materia/{{materia.id}}/01" role="button" hidden>Regular</a>
-                                    <a name="" id="{{materia.id}}libre" class="btn btn-primary" href="/inscribirse_materia/{{materia.id}}/02" role="button" hidden>Libre</a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="alert alert-danger" style="font-size: 20px;"> No hay materias disponibles.</div>
-        {% endif %}
-        </div>
-    </div>
-<script>    
-        function mostrarBotones(materia) {
-            if (typeof boton_inscribirse !== 'undefined' && typeof boton_regular !== 'undefined' && typeof boton_libre !== 'undefined')
-            {
-                boton_inscribirse.hidden=false
-                boton_regular.hidden=true
-                boton_libre.hidden=true 
-            }
-            boton_inscribirse=document.getElementById(materia+"inscribirse")
-            boton_regular=document.getElementById(materia+"regular")
-            boton_libre=document.getElementById(materia+"libre")
-            if (boton_inscribirse.parentElement.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.innerHTML.toLowerCase().substring(0, 5) == 'pract' || boton_inscribirse.parentElement.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.innerHTML.toLowerCase().substring(0, 5) == 'práct' )
-            {
-                boton_inscribirse.hidden=true
-                boton_regular.hidden=false
-            }
-            else
-            {
-                boton_inscribirse.hidden=true
-                boton_regular.hidden=false
-                boton_libre.hidden=false
-            }
-        }
-    </script>
+<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+  <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-sm font-semibold text-tinta-900">Materias disponibles</h2></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+          <th class="px-5 py-3 font-semibold">Nombre</th>
+          <th class="px-5 py-3 font-semibold">Año</th>
+          <th class="px-5 py-3 font-semibold">Carrera</th>
+          <th class="px-5 py-3 font-semibold">Profesor</th>
+          <th class="px-5 py-3 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for materia in materias %}
+        <tr class="hover:bg-slate-50" x-data="{ abierto: false }" data-practica="{% if materia.nombre_materia|lower|slice:':5' == 'pract' or materia.nombre_materia|lower|slice:':5' == 'práct' %}1{% else %}0{% endif %}">
+          <td class="px-5 py-3 font-medium text-tinta-900">{{ materia.nombre_materia }}</td>
+          <td class="px-5 py-3">{{ materia.anio }}</td>
+          <td class="px-5 py-3">{{ materia.carrera.nombre_carrera }}</td>
+          <td class="px-5 py-3">{{ materia.profesor.nombres|default:"—" }}</td>
+          <td class="px-5 py-3">
+            <div class="flex items-center justify-end gap-2">
+              <button type="button" x-show="!abierto" @click="abierto = true" class="rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Inscribirme</button>
+              <a x-show="abierto" x-cloak href="/inscribirse_materia/{{ materia.id }}/01" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Regular</a>
+              <a x-show="abierto && $el.closest('tr').dataset.practica === '0'" x-cloak href="/inscribirse_materia/{{ materia.id }}/02" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Libre</a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No hay materias disponibles.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

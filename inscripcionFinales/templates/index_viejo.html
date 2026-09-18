@@ -1,0 +1,59 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+
+<div class="index-body" >
+  {%if user.is_authenticated%}  
+  <br>
+  <div class="index-body">
+    <center style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+      <img style='height:10%;width:%' src="/static/imagenes/SIMEFN.png" >
+    </center>
+  </div>
+
+  {%else%}
+  <br>
+  <div class="p-3 card text-white rounded" style="margin-top: 180px; background-color: #dbd8e3; font-size: 100px;   width: 986px;
+            height: 326px;"><h2 class="text-black" style="margin-top: 60px">Hola, bienvenidos!</h2>
+    <h4 class="text-black" style="margin-top: 20px">Para acceder al sistema, loguéese.<br>Si no posee usuario, póngase en contacto con el instituto<br>Muchas Gracias!</h4><img src="/static/imagenes/SIMEF.png" style="margin-left: 650px; margin-top: -220px;"></div>
+  {%endif%}
+</div>
+
+<style>
+  body {
+      overflow-y:hidden;
+    }
+    @media (max-width: 768px) {
+      h2,h4 {
+          font-size: 5vw; /* Tamaño de fuente más grande en pantallas más pequeñas */
+          margin-left: 20px;
+          margin-bottom: 30px;
+      }
+  }
+  
+  @media (max-width: 480px) {
+      h2,h4 {
+          font-size: 6vw; /* Tamaño de fuente aún más grande en pantallas muy pequeñas */
+          margin-left: 20px;
+          margin-bottom: 30px;
+      } h2, h4 {
+        text-align: center; /* Centrar el texto dentro del card */
+    }
+  
+    @media (max-width: 768px) {
+        h2, h4 {
+            font-size: 5vw; /* Tamaño de fuente más grande en pantallas más pequeñas */
+        }
+    }
+    
+    @media (max-width: 480px) {
+        h2, h4 {
+            font-size: 6vw; /* Tamaño de fuente aún más grande en pantallas muy pequeñas */
+        }
+    }
+  }
+</style>  
+{% endblock %}
+

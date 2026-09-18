@@ -1,0 +1,287 @@
+{% extends 'base/base.html' %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/finales/list_mesa.html
+  (PISA la versión original en Bootstrap — ESTE es el template que la ruta
+   'list_mesa' realmente renderiza, por el template_name='finales/list_mesa.html'
+   del urls.py. La copia registration/mesas_finales_lista.html queda sin uso.)
+
+  Migrado a Tailwind + Alpine. Sin jQuery ni Bootstrap JS.
+  Paginación de a 10 en el cliente, igual que el original.
+{% endcomment %}
+
+{% block title %}Lista de Mesas{% endblock %}
+{% block encabezado %}Listado de mesas de examen{% endblock %}
+{% block subtitulo %}Gestión de mesas finales{% endblock %}
+
+{% block content %}
+
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+
+<div x-data="mesasFinales()" x-init="init()">
+
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+
+    <!-- Encabezado + acciones -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+      <div>
+        <h2 class="text-sm font-semibold text-tinta-900">Mesas registradas</h2>
+        <p class="text-xs text-slate-500"><span x-text="seleccionadas().length"></span> seleccionada(s)</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="text" x-model="busqueda" placeholder="Buscar materia…"
+               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+
+        <a href="{% url 'imprimir_mesas_finales_pdf' %}" target="_blank"
+           title="Generar cartel PDF para imprimir"
+           class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-600">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm7 0v5h5M9 14h6m-6 3h4"/></svg>
+          PDF
+        </a>
+
+        <button @click="pedirConfirmacion('abrir')"
+                title="Abrir inscripciones de las mesas seleccionadas"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-celeste-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-celeste-500">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 0 1 8 0M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z"/></svg>
+          Abrir
+        </button>
+
+        <button @click="pedirConfirmacion('cerrar')"
+                title="Cerrar inscripciones de las mesas seleccionadas"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 0 1 8 0v4M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z"/></svg>
+          Cerrar
+        </button>
+
+        <button @click="pedirConfirmacion('eliminar')"
+                title="Eliminar mesas seleccionadas"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg>
+          Eliminar
+        </button>
+      </div>
+    </div>
+
+    <!-- Formulario que envía la acción confirmada -->
+    <form id="formMesas" method="post" :action="accionUrl" x-ref="formMesas">
+      {% csrf_token %}
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+              <th class="px-5 py-3">
+                <input type="checkbox" @change="toggleTodos($event)" x-ref="checkTodos"
+                       title="Seleccionar todo"
+                       class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+              </th>
+              <th class="px-5 py-3 font-semibold">Materia</th>
+              <th class="px-5 py-3 font-semibold">Fecha</th>
+              <th class="px-5 py-3 font-semibold">Horario</th>
+              <th class="px-5 py-3 font-semibold">Inscripción abierta</th>
+              <th class="px-5 py-3 font-semibold text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for MesaFinal in object_list %}
+            <tr class="fila-mesa hover:bg-slate-50"
+                data-materia="{{ MesaFinal.materia|lower }}"
+                x-show="filaVisible($el)">
+              <td class="px-5 py-3">
+                <input type="checkbox" name="mesa_ids" value="{{ MesaFinal.id }}"
+                       @change="sincronizar()"
+                       class="mesa-check h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+              </td>
+              <td class="px-5 py-3 font-medium text-tinta-900">{{ MesaFinal.materia }}</td>
+              <td class="px-5 py-3">{{ MesaFinal.llamado|date:"d/m/Y" }}</td>
+              <td class="px-5 py-3">{{ MesaFinal.llamado|date:"H:i" }}</td>
+              <td class="px-5 py-3">
+                {% if MesaFinal.inscripcionAbierta %}
+                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Sí</span>
+                {% else %}
+                <span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">No</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3">
+                <div class="flex items-center justify-end gap-2">
+                  <a href="/edit_mesa/{{ MesaFinal.id }}" title="Editar mesa"
+                     class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg>
+                  </a>
+                  <a href="/acta_volante/{{ MesaFinal.id }}" title="Acta volante individual"
+                     class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+
+    <!-- Estado vacío al filtrar -->
+    <div x-show="totalVisibles() === 0" class="px-5 py-16 text-center">
+      <p class="text-sm font-medium text-tinta-900">No se encontraron mesas</p>
+      <p class="mt-1 text-sm text-slate-500">Probá con otro término de búsqueda.</p>
+    </div>
+
+    <!-- Paginación (cliente, de a 10) -->
+    <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm"
+         x-show="totalPaginas() > 1">
+      <p class="text-slate-500">Página <span x-text="pagina"></span> de <span x-text="totalPaginas()"></span></p>
+      <div class="flex gap-1">
+        <button @click="pagina = Math.max(1, pagina - 1)" :disabled="pagina === 1"
+                class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
+        <button @click="pagina = Math.min(totalPaginas(), pagina + 1)" :disabled="pagina === totalPaginas()"
+                class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal de confirmación ══ -->
+  <div x-show="modal.abierto" x-cloak
+       class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modal.abierto = false" x-transition.opacity>
+    <div class="w-full max-w-md rounded-2xl bg-white shadow-xl" @keydown.escape.window="modal.abierto = false">
+      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <h3 class="text-sm font-semibold text-tinta-900" x-text="modal.titulo"></h3>
+        <button @click="modal.abierto = false" class="text-slate-400 hover:text-slate-600" aria-label="Cerrar">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="px-5 py-6 text-center text-sm text-slate-700" x-text="modal.mensaje"></div>
+      <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <button @click="modal.abierto = false"
+                class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button @click="confirmar()"
+                class="rounded-lg px-4 py-2 text-sm font-semibold text-white"
+                :class="modal.tipo === 'eliminar' ? 'bg-red-600 hover:bg-red-700' : 'bg-tinta-900 hover:bg-tinta-800'"
+                x-text="modal.tipo === 'eliminar' ? 'Eliminar' : 'Confirmar'"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal "seleccioná al menos una" ══ -->
+  <div x-show="avisoVacio" x-cloak
+       class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="avisoVacio = false" x-transition.opacity>
+    <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+      <h3 class="text-sm font-semibold text-tinta-900">Advertencia</h3>
+      <p class="mt-2 text-sm text-slate-600">Debés seleccionar al menos una mesa.</p>
+      <button @click="avisoVacio = false"
+              class="mt-4 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- ══ Modal de éxito (tras eliminar) ══ -->
+  {% if cantidad_eliminadas %}
+  <div x-data="{ show: true }" x-show="show" x-cloak
+       class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" x-transition.opacity>
+    <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+      <h3 class="text-sm font-semibold text-tinta-900">Notificación</h3>
+      <p class="mt-2 text-sm text-slate-600">
+        {% if cantidad_eliminadas == 1 %}¡La mesa fue eliminada correctamente!
+        {% else %}¡Las {{ cantidad_eliminadas }} mesas fueron eliminadas correctamente!{% endif %}
+      </p>
+      <a href="{% url 'list_mesa' %}"
+         class="mt-4 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver</a>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+  function mesasFinales() {
+    return {
+      pagina: 1,
+      porPagina: 10,
+      busqueda: '',
+      avisoVacio: false,
+      modal: { abierto: false, tipo: '', titulo: '', mensaje: '' },
+      accionUrl: '',
+      urls: {
+        eliminar: "{% url 'eliminar_mesas_seleccionadas' %}",
+        abrir: "{% url 'abrir_mesas_seleccionadas' %}",
+        cerrar: "{% url 'cerrar_mesas_seleccionadas' %}",
+      },
+
+      init() {
+        this.$watch('busqueda', () => { this.pagina = 1; });
+      },
+
+      filas() {
+        return Array.from(this.$el.querySelectorAll('.fila-mesa'));
+      },
+      coincide(fila) {
+        const q = this.busqueda.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        if (!q) return true;
+        return (fila.dataset.materia || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q);
+      },
+      filasFiltradas() {
+        return this.filas().filter(f => this.coincide(f));
+      },
+      totalVisibles() { return this.filasFiltradas().length; },
+      totalPaginas() { return Math.max(1, Math.ceil(this.totalVisibles() / this.porPagina)); },
+      filaVisible(el) {
+        if (!this.coincide(el)) return false;
+        const idx = this.filasFiltradas().indexOf(el);
+        const inicio = (this.pagina - 1) * this.porPagina;
+        return idx >= inicio && idx < inicio + this.porPagina;
+      },
+
+      checks() { return Array.from(this.$el.querySelectorAll('.mesa-check')); },
+      seleccionadas() { return this.checks().filter(c => c.checked); },
+      toggleTodos(e) {
+        this.filasFiltradas()
+          .slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina)
+          .forEach(f => { const c = f.querySelector('.mesa-check'); if (c) c.checked = e.target.checked; });
+      },
+      sincronizar() {
+        const visibles = this.filasFiltradas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina);
+        const todas = visibles.every(f => f.querySelector('.mesa-check')?.checked);
+        if (this.$refs.checkTodos) this.$refs.checkTodos.checked = visibles.length > 0 && todas;
+      },
+
+      pedirConfirmacion(tipo) {
+        const sel = this.seleccionadas();
+        if (sel.length === 0) { this.avisoVacio = true; return; }
+
+        const uno = sel.length === 1;
+        const nombre = uno ? sel[0].closest('tr').children[1].textContent.trim() : '';
+        const textos = {
+          eliminar: { t: 'Advertencia',
+            m: uno ? `¿Está seguro que desea eliminar la mesa "${nombre}"?`
+                   : `¿Está seguro que desea eliminar las ${sel.length} mesas seleccionadas?` },
+          abrir: { t: 'Abrir inscripciones',
+            m: uno ? `¿Está seguro que desea abrir las inscripciones para la mesa "${nombre}"?`
+                   : `¿Está seguro que desea abrir las inscripciones para las ${sel.length} mesas seleccionadas?` },
+          cerrar: { t: 'Cerrar inscripciones',
+            m: uno ? `¿Está seguro que desea cerrar las inscripciones para la mesa "${nombre}"?`
+                   : `¿Está seguro que desea cerrar las inscripciones para las ${sel.length} mesas seleccionadas?` },
+        };
+        this.accionUrl = this.urls[tipo];
+        this.modal = { abierto: true, tipo, titulo: textos[tipo].t, mensaje: textos[tipo].m };
+      },
+      confirmar() {
+        this.$refs.formMesas.submit();
+      },
+    };
+  }
+</script>
+
+{% else %}
+
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

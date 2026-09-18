@@ -1,106 +1,31 @@
 {% extends 'base/base.html' %}
-
-{% block title %}Contraseña Cambiada Exitosamente{% endblock %}
-
+{% block title %}Contraseña cambiada{% endblock %}
+{% block encabezado %}Contraseña cambiada{% endblock %}
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-check-circle"></i> 
-                        ¡Contraseña Cambiada Exitosamente!
-                    </h4>
-                </div>
-                <div class="card-body text-center py-5">
-                    <div class="mb-4">
-                        <i class="fas fa-shield-alt text-success" style="font-size: 4rem;"></i>
-                    </div>
-                    
-                    <div class="alert alert-success">
-                        <h5><i class="fas fa-thumbs-up"></i> ¡Perfecto!</h5>
-                        <p class="mb-2">Tu contraseña ha sido cambiada exitosamente.</p>
-                        <p class="mb-0">
-                            <strong>Ya puedes usar el sistema normalmente con tu nueva contraseña.</strong>
-                        </p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h6 class="text-muted">¿Qué sigue ahora?</h6>
-                        <ul class="list-unstyled text-start">
-                            <li class="mb-2">
-                                <i class="fas fa-check text-success"></i> 
-                                Tu contraseña temporal ha sido reemplazada
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check text-success"></i> 
-                                Ya tienes acceso completo al sistema
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check text-success"></i> 
-                                Puedes cambiar tu contraseña cuando quieras desde tu perfil
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'inicio' %}" class="btn btn-primary btn-lg">
-                            <i class="fas fa-home"></i> Ir al Inicio del Sistema
-                        </a>
-                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
-                            <i class="fas fa-user"></i> Ver Mi Perfil
-                        </a>
-                    </div>
-                    
-                    <hr class="my-4">
-                    
-                    <div class="text-muted">
-                        <small>
-                            <i class="fas fa-info-circle"></i> 
-                            <strong>Consejo de seguridad:</strong> 
-                            Mantén tu contraseña segura y no la compartas con nadie.
-                            Si necesitas cambiarla nuevamente, puedes hacerlo desde tu perfil de usuario.
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="mx-auto max-w-lg">
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="bg-emerald-600 px-6 py-5 text-white">
+      <h2 class="text-base font-bold">¡Contraseña cambiada exitosamente!</h2>
     </div>
+    <div class="px-6 py-6 text-center">
+      <div class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-emerald-500">
+        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.5 11 14.5 15.5 10M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+      </div>
+      <p class="mt-4 text-sm text-slate-600">Tu contraseña fue cambiada exitosamente. Ya podés usar el sistema normalmente.</p>
+
+      <ul class="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm text-slate-600">
+        <li class="flex items-start gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Tu contraseña temporal fue reemplazada</li>
+        <li class="flex items-start gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Ya tenés acceso completo al sistema</li>
+        <li class="flex items-start gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Podés cambiarla cuando quieras desde tu perfil</li>
+      </ul>
+
+      <div class="mt-6 flex flex-col gap-2">
+        <a href="{% url 'inicio' %}" class="rounded-lg bg-tinta-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800">Ir al inicio del sistema</a>
+        <a href="{% url 'profile' %}" class="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Ver mi perfil</a>
+      </div>
+
+      <p class="mt-5 text-xs text-slate-400">Consejo de seguridad: mantené tu contraseña segura y no la compartas con nadie.</p>
+    </div>
+  </div>
 </div>
-
-<style>
-.card {
-    border: none;
-}
-
-.shadow {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-}
-
-.alert {
-    border-radius: 0.5rem;
-}
-
-.btn-lg {
-    padding: 0.75rem 1.25rem;
-    font-size: 1.125rem;
-}
-
-.list-unstyled li {
-    padding: 0.25rem 0;
-}
-
-.text-success {
-    color: #198754 !important;
-}
-
-.card-body {
-    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-}
-
-.fas.fa-shield-alt {
-    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-</style>
 {% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'base/base.html' %}
+{% block title %}Inscripción a materia{% endblock %}
+{% block encabezado %}Inscripción a materia{% endblock %}
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+<div class="mx-auto max-w-xl" x-data="inscMateriaAdm()" x-init="init()">
+  <form method="post" id="inscMateriaForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Inscripción a materia</h2>
+    </div>
+
+    <div class="space-y-4 px-6 py-6">
+      <div>
+        <label for="{{ form.usuario.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.usuario.label }}</label>
+        {{ form.usuario }}
+        {% if form.usuario.errors %}<p class="mt-1 text-xs text-red-600">{{ form.usuario.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="{{ form.materia.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.materia.label }}</label>
+        {{ form.materia }}
+        {% if form.materia.errors %}<p class="mt-1 text-xs text-red-600">{{ form.materia.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label for="{{ form.modalidad.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.modalidad.label }}</label>
+        {{ form.modalidad }}
+        {% if form.modalidad.errors %}<p class="mt-1 text-xs text-red-600">{{ form.modalidad.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <!-- Campos solo para modalidad Itinerante -->
+      <div id="div_institucion" x-show="itinerante" x-cloak>
+        <label for="{{ form.institucion.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.institucion.label }}</label>
+        {{ form.institucion }}
+        {% if form.institucion.errors %}<p class="mt-1 text-xs text-red-600">{{ form.institucion.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div id="div_turno" x-show="itinerante" x-cloak>
+        <label for="{{ form.turno.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.turno.label }}</label>
+        {{ form.turno }}
+        {% if form.turno.errors %}<p class="mt-1 text-xs text-red-600">{{ form.turno.errors|striptags }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="border-t border-slate-200 px-6 py-4">
+      <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Inscribirse</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  function inscMateriaAdm() {
+    return {
+      itinerante: false,
+      init() {
+        // estilo a todos los campos del form
+        var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+        document.querySelectorAll('#inscMateriaForm input:not([type=hidden]):not([type=checkbox]), #inscMateriaForm select, #inscMateriaForm textarea')
+          .forEach(function (el) { el.classList.add.apply(el.classList, c); });
+
+        // ocultar campo "aprobada" si existe
+        var ap = document.getElementById('id_aprobada');
+        if (ap) { ap.hidden = true; if (ap.previousElementSibling) ap.previousElementSibling.hidden = true; }
+
+        // detectar modalidad itinerante y sincronizar campos
+        var mod = document.getElementById('id_modalidad');
+        if (mod) {
+          this.evaluar(mod);
+          mod.addEventListener('change', () => this.evaluar(mod));
+        }
+      },
+      evaluar(sel) {
+        var txt = (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '').toLowerCase();
+        this.itinerante = txt.includes('itinerante');
+        // habilitar/deshabilitar como en el original (para que no viajen si están ocultos)
+        var inst = document.getElementById('id_institucion');
+        var tur = document.getElementById('id_turno');
+        [inst, tur].forEach((f) => {
+          if (!f) return;
+          f.disabled = !this.itinerante;
+          f.required = this.itinerante;
+          if (!this.itinerante) f.value = '';
+        });
+      },
+    };
+  }
+</script>
+{% else %}
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

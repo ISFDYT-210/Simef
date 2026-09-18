@@ -8,3 +8,9 @@ gestioninstituto_models_*.png
 env/
 venv/
 .env
+tailwindcss
+tailwindcss.exe
+.claude/
+graft
+.ignore
+.mcp.json

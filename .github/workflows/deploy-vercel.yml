@@ -1,0 +1,89 @@
+# .github/workflows/deploy-vercel.yml
+#
+# Deploy del proyecto Django a Vercel. Usa el vercel.json de la raiz, que rutea
+# todo a gestionInstituto/wsgi.py con @vercel/python.
+#
+# Nota: vercel.json usa la clave legacy `builds`, que no es compatible con el
+# flujo `vercel build` + `vercel deploy --prebuilt`. Por eso aca se sube el
+# fuente y Vercel compila del lado del servidor (`vercel deploy` a secas).
+#
+# Secrets necesarios (Settings -> Secrets and variables -> Actions):
+#   VERCEL_TOKEN       -> Vercel -> Account Settings -> Tokens
+#   VERCEL_ORG_ID      -> .vercel/project.json (correr `vercel link` en local)
+#   VERCEL_PROJECT_ID  -> .vercel/project.json
+#
+# Las variables de la app (SECRET_KEY, DATABASE_URL, ALLOWED_HOSTS, EMAIL_*) se
+# cargan en Vercel -> Project -> Settings -> Environment Variables, no aca.
+
+name: Deploy Vercel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: deploy-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: ${{ github.ref == 'refs/heads/main' && 'Produccion' || 'Preview' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # para comentar la URL de preview en el PR
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (para la CLI de Vercel)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull de la configuracion del proyecto
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+
+      - name: Deploy
+        id: deploy
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
+          else
+            url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deploy disponible en $url"
+
+      # En Vercel (funciones serverless) el entrypoint.sh no corre: las
+      # migraciones hay que aplicarlas aparte contra la base remota, p. ej.:
+      #   DATABASE_URL=<url-de-produccion> python manage.py migrate
+      - name: Recordatorio de migraciones
+        if: github.ref == 'refs/heads/main'
+        run: echo "::notice title=Migraciones::Recorda correr 'python manage.py migrate' contra la base de produccion."
+
+      - name: Comentar la URL de preview en el PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Preview deploy: ${{ steps.deploy.outputs.url }}`
+            })

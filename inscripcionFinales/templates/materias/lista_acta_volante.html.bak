@@ -1,0 +1,32 @@
+{% extends 'base/base.html' %}
+{% block title %}Actas volante{% endblock %}
+{% block encabezado %}Actas volante{% endblock %}
+{% block content %}
+{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+<div class="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center">
+  <h2 class="text-lg font-bold text-tinta-900">Actas volante</h2>
+  <p class="mt-2 text-sm text-slate-600">Hay varias actas volante para esta mesa. Tocá el botón para abrirlas en pestañas nuevas.</p>
+  <button id="openAllPages" class="mt-5 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Mostrar actas</button>
+</div>
+<script>
+  document.getElementById('openAllPages').addEventListener('click', function () {
+    var pages = JSON.parse('{{ pages_json|escapejs }}');
+    var abrio = true;
+    pages.forEach(function (page) {
+      var t = window.open('', '_blank');
+      if (t) { t.document.write('<html><head><title>' + page.title + '</title></head><body><div>' + page.content + '</div></body></html>'); t.document.close(); }
+      else { abrio = false; }
+    });
+    if (!abrio) alert('No se pudieron abrir las pestañas. Permití las ventanas emergentes para este sitio.');
+  });
+</script>
+{% else %}
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,48 +1,99 @@
-  <div class="row my-3 p-3">
-        <h1>Perfil de {{ request.user.email }}</h1>
-        <p>
-          Nombre de Usuario: {{ request.user.username }}
-        </p>
-        <p>
-          Nombre completo: {{ request.user.nombre_completo }}
-        </p>
-        <p>
-          Fecha de Nacimiento: {{ request.user.feca_nac }}
-        </p>
-        <p>
-          DNI: {{ request.user.dni }}
-        </p>
-        <p>
-          Dirección: {{ request.user.direccion }}
-        </p>
-        <p>
-          Localidad: {{ request.user.localidad }}
-        </p>
-        <p>
-          Ciudad: {{ request.user.ciudad }}
-        </p>
-        <p>
-          Nacionalidad: {{ request.user.nacionalidad }}
-        </p>
-        <p>
-          Teléfono_1: {{ request.user.teléfono_1 }}
-        </p>
-        <p>
-        Telefóno_2: {{ request.user.telefóno_2 }}
-      </p>
-      <p>
-        Estado Civil: {{ request.user.estado_civil }}
-      </p>
-      <p>
-        Sexo: {{ request.user.sexo }}
-      </p>
-      <p>
-        Género: {{ request.user.genero }}
-      </p>
+{% extends 'base/base.html' %}
+{% comment %}
+  UBICACIÓN: inscripcionFinales/templates/registration/profile.html (reemplaza al actual)
 
+  El template original no extendía el base (por eso se veía como texto suelto) y
+  tenía varios nombres de campo mal escritos que siempre mostraban vacío:
+    feca_nac → fecha_nac ; teléfono_1/telefóno_2 → telefono_1/telefono_2 ;
+    "genero" no existe en el modelo (se quitó).
+{% endcomment %}
+
+{% block title %}Mi perfil{% endblock %}
+{% block encabezado %}Mi perfil{% endblock %}
+
+{% block content %}
+{% with u=request.user %}
+<div class="mx-auto max-w-3xl">
+
+  <!-- Cabecera de la tarjeta -->
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex flex-col items-center gap-4 bg-tinta-900 px-6 py-8 text-center sm:flex-row sm:text-left">
+      {% if u.imagen %}
+      <img src="{{ u.imagen.url }}" alt="" class="h-20 w-20 shrink-0 rounded-full border-2 border-white/30 object-cover">
+      {% else %}
+      <div class="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-tinta-700 text-2xl font-bold text-white">
+        {{ u.nombre_completo|default:u.email|slice:":1"|upper }}
+      </div>
+      {% endif %}
+      <div class="min-w-0">
+        <h2 class="truncate text-xl font-bold text-white">{{ u.nombre_completo|default:"Sin nombre cargado" }}</h2>
+        <p class="truncate text-sm text-tinta-300">{{ u.email }}</p>
+        <span class="mt-2 inline-block rounded-full bg-celeste-500/20 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-celeste-400">
+          {{ u.get_rol_display }}
+        </span>
+      </div>
     </div>
-    
-    <p>
-      <a href="/">Volver a Inicio</a>
-    </p>
-      
+
+    <!-- Datos -->
+    <dl class="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2">
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nombre de usuario</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.username|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">DNI</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.dni|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Fecha de nacimiento</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.fecha_nac|date:"d/m/Y"|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Estado civil</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.estado_civil|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Sexo</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.sexo|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nacionalidad</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.nacionalidad|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Teléfono 1</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.telefono_1|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Teléfono 2</dt>
+        <dd class="mt-1 text-sm text-tinta-900">{{ u.telefono_2|default:"—" }}</dd>
+      </div>
+      <div class="bg-white px-6 py-4 sm:col-span-2">
+        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Dirección</dt>
+        <dd class="mt-1 text-sm text-tinta-900">
+          {{ u.direccion|default:"—" }}{% if u.localidad %}, {{ u.localidad }}{% endif %}{% if u.ciudad %}, {{ u.ciudad }}{% endif %}
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- Acciones -->
+  <div class="mt-5 flex flex-wrap gap-2">
+    <a href="/edit_user/{{ u.id }}"
+       class="inline-flex items-center gap-1.5 rounded-lg bg-tinta-900 px-4 py-2 text-sm font-semibold text-white hover:bg-tinta-800">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg>
+      Editar perfil
+    </a>
+    <a href="/change_password"
+       class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+      Cambiar contraseña
+    </a>
+    <a href="{% url 'inicio' %}"
+       class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+      Volver al inicio
+    </a>
+  </div>
+
+</div>
+{% endwith %}
+{% endblock %}

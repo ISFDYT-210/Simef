@@ -1,510 +1,63 @@
 {% extends 'base/base.html' %}
-
-{% block title %}Alta de Mesa Final{% endblock %}
-
+{% block title %}Alta de mesa final{% endblock %}
+{% block encabezado %}Alta de mesa final{% endblock %}
 {% block content %}
-<div class="container-fluid min-vh-100 d-flex align-items-center" style="background-color: #e8e4f0;">
-    <div class="row w-100 justify-content-center align-items-center">
-        <!-- Columna izquierda - Formulario -->
-        <div class="col-lg-5 col-md-6 col-sm-10">
-            <div class="form-container p-5" style="background-color: #d7d1dc;">
-                <h2 class="text-center mb-4" style="font-size: 1.8rem; font-weight: 600; color: #333;">
-                    Completar los siguientes campos:
-                </h2>
-                
-                <form id="formulario" method="post" novalidate>
-                    {% csrf_token %}
-                    
-                    <!-- Materia -->
-                    <div class="mb-4">
-                        <label for="{{ form.materia.id_for_label }}" class="form-label text-center d-block mb-3" style="font-size: 1.1rem; font-weight: 500; color: #333;">
-                            Nombre de materia:
-                        </label>
-                        {{ form.materia }}
-                        <div id="materia-error" class="text-danger text-center mt-2 fw-semibold" style="display: none;"></div>
-                    </div>
-
-                    <!-- Llamado (Fecha y Hora) -->
-                    <div class="mb-4">
-                        <label for="{{ form.llamado.id_for_label }}" class="form-label text-center d-block mb-3" style="font-size: 1.1rem; font-weight: 500; color: #333;">
-                            Fecha y Hora:
-                        </label>
-                        {{ form.llamado }}
-                        <div id="llamado-error" class="text-danger text-center mt-2 fw-semibold" style="display: none;"></div>
-                    </div>
-
-                    <!-- Campo oculto de vigente si existe en el form -->
-                    {% if form.vigente %}
-                        <div style="display: none;">
-                            {{ form.vigente }}
-                        </div>
-                    {% endif %}
-
-                    <!-- Campo oculto de inscripcionAbierta si existe en el form -->
-                    {% if form.inscripcionAbierta %}
-                        <div style="display: none;">
-                            {{ form.inscripcionAbierta }}
-                        </div>
-                    {% endif %}
-                </form>
-            </div>
-        </div>
-
-        <!-- Columna derecha - Logo y Botones -->
-        <div class="col-lg-4 col-md-5 col-sm-10 text-center mt-5 mt-md-0">
-            <div class="logo-container mb-5">
-                <img src="/static/imagenes/SIMEF.png" alt="SIMEF Logo" style="width: 100%; max-width: 400px; height: auto;">
-            </div>
-            
-            <div class="d-grid gap-3">
-                <button type="submit" form="formulario" class="btn btn-primary btn-lg py-3" id="btnGuardar" 
-                    style="font-size: 1.3rem; font-weight: 600; border-radius: 0; background-color: #4d4dff; border: none; box-shadow: 0 4px 10px rgba(77, 77, 255, 0.3);">
-                    <span class="btn-text">Guardar</span>
-                    <span class="spinner-border spinner-border-sm ms-2" style="display: none;" id="loadingSpinner"></span>
-                </button>
-                
-                <a href="{% url 'list_mesa' %}" class="btn btn-link btn-lg" 
-                    style="font-size: 1.2rem; font-weight: 500; color: #4d4dff; text-decoration: none;">
-                    Volver
-                </a>
-            </div>
-        </div>
+<div class="mx-auto max-w-xl" x-data="altaMesa()" x-init="init()">
+  <form method="post" id="altaMesaForm" @submit="validar($event)" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Completá los siguientes campos</h2>
     </div>
+    <div class="space-y-4 px-6 py-6">
+      <div>
+        <label for="{{ form.materia.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Materia</label>
+        {{ form.materia }}
+        <p x-show="errores.materia" x-cloak class="mt-1 text-xs text-red-600" x-text="errores.materia"></p>
+      </div>
+      <div>
+        <label for="{{ form.llamado.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Fecha y hora</label>
+        {{ form.llamado }}
+        <p x-show="errores.llamado" x-cloak class="mt-1 text-xs text-red-600" x-text="errores.llamado"></p>
+      </div>
+      {% if form.vigente %}<div class="hidden">{{ form.vigente }}</div>{% endif %}
+      {% if form.inscripcionAbierta %}<div class="hidden">{{ form.inscripcionAbierta }}</div>{% endif %}
+    </div>
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+      <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">Guardar</button>
+      <a href="{% url 'list_mesa' %}" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver</a>
+    </div>
+  </form>
 </div>
 
-<!-- Success Modal -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-success text-white border-0">
-                <h5 class="modal-title" id="successModalLabel">
-                    <i class="fas fa-check-circle me-2"></i>Mesa Final Creada
-                </h5>
-            </div>
-            <div class="modal-body text-center py-4">
-                <div class="mb-3">
-                    <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
-                </div>
-                <h6 class="mb-3">La mesa final se ha creado correctamente</h6>
-                <p class="text-muted mb-0">Será redirigido a la lista de mesas finales</p>
-            </div>
-            <div class="modal-footer border-0 justify-content-center">
-                <button type="button" class="btn btn-success px-4" onclick="redirectToList()">
-                    <i class="fas fa-list me-2"></i>Ver Lista de Mesas
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Error Modal -->
-<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-danger text-white border-0">
-                <h5 class="modal-title" id="errorModalLabel">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Error
-                </h5>
-            </div>
-            <div class="modal-body text-center py-4">
-                <div class="mb-3">
-                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
-                </div>
-                <h6 class="mb-3" id="errorMessage">Error al crear la mesa final</h6>
-                <p class="text-muted mb-0">Por favor, corrija los datos e intente nuevamente</p>
-            </div>
-            <div class="modal-footer border-0 justify-content-center">
-                <button type="button" class="btn btn-danger px-4" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Loading Overlay -->
-<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
-    <div class="d-flex justify-content-center align-items-center h-100">
-        <div class="card border-0 shadow">
-            <div class="card-body text-center py-4">
-                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
-                <h6 class="mb-0">Creando mesa final...</h6>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-/* Estilos generales */
-body {
-    overflow-x: hidden;
-}
-
-/* Estilos de campos del formulario */
-.form-control, .form-select {
-    border: none;
-    border-radius: 0;
-    padding: 0.9rem 1.2rem;
-    font-size: 1.05rem;
-    background-color: #ffffff;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.form-control:focus, .form-select:focus {
-    outline: none;
-    box-shadow: 0 4px 10px rgba(77, 77, 255, 0.2);
-    border: 2px solid #4d4dff;
-    background-color: #fff;
-}
-
-.form-select {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    padding-right: 2.5rem;
-}
-
-/* Estilos para input de fecha y hora */
-input[type="datetime-local"] {
-    cursor: pointer;
-}
-
-/* Botón principal */
-.btn-primary {
-    transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 15px rgba(77, 77, 255, 0.4) !important;
-    background-color: #3d3dff !important;
-}
-
-.btn-primary:active {
-    transform: translateY(-1px);
-}
-
-/* Botón volver */
-.btn-link:hover {
-    transform: scale(1.05);
-    transition: all 0.3s ease;
-}
-
-/* Animación de error */
-.shake {
-    animation: shake 0.6s;
-}
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-8px); }
-    75% { transform: translateX(8px); }
-}
-
-/* Campo con error */
-.is-invalid {
-    border: 2px solid #dc3545 !important;
-    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.15) !important;
-}
-
-/* Loading state para el botón */
-.btn-loading {
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-/* Contenedor del formulario */
-.form-container {
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    border-radius: 0;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .form-container {
-        padding: 2rem !important;
-    }
-    
-    .logo-container img {
-        max-width: 250px !important;
-    }
-    
-    h2 {
-        font-size: 1.5rem !important;
-    }
-    
-    .form-label {
-        font-size: 1rem !important;
-    }
-    
-    .btn-lg {
-        font-size: 1.1rem !important;
-        padding: 0.75rem !important;
-    }
-}
-
-@media (max-width: 576px) {
-    .container-fluid {
-        padding: 1rem;
-    }
-    
-    .form-container {
-        padding: 1.5rem !important;
-    }
-}
-
-/* Etiquetas del formulario */
-.form-label {
-    color: #333;
-    font-weight: 500;
-}
-
-/* Placeholder personalizado */
-.form-control::placeholder,
-.form-select option:first-child {
-    color: #999;
-    font-style: italic;
-}
-</style>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-$(document).ready(function() {
-    // Aplicar clases de Bootstrap a los campos del formulario
-    $('#{{ form.materia.id_for_label }}').addClass('form-select');
-    $('#{{ form.llamado.id_for_label }}').addClass('form-control').attr('type', 'datetime-local');
-    
-    // Establecer fecha mínima (hoy + 1 día)
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const minDate = tomorrow.toISOString().slice(0, 16);
-    $('#{{ form.llamado.id_for_label }}').attr('min', minDate);
-
-    console.log('Fecha mínima establecida:', minDate);
-
-    // Validación en tiempo real
-    $('#{{ form.materia.id_for_label }}').on('change', function() {
-        console.log('Materia seleccionada:', $(this).val());
-        validateField($(this), 'materia-error', 'Debe seleccionar una materia');
-    });
-
-    $('#{{ form.llamado.id_for_label }}').on('change', function() {
-        const selectedDate = new Date($(this).val());
-        const today = new Date();
-        console.log('Fecha seleccionada:', selectedDate);
-        console.log('Fecha actual:', today);
-        
-        if (selectedDate <= today) {
-            showFieldError($(this), 'llamado-error', 'La fecha debe ser posterior al día de hoy');
-        } else {
-            hideFieldError($(this), 'llamado-error');
+  function altaMesa() {
+    return {
+      errores: { materia: '', llamado: '' },
+      idMateria: '{{ form.materia.id_for_label }}',
+      idLlamado: '{{ form.llamado.id_for_label }}',
+      init() {
+        var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+        var mat = document.getElementById(this.idMateria);
+        var ll = document.getElementById(this.idLlamado);
+        if (mat) mat.classList.add.apply(mat.classList, c);
+        if (ll) {
+          ll.classList.add.apply(ll.classList, c);
+          ll.setAttribute('type', 'datetime-local');
+          var man = new Date(); man.setDate(man.getDate() + 1);
+          ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
         }
-    });
-
-    // Evitar envío múltiple
-    let formSubmitting = false;
-
-    // Envío del formulario
-    $('#formulario').on('submit', function(e) {
-        e.preventDefault();
-        
-        if (formSubmitting) {
-            console.log('Envío bloqueado - formulario ya en proceso');
-            return false;
-        }
-        
-        console.log('Formulario enviado');
-        
-        // Validar formulario
-        if (!validateForm()) {
-            console.log('Validación falló');
-            return;
-        }
-
-        console.log('Validación exitosa, enviando datos...');
-        
-        formSubmitting = true;
-        
-        // Mostrar estado de carga
-        showLoading();
-        
-        // Obtener datos del formulario
-        const formData = $(this).serialize();
-        console.log('Datos del formulario:', formData);
-        
-        $.ajax({
-            type: 'POST',
-            url: '{% url "altaMesa" %}',
-            data: formData,
-            timeout: 15000,
-            success: function(response, textStatus, xhr) {
-                console.log('Respuesta exitosa:', response);
-                console.log('Status:', xhr.status);
-                console.log('Content-Type:', xhr.getResponseHeader('Content-Type'));
-                
-                hideLoading();
-                formSubmitting = false;
-                
-                // Verificar si la respuesta es JSON
-                if (xhr.getResponseHeader('Content-Type') && xhr.getResponseHeader('Content-Type').includes('application/json')) {
-                    if (response.status === 'error') {
-                        console.log('Error del servidor:', response.message);
-                        showErrorModal(response.message);
-                    } else {
-                        console.log('Mesa creada exitosamente');
-                        showSuccessModal();
-                    }
-                } else {
-                    // Respuesta HTML o redirect - asumir éxito
-                    console.log('Respuesta no-JSON, asumiendo éxito');
-                    showSuccessModal();
-                }
-            },
-            error: function(xhr, textStatus, errorThrown) {
-                console.log('Error AJAX:');
-                console.log('Status:', xhr.status);
-                console.log('Text Status:', textStatus);
-                console.log('Error:', errorThrown);
-                console.log('Response Text:', xhr.responseText);
-                
-                hideLoading();
-                formSubmitting = false;
-                
-                if (xhr.status === 200) {
-                    // Status 200 pero no JSON - probablemente éxito
-                    console.log('Status 200 - Mesa creada exitosamente');
-                    showSuccessModal();
-                } else if (xhr.status === 302 || xhr.status === 301) {
-                    // Redirect - probablemente éxito
-                    console.log('Redirect detectado - Mesa creada exitosamente');
-                    showSuccessModal();
-                } else {
-                    // Error real
-                    let errorMessage = 'Error al crear la mesa final. ';
-                    if (xhr.responseText) {
-                        try {
-                            const errorResponse = JSON.parse(xhr.responseText);
-                            errorMessage += errorResponse.message || 'Por favor, intente nuevamente.';
-                        } catch (e) {
-                            errorMessage += 'Por favor, verifique los datos e intente nuevamente.';
-                        }
-                    } else {
-                        errorMessage += 'Por favor, intente nuevamente.';
-                    }
-                    console.log('Mostrando error:', errorMessage);
-                    showErrorModal(errorMessage);
-                }
-            }
-        });
-    });
-});
-
-function validateForm() {
-    let isValid = true;
-    console.log('Iniciando validación del formulario');
-    
-    // Validar materia
-    const materia = $('#{{ form.materia.id_for_label }}');
-    const materiaValue = materia.val();
-    console.log('Valor de materia:', materiaValue);
-    
-    if (!materiaValue || materiaValue === '' || materiaValue === '---------') {
-        console.log('Error: Materia no seleccionada');
-        showFieldError(materia, 'materia-error', 'Debe seleccionar una materia');
-        isValid = false;
-    } else {
-        hideFieldError(materia, 'materia-error');
-    }
-    
-    // Validar fecha
-    const llamado = $('#{{ form.llamado.id_for_label }}');
-    const llamadoValue = llamado.val();
-    console.log('Valor de llamado:', llamadoValue);
-    
-    if (!llamadoValue) {
-        console.log('Error: Fecha no seleccionada');
-        showFieldError(llamado, 'llamado-error', 'Debe seleccionar una fecha y hora');
-        isValid = false;
-    } else {
-        const selectedDate = new Date(llamadoValue);
-        const today = new Date();
-        
-        console.log('Comparando fechas - Seleccionada:', selectedDate, 'Hoy:', today);
-        
-        if (selectedDate <= today) {
-            console.log('Error: Fecha no válida');
-            showFieldError(llamado, 'llamado-error', 'La fecha debe ser posterior al día de hoy');
-            isValid = false;
-        } else {
-            hideFieldError(llamado, 'llamado-error');
-        }
-    }
-    
-    console.log('Resultado de validación:', isValid);
-    return isValid;
-}
-
-function validateField(field, errorId, message) {
-    const value = field.val();
-    if (!value || value === '' || value === '---------') {
-        showFieldError(field, errorId, message);
-        return false;
-    } else {
-        hideFieldError(field, errorId);
-        return true;
-    }
-}
-
-function showFieldError(field, errorId, message) {
-    field.addClass('is-invalid shake');
-    $('#' + errorId).text(message).show();
-    setTimeout(() => field.removeClass('shake'), 500);
-}
-
-function hideFieldError(field, errorId) {
-    field.removeClass('is-invalid');
-    $('#' + errorId).hide();
-}
-
-function showLoading() {
-    $('#loadingOverlay').show();
-    $('#btnGuardar').prop('disabled', true).addClass('btn-loading');
-    $('#loadingSpinner').show();
-    $('.btn-text').text('Guardando...');
-}
-
-function hideLoading() {
-    $('#loadingOverlay').hide();
-    $('#btnGuardar').prop('disabled', false).removeClass('btn-loading');
-    $('#loadingSpinner').hide();
-    $('.btn-text').text('Guardar');
-}
-
-function showSuccessModal() {
-    $('#successModal').modal('show');
-    
-    // Auto-redirect después de 3 segundos
-    setTimeout(() => {
-        redirectToList();
-    }, 3000);
-}
-
-function showErrorModal(message) {
-    const defaultMessage = 'Por favor, corrija los datos e intente nuevamente';
-    $('#errorMessage').text(message || defaultMessage);
-    $('#errorModal').modal('show');
-    
-    // Habilitar el botón nuevamente cuando se cierre el modal
-    $('#errorModal').on('hidden.bs.modal', function() {
-        hideLoading();
-    });
-}
-
-function redirectToList() {
-    window.location.href = '{% url "list_mesa" %}';
-}
+      },
+      validar(e) {
+        this.errores = { materia: '', llamado: '' };
+        var mat = document.getElementById(this.idMateria);
+        var ll = document.getElementById(this.idLlamado);
+        var ok = true;
+        if (!mat || !mat.value || mat.value === '---------') { this.errores.materia = 'Debés seleccionar una materia.'; ok = false; }
+        if (!ll || !ll.value) { this.errores.llamado = 'Debés seleccionar fecha y hora.'; ok = false; }
+        else if (new Date(ll.value) <= new Date()) { this.errores.llamado = 'La fecha debe ser posterior a hoy.'; ok = false; }
+        if (!ok) e.preventDefault();
+      },
+    };
+  }
 </script>
 {% endblock %}

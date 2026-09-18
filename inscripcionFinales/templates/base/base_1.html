@@ -1,0 +1,283 @@
+{% load static %}
+{% comment %}
+   ═══════════════════════════════════════════════════════════════
+   UBICACIÓN: inscripcionFinales/templates/base/base_nuevo.html
+   (al lado del base.html actual — conviven durante la migración)
+
+   Cada template se migra cambiando su primera línea:
+     extends 'base/base.html'  →  extends 'base/base_nuevo.html'
+
+   Compatible con los bloques existentes: title y content.
+   Bloques nuevos opcionales: encabezado, subtitulo, extra_head, extra_js.
+
+   El layout se elige solo: sin sesión → tarjeta centrada (login/recupero);
+   con sesión → sidebar + topbar.
+   ═══════════════════════════════════════════════════════════════
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="/static/imagenes/Logo_i210_fondo_trans.png"/>
+  <title>{% block title %}SIMEF{% endblock %} · ISFDyT N°210</title>
+
+  {# Tailwind compilado localmente (sin CDN) — funciona offline y en redes que bloquean CDNs. #}
+  <link rel="stylesheet" href="{% static 'css/simef.css' %}">
+
+  {# Alpine.js servido localmente (sin CDN). #}
+  <script defer src="{% static 'js/alpine.min.js' %}"></script>
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body class="{% if user.is_authenticated %}h-full bg-slate-100{% else %}grid min-h-full place-items-center bg-tinta-900 bg-[radial-gradient(ellipse_at_top,rgba(62,155,214,0.18),transparent_60%)]{% endif %} font-sans text-slate-800 antialiased"
+      {% if user.is_authenticated %}x-data="{ sidebar: window.innerWidth >= 1024 }"{% endif %}>
+
+{% if user.is_authenticated %}
+{# ─────────────────── LAYOUT CON SESIÓN: sidebar + topbar ─────────────────── #}
+<div class="flex min-h-full">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="fixed inset-y-0 left-0 z-40 flex flex-col bg-tinta-900 text-tinta-100 transition-all duration-200"
+         :class="sidebar ? 'w-64' : 'w-0 lg:w-[4.5rem]'" x-cloak>
+
+    <div class="flex h-16 items-center gap-3 border-b border-tinta-700/60 px-4 overflow-hidden">
+      <img src="/static/imagenes/Logo_i210_fondo_trans.png" alt="" class="h-9 w-9 shrink-0 object-contain">
+      <div x-show="sidebar" x-transition.opacity class="leading-tight whitespace-nowrap">
+        <span class="text-[11px] text-tinta-300">ISFDyT N°210 · La Plata</span>
+      </div>
+    </div>
+
+    <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">General</p>
+        <a href="{% url 'inicio' %}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1v-9.5Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inicio</span>
+        </a>
+        <a href="{% url 'profile' %}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16 19a4 4 0 0 0-8 0m4-7a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 9a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Mi perfil</span>
+        </a>
+      </div>
+
+      {# ── Usuarios: solo administración (misma condición que el navbar viejo) ── #}
+      {% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">Usuarios</p>
+        <a href="/user_list/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19a4 4 0 0 0-8 0M11 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 8a4 4 0 0 0-3-3.87M15 5.1a3 3 0 0 1 0 5.8"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Lista de usuarios</span>
+        </a>
+        <a href="/create_user/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Crear usuario</span>
+        </a>
+        <a href="/cargaMasivaEstudiantes/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0 4 4m-4-4L8 8m-4 8v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Carga masiva</span>
+        </a>
+      </div>
+      {% endif %}
+
+      {# ── Materias ── #}
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">Materias</p>
+        {% if request.user.puede_gestionar_materias %}
+        <a href="/altaMateria/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Crear materia</span>
+        </a>
+        <a href="/career/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4 2 9l10 5 10-5-10-5Zm0 5v6m6-3v4a6 3 0 0 1-12 0v-4"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Crear carrera</span>
+        </a>
+        {% endif %}
+        {% if request.user.puede_ver_materias %}
+        <a href="/lista_materias_admin/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Listado de materias</span>
+        </a>
+        {% endif %}
+        {% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+        <a href="/inscripcionMateria/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inscripción a materias</span>
+        </a>
+        <a href="/listaMateriasAdm/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11.5 11 13.5 15.5 9M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Lista de inscripciones</span>
+        </a>
+        {% else %}
+        <a href="/inscripcionMateriaEst/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inscripción a materias</span>
+        </a>
+        <a href="/listaMateriasEst/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11.5 11 13.5 15.5 9M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Mis inscripciones</span>
+        </a>
+        {% endif %}
+      </div>
+
+      {# ── Finales ── #}
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">Finales</p>
+        {% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+        <a href="/altaMesa/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Alta mesa de final</span>
+        </a>
+        <a href="{% url 'list_mesa' %}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v3m8-3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Listado de mesas</span>
+        </a>
+        <a href="/inscripcionFinal/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inscripción a finales</span>
+        </a>
+        <a href="/listaFinalesAdm/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11.5 11 13.5 15.5 9M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Lista de inscripciones</span>
+        </a>
+        {% else %}
+        <a href="/inscripcionFinalEst/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Inscripción a finales</span>
+        </a>
+        <a href="/listaFinalesEst/" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11.5 11 13.5 15.5 9M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Mis inscripciones</span>
+        </a>
+        {% endif %}
+      </div>
+
+      {# ── Enlaces institucionales ── #}
+      <div>
+        <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">Instituto</p>
+        <a href="https://biblioteca210.pythonanywhere.com/" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.5c-1.5-1.3-3.5-2-6-2v13c2.5 0 4.5.7 6 2 1.5-1.3 3.5-2 6-2v-13c-2.5 0-4.5.7-6 2Zm0 0v13"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Biblioteca</span>
+        </a>
+        <a href="https://isfdyt210-bue.infd.edu.ar/" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-4h6v4"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">El Instituto</span>
+        </a>
+      </div>
+    </nav>
+
+  </aside>
+
+  <!-- ══════════ ÁREA PRINCIPAL ══════════ -->
+  <div class="flex min-h-full flex-1 flex-col transition-all duration-200"
+       :class="sidebar ? 'lg:pl-64' : 'lg:pl-[4.5rem]'">
+
+    <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
+      <button @click="sidebar = !sidebar"
+              class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-tinta-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500"
+              aria-label="Mostrar u ocultar menú">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <h1 class="truncate text-base font-semibold text-tinta-900">{% block encabezado %}{% endblock %}</h1>
+        <p class="hidden truncate text-xs text-slate-500 sm:block">{% block subtitulo %}{% endblock %}</p>
+      </div>
+
+      <div class="relative" x-data="{ open: false }">
+        <button @click="open = !open" @click.outside="open = false"
+                class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">
+          {% if user.imagen %}
+          <img src="{{ user.imagen.url }}" alt="" class="h-8 w-8 shrink-0 rounded-full object-cover">
+          {% else %}
+          <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-tinta-700 text-xs font-semibold text-white">
+            {{ user.nombre_completo|default:user.email|slice:":1"|upper }}
+          </div>
+          {% endif %}
+          <span class="hidden text-left leading-tight sm:block">
+            <span class="block truncate text-slate-700">{{ user.nombre_completo|default:user.email }}</span>
+            <span class="mt-0.5 inline-block rounded-full bg-celeste-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-celeste-600">{{ user.get_rol_display }}</span>
+          </span>
+          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div x-show="open" x-transition.origin.top.right x-cloak
+             class="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          <a href="/edit_user/{{ request.user.id }}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Editar perfil</a>
+          <a href="/change_password" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cambiar contraseña</a>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">Cerrar sesión</button>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    {% if messages %}
+    <div class="fixed right-4 top-20 z-50 flex w-80 flex-col gap-2">
+      {% for message in messages %}
+      <div x-data="{ show: true }" x-show="show" x-transition
+           x-init="setTimeout(() => show = false, 6000)"
+           class="flex items-start gap-3 rounded-xl border p-4 shadow-lg
+                  {% if message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800
+                  {% elif message.tags == 'error' %}border-red-200 bg-red-50 text-red-800
+                  {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-800
+                  {% else %}border-celeste-100 bg-celeste-100/60 text-tinta-800{% endif %}">
+        <p class="flex-1 text-sm">{{ message }}</p>
+        <button @click="show = false" class="opacity-50 hover:opacity-100" aria-label="Cerrar aviso">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+{% else %}
+{# ─────────────────── LAYOUT SIN SESIÓN: tarjeta centrada ─────────────────── #}
+<div class="w-full max-w-md px-4 py-10">
+  <div class="mb-6 text-center">
+    <img src="/static/imagenes/Logo_i210_fondo_trans.png" alt="ISFDyT N°210" class="mx-auto h-16">
+    <p class="mt-3 text-sm text-tinta-300">Instituto Superior de Formación Docente y Técnica N°210</p>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+    <div class="mb-3 rounded-xl border p-3 text-sm
+                {% if message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800
+                {% elif message.tags == 'error' %}border-red-200 bg-red-50 text-red-800
+                {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-800
+                {% else %}border-celeste-100 bg-celeste-100 text-tinta-800{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="rounded-2xl bg-white p-6 shadow-xl">
+{% endif %}
+
+      {# ── ÚNICO bloque content: acá se renderizan todos los templates hijos ── #}
+      {% block content %}{% endblock %}
+
+{% if user.is_authenticated %}
+    </main>
+
+    <footer class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 px-6 py-4">
+      <p class="text-xs text-slate-400">SIMEF · Instituto Superior de Formación Docente y Técnica N°210 · La Plata</p>
+      <div class="flex items-center gap-4">
+        <img src="/static/imagenes/Logo-UPCN.png" alt="UPCN" class="h-8 object-contain">
+        <img src="/static/imagenes/Logo-Cultura.jpg" alt="Cultura" class="h-8 object-contain">
+      </div>
+    </footer>
+  </div>
+</div>
+{% else %}
+  </div>
+  <p class="mt-6 text-center text-xs text-tinta-300">SIMEF · ISFDyT N°210, La Plata</p>
+</div>
+{% endif %}
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

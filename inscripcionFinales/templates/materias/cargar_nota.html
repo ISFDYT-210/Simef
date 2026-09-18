@@ -1,182 +1,102 @@
 {% extends 'base/base.html' %}
-
-{% block title %}Editar Cursada{% endblock %}
-
+{% block title %}Editar cursada{% endblock %}
+{% block encabezado %}Cargar notas{% endblock %}
 {% block content %}
-{% load inscripcionfinales_extras %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
-<div id="edit-inscr"> 
-  <form method="POST" class="form" id="formCargarNotas">
-      <div class="edit-rectangulo1">
-          {% csrf_token %}
-          <h2>Cargar Notas</h2>
-          <p>Estudiante: {{ usuarios_materia.usuario }}</p>
-          <p>Materia: {{ usuarios_materia.materia }}</p>
-          <p id="modalidadAlumno" data-modalidad="{{ usuarios_materia.modalidad }}">Modalidad: {{ usuarios_materia.get_modalidad_display }}</p>
-          
-          <!-- Campo nota de cursada (se oculta para oyentes) -->
-          <div id="div_nota_cursada">
-            <label for="{{ form.nota_cursada.id_for_label }}">{{ form.nota_cursada.label }}:</label>
-            {{ form.nota_cursada }}
-            {% if form.nota_cursada.errors %}
-              <div class="text-danger">{{ form.nota_cursada.errors }}</div>
-            {% endif %}
-          </div>
-          
-          <!-- Campo nota final (siempre visible) -->
-          <div id="div_nota_final">
-            <label for="{{ form.nota_final.id_for_label }}">{{ form.nota_final.label }}:</label>
-            {{ form.nota_final }}
-            {% if form.nota_final.errors %}
-              <div class="text-danger">{{ form.nota_final.errors }}</div>
-            {% endif %}
-          </div>
-          
-          <!-- Otros campos del formulario si existen -->
-          {% for field in form %}
-            {% if field.name != 'nota_cursada' and field.name != 'nota_final' %}
-              <div class="mb-3">
-                {{ field.label_tag }}
-                {{ field }}
-                {% if field.errors %}
-                  <div class="text-danger">{{ field.errors }}</div>
-                {% endif %}
-              </div>
-            {% endif %}
-          {% endfor %}
-        </div>
+{% if request.user.puede_cargar_notas %}
+<div class="mx-auto max-w-xl">
+  <form method="POST" id="formCargarNotas" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Cargar notas</h2>
+    </div>
 
-        <div class="edit-rectangulo2">
-          <div class="logo-edit-user only-lt">
-            <img src="/static/imagenes/SIMEF.png" style="width: 70%; height: 100%;">
-          </div>
-          <div class="botones-edituser">
-            <button type="submit" class="btn btn-blue" style="transition: 0.6s">Cargar nota</button>
+    <div class="space-y-4 px-6 py-6">
+      <div class="rounded-xl bg-slate-50 p-4 text-sm">
+        <p class="text-tinta-900"><span class="font-medium">Estudiante:</span> {{ usuarios_materia.usuario }}</p>
+        <p class="mt-1 text-tinta-900"><span class="font-medium">Materia:</span> {{ usuarios_materia.materia }}</p>
+        <p class="mt-1 text-tinta-900" id="modalidadAlumno" data-modalidad="{{ usuarios_materia.modalidad }}"><span class="font-medium">Modalidad:</span> {{ usuarios_materia.get_modalidad_display }}</p>
+      </div>
 
-            <div id="volver_usuario">
-              <a href="/listaMateriasAdm/" style="font-size: 20px; text-decoration: none">Volver a Lista de Inscripciones</a>
-            </div>
-          </div>
+      <div id="div_nota_cursada">
+        <label for="{{ form.nota_cursada.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.nota_cursada.label }}</label>
+        {{ form.nota_cursada }}
+        {% if form.nota_cursada.errors %}<p class="mt-1 text-xs text-red-600">{{ form.nota_cursada.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div id="div_nota_final">
+        <label for="{{ form.nota_final.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">{{ form.nota_final.label }}</label>
+        {{ form.nota_final }}
+        {% if form.nota_final.errors %}<p class="mt-1 text-xs text-red-600">{{ form.nota_final.errors|striptags }}</p>{% endif %}
+      </div>
+
+      {% for field in form %}
+        {% if field.name != 'nota_cursada' and field.name != 'nota_final' %}
+        <div>
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}<p class="mt-1 text-xs text-red-600">{{ field.errors|striptags }}</p>{% endif %}
         </div>
-    </form>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+      <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Cargar nota</button>
+      <a href="/listaMateriasAdm/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver a inscripciones</a>
+    </div>
+  </form>
 </div>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Actualizar nombre de usuario si existe
-    const nombreUsuarioElement = document.getElementById('nombreUsuario');
-    const usuarioSelect = document.getElementById('id_usuario');
-    if (nombreUsuarioElement && usuarioSelect) {
-      nombreUsuarioElement.innerHTML = usuarioSelect.options[usuarioSelect.selectedIndex].innerHTML;
+  document.addEventListener('DOMContentLoaded', function () {
+    // estilo a los inputs de nota
+    var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+    ['id_nota_cursada','id_nota_final'].forEach(function (id) { var f = document.getElementById(id); if (f) f.classList.add.apply(f.classList, c); });
+
+    var form = document.getElementById('formCargarNotas');
+    var divCursada = document.getElementById('div_nota_cursada');
+    var cursada = document.getElementById('id_nota_cursada');
+    var finalN = document.getElementById('id_nota_final');
+    var modEl = document.getElementById('modalidadAlumno');
+
+    // ¿Es oyente? modalidad '01' = Oyente
+    var esOyente = modEl && modEl.getAttribute('data-modalidad') === '01';
+
+    if (esOyente && divCursada && cursada) {
+      divCursada.style.display = 'none';
+      cursada.disabled = true; cursada.required = false; cursada.value = '';
+      if (finalN) { finalN.disabled = false; finalN.required = false; }
     }
 
-    // Obtener elementos del formulario
-    const form = document.getElementById('formCargarNotas');
-    const notaCursadaDiv = document.getElementById('div_nota_cursada');
-    const notaCursadaInput = document.getElementById('id_nota_cursada');
-    const notaFinalInput = document.getElementById('id_nota_final');
-    const modalidadElement = document.getElementById('modalidadAlumno');
-
-    // Determinar si es oyente usando el código '01' para Oyente
-    let esOyente = false;
-    if (modalidadElement) {
-      const modalidad = modalidadElement.getAttribute('data-modalidad');
-      esOyente = modalidad === '01'; // '01' corresponde a 'Oyente' según choices.py
-      console.log('Modalidad detectada:', modalidad, 'Es oyente:', esOyente);
-    }
-
-    // Si es oyente, ocultar y deshabilitar el campo de nota de cursada
-    if (esOyente && notaCursadaDiv && notaCursadaInput) {
-      notaCursadaDiv.style.display = 'none';
-      notaCursadaInput.disabled = true;
-      notaCursadaInput.required = false;
-      notaCursadaInput.value = ''; // Limpiar valor
-      
-      // Habilitar nota final para oyentes
-      if (notaFinalInput) {
-        notaFinalInput.disabled = false;
-        notaFinalInput.required = false;
-      }
-    }
-
-    // Validación del formulario
-    if (form && notaCursadaInput && notaFinalInput) {
-      form.addEventListener('submit', function(e) {
-        const notaCursada = notaCursadaInput.value.trim();
-        const notaFinal = notaFinalInput.value.trim();
-
-        // Si NO es oyente, validar que no se pueda cargar nota final sin nota de cursada
+    if (form && cursada && finalN) {
+      form.addEventListener('submit', function (e) {
+        var nc = cursada.value.trim(), nf = finalN.value.trim();
         if (!esOyente) {
-          if (notaFinal !== '' && notaCursada === '') {
-            e.preventDefault();
-            alert('No se puede cargar una Nota Final sin haber cargado primero la Nota de Cursada.');
-            notaFinalInput.focus();
-            return false;
-          }
-
-          // Validar nota de cursada
-          if (notaCursada !== '' && (parseFloat(notaCursada) < 0 || parseFloat(notaCursada) > 10)) {
-            e.preventDefault();
-            alert('La Nota de Cursada debe estar entre 0 y 10.');
-            notaCursadaInput.focus();
-            return false;
-          }
+          if (nf !== '' && nc === '') { e.preventDefault(); alert('No se puede cargar una nota final sin haber cargado primero la nota de cursada.'); finalN.focus(); return; }
+          if (nc !== '' && (parseFloat(nc) < 0 || parseFloat(nc) > 10)) { e.preventDefault(); alert('La nota de cursada debe estar entre 0 y 10.'); cursada.focus(); return; }
         }
-
-        // Validar nota final (aplica para todos)
-        if (notaFinal !== '' && (parseFloat(notaFinal) < 0 || parseFloat(notaFinal) > 10)) {
-          e.preventDefault();
-          alert('La Nota Final debe estar entre 0 y 10.');
-          notaFinalInput.focus();
-          return false;
-        }
-
-        // Para oyentes, validar que al menos haya nota final
-        if (esOyente && notaFinal === '') {
-          e.preventDefault();
-          alert('Debe cargar la Nota Final para el alumno Oyente.');
-          notaFinalInput.focus();
-          return false;
-        }
+        if (nf !== '' && (parseFloat(nf) < 0 || parseFloat(nf) > 10)) { e.preventDefault(); alert('La nota final debe estar entre 0 y 10.'); finalN.focus(); return; }
+        if (esOyente && nf === '') { e.preventDefault(); alert('Debés cargar la nota final para el alumno oyente.'); finalN.focus(); return; }
       });
 
-      // Lógica para alumnos regulares: limpiar nota final si se borra la nota de cursada
+      // Regulares: la nota final se habilita solo si hay nota de cursada
       if (!esOyente) {
-        notaCursadaInput.addEventListener('input', function() {
-          if (this.value.trim() === '') {
-            notaFinalInput.value = '';
-            notaFinalInput.disabled = true;
-          } else {
-            notaFinalInput.disabled = false;
-          }
+        cursada.addEventListener('input', function () {
+          if (this.value.trim() === '') { finalN.value = ''; finalN.disabled = true; }
+          else { finalN.disabled = false; }
         });
-
-        // Deshabilitar nota final si no hay nota de cursada al cargar la página
-        if (notaCursadaInput.value.trim() === '') {
-          notaFinalInput.disabled = true;
-        }
+        if (cursada.value.trim() === '') finalN.disabled = true;
       }
     }
   });
 </script>
-
-<style>
-  @media only screen and (max-width: 600px) {
-    .edit-rectangulo1 {
-      width: 70%;
-    }
-    .edit-rectangulo2 {
-      margin-top: 50%;
-      margin-right: 10%;
-    }
-  }
-</style>
-
-{%else%}
-<div class="text-center">
-  <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+{% else %}
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
 </div>
-{%endif%}
-
+{% endif %}
 {% endblock %}

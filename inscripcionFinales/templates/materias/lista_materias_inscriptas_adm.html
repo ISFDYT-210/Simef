@@ -1,145 +1,67 @@
-<!-- lista_materias_user.html -->
 {% extends 'base/base.html' %}
-
-{% block title %}Lista de Inscripciones{% endblock %}
-
+{% block title %}Lista de inscripciones{% endblock %}
+{% block encabezado %}Inscripciones a materias{% endblock %}
 {% block content %}
-<div class="card-body" style="margin-top: 50px; margin-bottom: 50px;">
-        <div class="card">
-        <div class="card-headers rounded-top">
-            <h4 class="card-title">Lista de Inscripciones</h4>
-        </div>
-        <div class="card-body">
-            {% if materias %}
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th class="h5">Nombre</th>
-                        <th class="h5">Estudiante</th>
-                        <th class="h5">Modalidad</th>
-                        <th class="h5">Nota Cursada</th>
-                        <th class="h5">Nota Final</th>
-                        <th class="h5">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                        {% for materia in materias %}
-                            <tr class="inscripcion text-center"hidden=True>
-                                <td class="h6">{{materia.materia}}</td>
-                                <td class="h6">{{materia.usuario}}</td>
-                                <td id='modalidad{{materia.id}}' class="h6">{{materia.get_modalidad_display}}</td>
-                                <td class="h6">{{materia.nota_cursada}}</td>
-                                <td class="h6">{{materia.nota_final}}</td>
-                                <td>
-                                    <a name="" id="" class="btn btn-primary" href="/cargar_nota_cursada/{{materia.id}}" role="button">Cargar nota</a>
-                                    <a name="" id="" class="btn btn-danger" href="/eliminar_inscripcion_materia/{{materia.id}}" role="button">Dar de baja</a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="alert alert-danger" style="font-size: 20px;"> No hay materias disponibles.</div>
-        {% endif %}
-        </div>
-        <nav aria-label="..." class="d-flex justify-content-center">
-            <ul class="pagination">
-              <li class="page-item" id='btnAnt'>
-              <button class="page-link" title="Anterior" id='btnAnt_' style="cursor: pointer;"onclick="paginaAnt()">←</button>
-              </li>
-              <li class="page-item" id='btnSig'>
-              <button class="page-link" title="Siguiente" id='btnSig_' onclick="paginaSig()">→</button>
-              </li>
-            </ul>
-          </nav>
+<div x-data="listaInscMaterias()">
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Lista de inscripciones</h2>
     </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-5 py-3 font-semibold">Materia</th>
+            <th class="px-5 py-3 font-semibold">Estudiante</th>
+            <th class="px-5 py-3 font-semibold">Modalidad</th>
+            <th class="px-5 py-3 font-semibold">Nota cursada</th>
+            <th class="px-5 py-3 font-semibold">Nota final</th>
+            <th class="px-5 py-3 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for materia in materias %}
+          <tr class="fila-insc hover:bg-slate-50" x-show="filaVisible($el)">
+            <td class="px-5 py-3 font-medium text-tinta-900">{{ materia.materia }}</td>
+            <td class="px-5 py-3">{{ materia.usuario }}</td>
+            <td class="px-5 py-3"><span class="rounded-full bg-tinta-50 px-2.5 py-1 text-xs font-semibold text-tinta-700">{{ materia.get_modalidad_display }}</span></td>
+            <td class="px-5 py-3">{{ materia.nota_cursada|default:"—" }}</td>
+            <td class="px-5 py-3">{{ materia.nota_final|default:"—" }}</td>
+            <td class="px-5 py-3">
+              <div class="flex items-center justify-end gap-2">
+                <a href="/cargar_nota_cursada/{{ materia.id }}" class="rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Cargar nota</a>
+                <a href="/eliminar_inscripcion_materia/{{ materia.id }}" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Dar de baja</a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-slate-500">No hay inscripciones disponibles.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm" x-show="totalPaginas() > 1">
+      <p class="text-slate-500">Página <span x-text="pagina"></span> de <span x-text="totalPaginas()"></span></p>
+      <div class="flex gap-1">
+        <button @click="pagina = Math.max(1, pagina - 1)" :disabled="pagina === 1" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
+        <button @click="pagina = Math.min(totalPaginas(), pagina + 1)" :disabled="pagina === totalPaginas()" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
+      </div>
+    </div>
+  </div>
 </div>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
-<script>   
-  var pagina = 1
-  if (pagina = 1)
-  {
-    document.getElementById("btnAnt").className="page.item disabled"
-  }
-  let elementos = document.querySelectorAll('.inscripcion');
-  if (elementos.length<=10)
-  {
-    document.getElementById("btnSig").className="page.item disabled"
-  }
-  for (let i = 0; i <= pagina*10-1; i++) {
-    try{elementos[i].hidden=false}
-    catch(e){console.log("Tenes que cerrar el estadio")}
-    }
-  function paginaSig()
-  {
-    let elementos = document.querySelectorAll('.inscripcion');
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=true}
-      catch(e){console.log("Anda, todo pelota.")}
-      }  
-    pagina=pagina+1
-    if (pagina>1)
-    {
-      document.getElementById("btnAnt").className="page-item active"
-    }
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=false}
-      catch(e){console.log("No hay mas usuarios")
-      document.getElementById("btnSig").className="page.item disabled"
-      }
-      }
-  } 
-  function paginaAnt()
-  {
-    document.getElementById("btnSig").className="page.item active"    
-    let elementos = document.querySelectorAll('.inscripcion');
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=true}
-      catch(e){console.log("Parmisano no mires esto")}
-      }
-    pagina=pagina-1
-    if (pagina>1)
-    {
-      document.getElementById("btnAnt").className="page-item active"
-    }
-    else{document.getElementById("btnAnt").className="page-item disabled"}
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=false} 
-      catch(e){console.log("Mission Accomplished")}
-      }
-    }
-    document.querySelectorAll('button').forEach(node => 
-    node.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-        }
-    })
-);
 
-{%for materia in materias%}
-    modalidad=document.getElementById("modalidad{{materia.id}}")
-        if (modalidad.innerHTML=='1')
-        {
-            modalidad.innerHTML='Regular'
-        }
-        else if(modalidad.innerHTML=='2')
-        {
-            modalidad.innerHTML='Libre'
-        }
-        else if(modalidad.innerHTML=='3')
-        {
-            modalidad.innerHTML='Condicional'
-        }
-{%endfor%}
-
-$(document).ready(function() {
-  // Selecciona todos los elementos y recórrelos
-  $('*').each(function() {
-      // Verifica si el innerHTML es exactamente "None"
-      if ($(this).html().trim() === "None") {
-          $(this).html("-");
-      }
-  });
-});
+<script>
+  function listaInscMaterias() {
+    return {
+      pagina: 1, porPagina: 10,
+      filas() { return Array.from(document.querySelectorAll('.fila-insc')); },
+      totalPaginas() { return Math.max(1, Math.ceil(this.filas().length / this.porPagina)); },
+      filaVisible(el) {
+        var idx = this.filas().indexOf(el), ini = (this.pagina - 1) * this.porPagina;
+        return idx >= ini && idx < ini + this.porPagina;
+      },
+    };
+  }
 </script>
 {% endblock %}

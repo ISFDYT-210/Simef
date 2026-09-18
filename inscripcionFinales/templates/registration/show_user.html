@@ -1,86 +1,36 @@
 {% extends 'base/base.html' %}
-
 {% block title %}Perfil de usuario{% endblock %}
-
+{% block encabezado %}Perfil de {{ object.email }}{% endblock %}
 {% block content %}
-<h1 style="margin-top: -50px">Perfil de {{ object.email }}</h1>
-<div style="margin-top: -170px">
-  <div class="card p-5 mb-2 bg-light">
-    <div class="card-body p-3 mb-2">
-      <div class="position-absolute top-50 start-50 translate-middle"></div>
-      
-      <p class="h6 fw-semibold">
-        Nombre de Usuario: {{ object.username }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Email: {{ object.email }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Nombre completo: {{ object.nombre_completo }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Rol: {{ object.get_rol_display }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Fecha de Nacimiento: {{ object.fecha_nac }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        DNI: {{ object.dni }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Dirección: {{ object.direccion }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Localidad: {{ object.localidad }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Ciudad: {{ object.ciudad }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Nacionalidad: {{ object.nacionalidad }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Teléfono 1: {{ object.telefono_1 }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Teléfono 2: {{ object.telefono_2 }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Estado Civil: {{ object.estado_civil }}
-      </p>
-      
-      <p class="h6 fw-semibold">
-        Sexo: {{ object.sexo }}
-      </p>
-
-      {% if object.carrera.all %}
-      <p class="h6 fw-semibold">
-        Carreras: 
-        {% for carrera in object.carrera.all %}
-          {{ carrera.nombre_carrera }}{% if not forloop.last %}, {% endif %}
-        {% endfor %}
-      </p>
+<div class="mx-auto max-w-3xl">
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex flex-col items-center gap-4 bg-tinta-900 px-6 py-8 text-center sm:flex-row sm:text-left">
+      {% if object.imagen %}
+      <img src="{{ object.imagen.url }}" alt="" class="h-20 w-20 shrink-0 rounded-full border-2 border-white/30 object-cover">
+      {% else %}
+      <div class="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-tinta-700 text-2xl font-bold text-white">{{ object.nombre_completo|default:object.email|slice:":1"|upper }}</div>
       {% endif %}
-
+      <div class="min-w-0">
+        <h2 class="truncate text-xl font-bold text-white">{{ object.nombre_completo|default:"Sin nombre cargado" }}</h2>
+        <p class="truncate text-sm text-tinta-300">{{ object.email }}</p>
+        <span class="mt-2 inline-block rounded-full bg-celeste-500/20 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-celeste-400">{{ object.get_rol_display }}</span>
+      </div>
     </div>
-
-    <p>
-      <a style='margin-left:300px' title="Volver" class="btn btn-danger" href="/user_list/" role="button">
-        <img src="/static/imagenes/back.png" height="20px" width="20px">
-      </a>                                                      
-    </p>
+    <dl class="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2">
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nombre de usuario</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.username|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">DNI</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.dni|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Fecha de nacimiento</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.fecha_nac|date:"d/m/Y"|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Estado civil</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.estado_civil|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Sexo</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.sexo|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nacionalidad</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.nacionalidad|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Teléfono 1</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.telefono_1|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Teléfono 2</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.telefono_2|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4 sm:col-span-2"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Dirección</dt><dd class="mt-1 text-sm text-tinta-900">{{ object.direccion|default:"—" }}{% if object.localidad %}, {{ object.localidad }}{% endif %}{% if object.ciudad %}, {{ object.ciudad }}{% endif %}</dd></div>
+      {% if object.carrera.all %}
+      <div class="bg-white px-6 py-4 sm:col-span-2"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Carreras</dt><dd class="mt-1 text-sm text-tinta-900">{% for carrera in object.carrera.all %}{{ carrera.nombre_carrera }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>
+      {% endif %}
+    </dl>
   </div>
+  <div class="mt-5"><a href="/user_list/" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver a usuarios</a></div>
 </div>
 {% endblock %}

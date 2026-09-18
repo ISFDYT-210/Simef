@@ -1,260 +1,166 @@
 {% extends 'base/base.html' %}
-{% block title %}Carga Usuarios Masiva{% endblock %}
-
+{% block title %}Carga masiva de usuarios{% endblock %}
+{% block encabezado %}Carga masiva de usuarios{% endblock %}
 {% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0" id="titulo">
-                        <i class="fas fa-upload me-2"></i>Carga Masiva de Usuarios
-                    </h3>
-                    <div id="cargando" style="display: none;">
-                        <h5 class="mb-1">
-                            <i class="fas fa-spinner fa-spin me-2"></i>Procesando archivo...
-                        </h5>
-                        <small>No abandone la página, esto puede tomar unos minutos</small>
-                    </div>
-                </div>
-                
-                <div class="card-body">
-                    <!-- Mensajes de Django -->
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                    
-                    <!-- Errores personalizados -->
-                    {% if errores %}
-                        <div class="alert alert-danger">
-                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Errores encontrados:</h6>
-                            <ul class="mb-0">
-                                {% for error in errores %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                    
-                    <div id="formulario-section">
-                        <!-- Instrucciones -->
-                        <div class="alert alert-info">
-                            <h6><i class="fas fa-info-circle me-2"></i>Instrucciones:</h6>
-                            <ol class="mb-2">
-                                <li>Descargue la plantilla de ejemplo usando el enlace de abajo</li>
-                                <li>Complete los datos en el archivo CSV según la estructura indicada</li>
-                                <li>Suba el archivo usando el formulario</li>
-                            </ol>
-                        </div>
-                        
-                        <!-- Estructura requerida -->
-                        <div class="card mb-4">
-                            <div class="card-header bg-light">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-table me-2"></i>Estructura del archivo CSV
-                                </h6>
-                            </div>
-                            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered">
-                                        <thead class="table-dark">
-                                            <tr>
-                                                <th>Campo</th>
-                                                <th>Requerido</th>
-                                                <th>Ejemplo</th>
-                                                <th>Observaciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td><strong>Correo electrónico</strong></td>
-                                                <td><span class="badge bg-danger">Sí</span></td>
-                                                <td>juan.perez@email.com</td>
-                                                <td>Debe ser único en el sistema</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Nombre estudiante</strong></td>
-                                                <td><span class="badge bg-danger">Sí</span></td>
-                                                <td>Juan Pérez</td>
-                                                <td>Nombre completo del usuario</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Documento estudiante</strong></td>
-                                                <td><span class="badge bg-danger">Sí</span></td>
-                                                <td>12345678</td>
-                                                <td>Solo números, debe ser único</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Username</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>juanperez</td>
-                                                <td>Si no se especifica, usa el DNI</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Fecha nacimiento</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>1995-05-15</td>
-                                                <td>Formato: AAAA-MM-DD</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Direccion</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>Av. Corrientes 1234</td>
-                                                <td>Dirección completa</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Localidad</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>CABA</td>
-                                                <td>Localidad de residencia</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Ciudad</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>Buenos Aires</td>
-                                                <td>Ciudad de residencia</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Nacionalidad</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>Argentina</td>
-                                                <td>Por defecto: Argentina</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Telefono 1</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>1122334455</td>
-                                                <td>Solo números, 6-15 dígitos</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Telefono 2</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>1166778899</td>
-                                                <td>Solo números, 6-15 dígitos</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Estado civil</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>Soltero</td>
-                                                <td>Soltero/a, Casado/a, Divorciado/a, Viudo/a</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Sexo</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>M</td>
-                                                <td>M, F, Masculino, Femenino</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Rol</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>Estudiante</td>
-                                                <td>Estudiante, Profesor, Directivo, Preceptor, Administrador, Bibliotecario</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Carrera</td>
-                                                <td><span class="badge bg-secondary">No</span></td>
-                                                <td>Ingeniería en Sistemas</td>
-                                                <td>Debe existir previamente en el sistema</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Formulario -->
-                        <form method="post" enctype="multipart/form-data" id="form-upload">
-                            {% csrf_token %}
-                            <div class="mb-4">
-                                <label for="csv_file" class="form-label">
-                                    <strong>Seleccionar archivo CSV</strong>
-                                </label>
-                                <input type="file" name="csv_file" id="csv_file" accept=".csv" required class="form-control">
-                                <div class="form-text">Formato: CSV (valores separados por comas). Máximo 5MB.</div>
-                            </div>
-                            
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary btn-lg" id="btn-submit">
-                                    <i class="fas fa-cloud-upload-alt me-2"></i>
-                                    <span id="btn-text">Cargar Usuarios</span>
-                                </button>
-                            </div>
-                        </form>
-                        
-                        <!-- Notas importantes -->
-                        <div class="mt-4">
-                            <div class="alert alert-warning">
-                                <h6><i class="fas fa-exclamation-circle me-2"></i>Notas importantes:</h6>
-                                <ul class="mb-0">
-                                    <li>Los usuarios se crean con su DNI como contraseña inicial</li>
-                                    <li>Se recomienda que cambien su contraseña en el primer acceso</li>
-                                    <li>Los emails y DNI deben ser únicos en el sistema</li>
-                                    <li>Las carreras deben estar previamente creadas en el sistema</li>
-                                    <li>Para estudiantes, se usa el DNI como matrícula por defecto</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Loading state -->
-                    <div id="loading-section" style="display: none;">
-                        <div class="text-center py-5">
-                            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
-                                <span class="visually-hidden">Cargando...</span>
-                            </div>
-                            <h5>Procesando archivo...</h5>
-                            <p class="text-muted">Esto puede tomar varios minutos dependiendo del tamaño del archivo</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="mx-auto max-w-4xl space-y-5" x-data="{ cargando: false }">
+
+  {% if messages %}
+    {% for message in messages %}
+    <div class="rounded-xl border p-3 text-sm {% if message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% elif message.tags == 'error' or message.tags == 'danger' %}border-red-200 bg-red-50 text-red-800{% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-800{% else %}border-celeste-100 bg-celeste-100/60 text-tinta-800{% endif %}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if errores %}
+  <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <p class="font-semibold">Errores encontrados:</p>
+    <ul class="mt-1 list-inside list-disc space-y-0.5">{% for error in errores %}<li>{{ error }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <!-- Instrucciones -->
+  <div class="rounded-xl border border-celeste-100 bg-celeste-100/40 p-4 text-sm text-tinta-800">
+    <p class="font-semibold">Instrucciones</p>
+    <ol class="mt-1 list-inside list-decimal space-y-0.5">
+      <li>Completá los datos en un archivo CSV según la estructura de abajo.</li>
+      <li>Subí el archivo con el formulario.</li>
+      <li>Revisá el resultado en la lista de usuarios.</li>
+    </ol>
+  </div>
+
+  <!-- Estructura del CSV -->
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-sm font-semibold text-tinta-900">Estructura del archivo CSV</h2></div>
+    <div class="max-h-96 overflow-y-auto">
+      <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-slate-50">
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-4 py-3 font-semibold">Campo</th>
+            <th class="px-4 py-3 font-semibold">Requerido</th>
+            <th class="px-4 py-3 font-semibold">Ejemplo</th>
+            <th class="px-4 py-3 font-semibold">Observaciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Correo electrónico</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Sí</span></td>
+              <td class="px-4 py-2 text-slate-500">juan.perez@email.com</td>
+              <td class="px-4 py-2 text-slate-500">Debe ser único en el sistema</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Nombre estudiante</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Sí</span></td>
+              <td class="px-4 py-2 text-slate-500">Juan Pérez</td>
+              <td class="px-4 py-2 text-slate-500">Nombre completo del usuario</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Documento estudiante</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Sí</span></td>
+              <td class="px-4 py-2 text-slate-500">12345678</td>
+              <td class="px-4 py-2 text-slate-500">Solo números, debe ser único</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Username</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">juanperez</td>
+              <td class="px-4 py-2 text-slate-500">Si no se especifica, usa el DNI</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Fecha nacimiento</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">1995-05-15</td>
+              <td class="px-4 py-2 text-slate-500">Formato: AAAA-MM-DD</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Dirección</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Av. Corrientes 1234</td>
+              <td class="px-4 py-2 text-slate-500">Dirección completa</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Localidad</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">CABA</td>
+              <td class="px-4 py-2 text-slate-500">Localidad de residencia</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Ciudad</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Buenos Aires</td>
+              <td class="px-4 py-2 text-slate-500">Ciudad de residencia</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Nacionalidad</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Argentina</td>
+              <td class="px-4 py-2 text-slate-500">Por defecto: Argentina</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Teléfono 1</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">1122334455</td>
+              <td class="px-4 py-2 text-slate-500">Solo números, 6-15 dígitos</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Teléfono 2</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">1166778899</td>
+              <td class="px-4 py-2 text-slate-500">Solo números, 6-15 dígitos</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Estado civil</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Soltero</td>
+              <td class="px-4 py-2 text-slate-500">Soltero/a, Casado/a, Divorciado/a, Viudo/a</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Sexo</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">M</td>
+              <td class="px-4 py-2 text-slate-500">M, F, Masculino, Femenino</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Rol</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Estudiante</td>
+              <td class="px-4 py-2 text-slate-500">Estudiante, Profesor, Directivo, Preceptor, etc.</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Carrera</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Ingeniería en Sistemas</td>
+              <td class="px-4 py-2 text-slate-500">Debe existir previamente en el sistema</td>
+            </tr>
+        </tbody>
+      </table>
     </div>
+  </div>
+
+  <!-- Formulario de subida -->
+  <form method="post" enctype="multipart/form-data" id="formUpload" @submit="cargando = true" class="rounded-2xl border border-slate-200 bg-white p-6">
+    {% csrf_token %}
+    <label for="csv_file" class="mb-1 block text-sm font-medium text-slate-700">Seleccionar archivo CSV</label>
+    <input type="file" name="csv_file" id="csv_file" accept=".csv" required
+           class="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-tinta-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-tinta-800">
+    <p class="mt-1 text-xs text-slate-500">Formato CSV (separado por comas). Máximo 5 MB.</p>
+
+    <button type="submit" :disabled="cargando" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-tinta-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800 disabled:opacity-60">
+      <svg x-show="cargando" x-cloak class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z"/></svg>
+      <span x-text="cargando ? 'Procesando archivo…' : 'Cargar usuarios'"></span>
+    </button>
+    <p x-show="cargando" x-cloak class="mt-2 text-xs text-slate-500">No abandones la página, esto puede tomar unos minutos.</p>
+  </form>
+
+  <!-- Notas -->
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+    <p class="font-semibold">Notas importantes</p>
+    <ul class="mt-1 list-inside list-disc space-y-0.5">
+      <li>Los usuarios se crean con su DNI como contraseña inicial.</li>
+      <li>Se recomienda que la cambien en el primer acceso.</li>
+      <li>Los emails y DNI deben ser únicos en el sistema.</li>
+      <li>Las carreras deben estar creadas previamente.</li>
+      <li>Para estudiantes, se usa el DNI como matrícula por defecto.</li>
+    </ul>
+  </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('form-upload');
-    const fileInput = document.getElementById('csv_file');
-    const btnSubmit = document.getElementById('btn-submit');
-    const btnText = document.getElementById('btn-text');
-    const formularioSection = document.getElementById('formulario-section');
-    const loadingSection = document.getElementById('loading-section');
-    const titulo = document.getElementById('titulo');
-    const cargando = document.getElementById('cargando');
-
-    form.addEventListener('submit', function(e) {
-        if (!fileInput.files.length) {
-            e.preventDefault();
-            alert('Por favor seleccione un archivo CSV');
-            return;
-        }
-
-        // Mostrar estado de carga
-        formularioSection.style.display = 'none';
-        loadingSection.style.display = 'block';
-        titulo.style.display = 'none';
-        cargando.style.display = 'block';
-        
-        // Deshabilitar el botón
-        btnSubmit.disabled = true;
-    });
-
-    // Mostrar nombre del archivo seleccionado
-    fileInput.addEventListener('change', function() {
-        if (this.files.length > 0) {
-            const fileName = this.files[0].name;
-            const fileSize = (this.files[0].size / 1024 / 1024).toFixed(2);
-            btnText.textContent = `Cargar: ${fileName} (${fileSize} MB)`;
-        } else {
-            btnText.textContent = 'Cargar Usuarios';
-        }
-    });
-});
-</script>
 {% endblock %}
