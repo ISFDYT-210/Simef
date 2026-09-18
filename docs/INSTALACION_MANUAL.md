@@ -194,6 +194,18 @@ que agregar nada.
 
 ---
 
+## Correr los tests
+
+```bash
+python manage.py test inscripcionFinales --settings=gestionInstituto.settings_TEST
+```
+
+> **El `--settings` no es opcional.** `settings_TEST` levanta una base SQLite en
+> memoria. Sin ese parámetro, Django toma el `DATABASE_URL` de tu `.env` y, si
+> apunta a la base compartida (Neon), intenta crear ahí una base de prueba.
+
+---
+
 ## Notas
 
 - Este entorno está pensado para **desarrollo local**.
