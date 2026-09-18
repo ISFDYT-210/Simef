@@ -1,34 +1,105 @@
 {% extends 'base/base.html' %}
+{% comment %}
+  Las filas no vienen renderizadas desde el servidor: las pide el navegador a
+  api_lista_inscripciones, que pagina en la base (de a 10). Así la página
+  aparece enseguida en vez de esperar a que se arme la tabla entera.
+{% endcomment %}
 {% block title %}Lista de inscripciones{% endblock %}
 {% block encabezado %}Inscripciones{% endblock %}
 {% block content %}
 {% if request.user.puede_administrar %}
-<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-  <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-sm font-semibold text-tinta-900">Inscripciones</h2></div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400"><th class="px-5 py-3 font-semibold">Usuario</th><th class="px-5 py-3 font-semibold">Llamado</th><th class="px-5 py-3 font-semibold text-right">Acciones</th></tr>
-      </thead>
-      <tbody class="divide-y divide-slate-100">
-        {% for insc in object_list %}
-        <tr class="hover:bg-slate-50">
-          <td class="px-5 py-3 font-medium text-tinta-900">{{ insc.usuario }}</td>
-          <td class="px-5 py-3">{{ insc.llamado }}</td>
-          <td class="px-5 py-3">
-            <div class="flex items-center justify-end gap-2">
-              <a href="/edit_inscr/{{ insc.id }}" title="Editar" class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg></a>
-              <a href="/delete_inscripcion/{{ insc.id }}" title="Eliminar" class="grid h-8 w-8 place-items-center rounded-lg bg-red-600 text-white hover:bg-red-700"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg></a>
-            </div>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="3" class="px-5 py-10 text-center text-sm text-slate-500">No hay inscripciones disponibles.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div x-data="listaInscripciones()" x-init="cargar()">
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Inscripciones</h2>
+      <p class="text-xs text-slate-500" x-show="!cargando && !error" x-cloak>
+        <span x-text="total"></span> en total
+      </p>
+    </div>
+
+    <!-- Cargando -->
+    <div x-show="cargando" class="flex items-center justify-center gap-2 px-5 py-16 text-sm text-slate-500">
+      <svg class="h-5 w-5 animate-spin text-celeste-600" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
+      </svg>
+      Cargando inscripciones…
+    </div>
+
+    <!-- Error -->
+    <div x-show="!cargando && error" x-cloak class="px-5 py-16 text-center text-sm text-red-600">
+      No se pudieron cargar las inscripciones.
+      <button @click="cargar()" class="font-semibold underline">Reintentar</button>
+    </div>
+
+    <div x-show="!cargando && !error" x-cloak class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400"><th class="px-5 py-3 font-semibold">Usuario</th><th class="px-5 py-3 font-semibold">Llamado</th><th class="px-5 py-3 font-semibold text-right">Acciones</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <template x-for="insc in filas" :key="insc.id">
+            <tr class="hover:bg-slate-50">
+              <td class="px-5 py-3 font-medium text-tinta-900" x-text="insc.usuario"></td>
+              <td class="px-5 py-3" x-text="insc.llamado"></td>
+              <td class="px-5 py-3">
+                <div class="flex items-center justify-end gap-2">
+                  <a :href="'/edit_inscr/' + insc.id" title="Editar" class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg></a>
+                  <a :href="'/delete_inscripcion/' + insc.id" title="Eliminar" class="grid h-8 w-8 place-items-center rounded-lg bg-red-600 text-white hover:bg-red-700"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg></a>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="filas.length === 0"><td colspan="3" class="px-5 py-10 text-center text-sm text-slate-500">No hay inscripciones disponibles.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginación (la resuelve el servidor) -->
+    <div x-show="!cargando && !error && numPaginas > 1" x-cloak
+         class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm">
+      <p class="text-slate-500">Página <span x-text="pagina"></span> de <span x-text="numPaginas"></span></p>
+      <div class="flex gap-1">
+        <button @click="irA(pagina - 1)" :disabled="pagina === 1" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
+        <button @click="irA(pagina + 1)" :disabled="pagina === numPaginas" class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
+      </div>
+    </div>
   </div>
 </div>
+
+<script>
+  function listaInscripciones() {
+    return {
+      cargando: true, error: false,
+      filas: [], pagina: 1, numPaginas: 1, total: 0,
+
+      async cargar() {
+        this.cargando = true;
+        this.error = false;
+        try {
+          const resp = await fetch(`{% url 'api_lista_inscripciones' %}?page=${this.pagina}`);
+          if (!resp.ok) throw new Error('status ' + resp.status);
+          const data = await resp.json();
+          this.filas = data.results;
+          this.pagina = data.page;
+          this.numPaginas = data.num_pages;
+          this.total = data.count;
+        } catch (e) {
+          this.error = true;
+        } finally {
+          this.cargando = false;
+        }
+      },
+
+      irA(pagina) {
+        if (pagina < 1 || pagina > this.numPaginas) return;
+        this.pagina = pagina;
+        this.cargar();
+      },
+    };
+  }
+</script>
+
 {% else %}
 <div class="grid min-h-[60vh] place-items-center text-center">
   <div>

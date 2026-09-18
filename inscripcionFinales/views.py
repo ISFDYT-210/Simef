@@ -1,6 +1,8 @@
 import re
+import unicodedata
+from collections import defaultdict
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.views import LoginView, LogoutView    
+from django.contrib.auth.views import LoginView, LogoutView
 from .models import *
 from .forms import *
 from django.views.generic import CreateView,TemplateView,ListView,UpdateView,DeleteView,FormView
@@ -311,13 +313,74 @@ class listUser(CapacidadRequeridaMixin, ListView):
         context['search_actual'] = self.request.GET.get('search', '')
         return context
     
-class listInscripcion(ListView):
-    model = InscripcionFinal
+def _sin_acentos(texto):
+    """'Matemática' -> 'matematica'. Para que buscar sin tildes igual encuentre."""
+    sin_tildes = unicodedata.normalize('NFD', str(texto or ''))
+    sin_tildes = ''.join(c for c in sin_tildes if unicodedata.category(c) != 'Mn')
+    return sin_tildes.lower().strip()
+
+
+def _pagina_json(queryset, request, armar_fila, por_pagina=10):
+    """Pagina en la base (LIMIT/OFFSET) y devuelve el JSON que consumen los listados."""
+    paginator = Paginator(queryset, por_pagina)
+    page = paginator.get_page(request.GET.get('page', 1))
+    return JsonResponse({
+        'results': [armar_fila(obj) for obj in page.object_list],
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
+
+
+class listInscripcion(TemplateView):
+    """Solo sirve el HTML; las filas las pide el navegador a api_lista_inscripciones."""
     template_name = 'registration/list_inscripcion.html'
 
-class listMesa(ListView):
-    model = MesaFinal
+
+def api_lista_inscripciones(request):
+    if not request.user.puede_administrar():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = InscripcionFinal.objects.select_related('usuario', 'llamado__materia').order_by('-id')
+
+    return _pagina_json(qs, request, lambda insc: {
+        'id': insc.id,
+        'usuario': str(insc.usuario),
+        'llamado': str(insc.llamado),
+    })
+
+
+class listMesa(TemplateView):
+    """Solo sirve el HTML; las filas las pide el navegador a api_lista_mesas."""
     template_name = 'registration/mesas_finales_lista.html'
+
+
+def api_lista_mesas(request):
+    if not request.user.puede_gestionar_mesas():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = MesaFinal.objects.select_related('materia').order_by('-llamado')
+
+    busqueda = _sin_acentos(request.GET.get('q', ''))
+    if busqueda:
+        # La búsqueda del listado ignora tildes. Como 'translate' no existe en
+        # SQLite, resolvemos las materias que coinciden acá (la tabla es chica)
+        # y filtramos por id, que funciona igual en Postgres y en SQLite.
+        ids = [
+            mid for mid, nombre in Materia.objects.values_list('id', 'nombre_materia')
+            if busqueda in _sin_acentos(nombre)
+        ]
+        qs = qs.filter(materia_id__in=ids)
+
+    return _pagina_json(qs, request, lambda mesa: {
+        'id': mesa.id,
+        'materia': str(mesa.materia),
+        'fecha': mesa.llamado.strftime('%d/%m/%Y'),
+        'hora': mesa.llamado.strftime('%H:%M'),
+        # inscripcion_vigente distingue "abierta de verdad" de "quedó abierta pero venció"
+        'vigente': mesa.inscripcion_vigente(),
+        'abierta': mesa.inscripcionAbierta,
+    })
    
    
 class showUser(ListView):
@@ -506,21 +569,66 @@ def lista_finales_inscriptos_user(request):
     )
     return render(request, 'finales/lista_finales_inscriptos_user.html', {'finales': finales_inscriptos})
 
-def lista_finales_inscriptos_adm(request):
-    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
-        return render(request, '403_forbidden.html', status=403)
-    finales_inscriptos = InscripcionFinal.objects.filter(
+def _finales_inscriptos_visibles(usuario):
+    """Inscripciones a final pendientes que este usuario tiene permitido ver."""
+    qs = InscripcionFinal.objects.filter(
         Q(aprobada=False) | Q(aprobada__isnull=True)
     ).select_related('llamado__materia', 'usuario')
-    if request.user.es_profesor() and not request.user.is_superuser:
+    if usuario.es_profesor() and not usuario.is_superuser:
         # El profesor solo ve a sus propios alumnos, no los de toda la escuela
-        finales_inscriptos = finales_inscriptos.filter(llamado__materia__profesor=request.user)
-    for final in finales_inscriptos:
-        final.notas = usuarios_materia.objects.filter(
-            usuario=final.usuario,
-            materia=final.llamado.materia
-    )
-    return render(request, 'finales/lista_finales_inscriptos_adm.html', {'finales': finales_inscriptos})
+        qs = qs.filter(llamado__materia__profesor=usuario)
+    return qs
+
+
+def lista_finales_inscriptos_adm(request):
+    """Solo sirve el HTML; las filas las pide el navegador a api_finales_inscriptos_adm."""
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return render(request, '403_forbidden.html', status=403)
+    return render(request, 'finales/lista_finales_inscriptos_adm.html')
+
+
+def api_finales_inscriptos_adm(request):
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = _finales_inscriptos_visibles(request.user).order_by('-id')
+
+    busqueda = request.GET.get('q', '').strip()
+    if busqueda:
+        qs = qs.filter(
+            Q(llamado__materia__nombre_materia__icontains=busqueda) |
+            Q(usuario__nombre_completo__icontains=busqueda)
+        )
+
+    paginator = Paginator(qs, 10)
+    page = paginator.get_page(request.GET.get('page', 1))
+    finales = list(page.object_list)
+
+    # Una sola query para las notas de toda la página, en vez de una por fila
+    pares = {(f.usuario_id, f.llamado.materia_id) for f in finales}
+    notas_por_par = defaultdict(list)
+    if pares:
+        for nota in usuarios_materia.objects.filter(
+            usuario_id__in={p[0] for p in pares},
+            materia_id__in={p[1] for p in pares},
+        ):
+            notas_por_par[(nota.usuario_id, nota.materia_id)].append(nota.nota_final)
+
+    return JsonResponse({
+        'results': [{
+            'id': f.id,
+            'materia': str(f.llamado.materia),
+            'anio': f.llamado.materia.anio,
+            'fecha': f.llamado.llamado.strftime('%d/%m/%Y'),
+            'hora': f.llamado.llamado.strftime('%H:%M'),
+            'estudiante': f.usuario.nombre_completo,
+            'dni': f.usuario.dni,
+            'notas': notas_por_par.get((f.usuario_id, f.llamado.materia_id), []),
+        } for f in finales],
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
 
 def inscripcionMesa(request):
     if request.method == 'POST':
