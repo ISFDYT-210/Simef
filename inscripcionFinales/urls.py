@@ -25,6 +25,7 @@ urlpatterns = [
     path("change_password/", auth_views.PasswordChangeView.as_view(template_name = 'registration/change_password.html'),name = 'cambiar_contraseña'),
     path("change_password_done/",auth_views.PasswordChangeDoneView.as_view(template_name='registration/success_password.html'), name='password_change_done'),
     path("user_list/",login_required(listUser.as_view(template_name='registration/list_user.html')),name='list_user'),
+    path("auditoria/",login_required(listAuditoria.as_view()),name='list_auditoria'),
     path("edit_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/edit_profile.html')), name='edit_profile'),
     path("delete_user/<int:pk>",login_required(deleteUser.as_view(template_name='registration/delete_user.html')),name='delete_user'),
     path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),

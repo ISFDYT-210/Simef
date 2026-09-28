@@ -80,6 +80,12 @@
           <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0 4 4m-4-4L8 8m-4 8v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
           <span x-show="sidebar" class="whitespace-nowrap">Carga masiva</span>
         </a>
+        {% if request.user.puede_ver_auditoria %}
+        <a href="{% url 'list_auditoria' %}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6m4 6V7m4 10v-3M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z"/></svg>
+          <span x-show="sidebar" class="whitespace-nowrap">Auditoría</span>
+        </a>
+        {% endif %}
       </div>
       {% endif %}
 

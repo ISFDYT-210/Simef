@@ -19,7 +19,7 @@ PASSWORD_PREDETERMINADA = '12345678'
 # hacer un rol, se edita SOLO este diccionario.
 CAPACIDADES_POR_ROL = {
     'Directivo':  {'gestionar_usuarios', 'gestionar_materias', 'ver_materias',
-                   'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes'},
+                   'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes', 'ver_auditoria'},
     'Secretario': {'gestionar_usuarios', 'gestionar_materias', 'ver_materias',
                    'gestionar_mesas', 'abrir_inscripciones', 'ver_reportes'},
     'Preceptor':  {'ver_materias', 'gestionar_mesas', 'abrir_inscripciones',
@@ -138,6 +138,9 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     def puede_ver_reportes(self):
         return self.tiene_capacidad('ver_reportes')
+
+    def puede_ver_auditoria(self):
+        return self.tiene_capacidad('ver_auditoria')
 
     def puede_administrar(self):
         """Atajo: ¿es personal administrativo (no estudiante ni profesor)?"""

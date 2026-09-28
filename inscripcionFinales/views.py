@@ -312,7 +312,44 @@ class listUser(CapacidadRequeridaMixin, ListView):
         context['rol_actual'] = self.request.GET.get('rol', '')
         context['search_actual'] = self.request.GET.get('search', '')
         return context
-    
+
+
+ROLES_AUDITABLES = ('Directivo', 'Secretario', 'Preceptor', 'Profesor')
+
+
+class listAuditoria(CapacidadRequeridaMixin, ListView):
+    capacidades_requeridas = ('ver_auditoria',)
+    model = RegistroAuditoria
+    template_name = 'registration/list_auditoria.html'
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = RegistroAuditoria.objects.select_related('usuario').filter(
+            usuario__rol__in=ROLES_AUDITABLES
+        )
+
+        rol_filter = self.request.GET.get('rol')
+        if rol_filter in ROLES_AUDITABLES:
+            queryset = queryset.filter(usuario__rol=rol_filter)
+
+        search = self.request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(usuario__nombre_completo__icontains=search) |
+                Q(usuario__email__icontains=search) |
+                Q(accion__icontains=search)
+            )
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['roles'] = [(r, dict(Usuario.ROL_CHOICES)[r]) for r in ROLES_AUDITABLES]
+        context['rol_actual'] = self.request.GET.get('rol', '')
+        context['search_actual'] = self.request.GET.get('search', '')
+        return context
+
+
 def _sin_acentos(texto):
     """'Matemática' -> 'matematica'. Para que buscar sin tildes igual encuentre."""
     sin_tildes = unicodedata.normalize('NFD', str(texto or ''))
