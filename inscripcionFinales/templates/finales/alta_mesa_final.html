@@ -12,7 +12,7 @@
       <div class="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
         <div>
           <label for="filtroCarrera" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por carrera</label>
-          <select id="filtroCarrera" x-model="filtroCarrera" @change="onCarreraChange()"
+          <select id="filtroCarrera" x-model="filtroCarrera" @change="aplicarFiltros()"
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
             <option value="">Todas las carreras</option>
             {% for carrera in carreras %}
@@ -22,7 +22,7 @@
         </div>
         <div>
           <label for="filtroAnio" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por año</label>
-          <select id="filtroAnio" x-model="filtroAnio" @change="filtrarMaterias()"
+          <select id="filtroAnio" x-model="filtroAnio" @change="aplicarFiltros()"
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
             <option value="">Todos los años</option>
             {% for valor, etiqueta in anios %}
@@ -70,45 +70,80 @@
         var man = new Date(); man.setDate(man.getDate() + 1);
         ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
       }
-      this.actualizarAniosDisponibles();
+      this.aplicarFiltros();
     },
-    onCarreraChange() {
-      this.actualizarAniosDisponibles();
-      this.filtrarMaterias();
-    },
-    actualizarAniosDisponibles() {
-      var anioSelect = document.getElementById('filtroAnio');
+    // ══ Filtro de carrera/año (bidireccional) ═════════════════════════════════
+    // El select de materias es la única fuente de datos: cada <option> trae
+    // data-carrera y data-anio (los agrega MateriaConFiltroSelect en forms.py),
+    // así que todo se resuelve en el cliente, sin volver a consultar la DB.
+    // Los dos selects llaman al MISMO recálculo: la carrera acota los años que
+    // se ofrecen y el año acota las carreras, en cualquier orden en que se
+    // elijan (y también al revés, al limpiar un filtro).
+    opcionesDeMateria() {
       var mat = document.getElementById(this.idMateria);
-      if (!anioSelect || !mat) return;
-      var aniosDisponibles = new Set();
-      Array.from(mat.options).forEach(function (opt) {
-        if (!opt.value) return; // opción vacía "---------"
-        if (!this.filtroCarrera || opt.dataset.carrera === this.filtroCarrera) {
-          aniosDisponibles.add(opt.dataset.anio);
-        }
-      }, this);
-      var seleccionOculta = false;
-      Array.from(anioSelect.options).forEach(function (opt) {
-        if (!opt.value) return;
-        var visible = aniosDisponibles.has(opt.value);
-        opt.hidden = !visible;
-        if (opt.selected && !visible) seleccionOculta = true;
-      });
-      if (seleccionOculta) this.filtroAnio = '';
+      if (!mat) return [];
+      // Se descarta la opción vacía ("---------") que agrega Django.
+      return Array.from(mat.options).filter(function (opt) { return !!opt.value; });
     },
-    filtrarMaterias() {
+    coinciden(opt, carrera, anio) {
+      return (!carrera || opt.dataset.carrera === carrera) &&
+             (!anio || opt.dataset.anio === anio);
+    },
+    // Deja visibles (y elegibles) solo las opciones admisibles del select.
+    // No alcanza con hidden: Safari/iOS lo ignora y dejaría elegir una
+    // combinación que no tiene ninguna materia.
+    aplicarVisibilidad(select, admisibles) {
+      if (!select) return;
+      Array.from(select.options).forEach(function (opt) {
+        if (!opt.value) return; // "Todas las carreras" / "Todos los años"
+        var admisible = admisibles.has(opt.value);
+        opt.hidden = !admisible;
+        opt.disabled = !admisible;
+        opt.style.display = admisible ? '' : 'none';
+      });
+    },
+    // Un filtro puede haber quedado apuntando a algo que ya no existe (se borró
+    // la carrera o la materia mientras la página estaba abierta): se limpia
+    // antes de dibujar, porque un estado imposible dejaría las listas vacías.
+    limpiarFiltrosSinOpciones(opciones) {
+      var sinOpciones = function (filtro, campo) {
+        return !opciones.some(function (opt) { return opt.dataset[campo] === filtro; });
+      };
+      if (this.filtroCarrera && sinOpciones(this.filtroCarrera, 'carrera')) this.filtroCarrera = '';
+      if (this.filtroAnio && sinOpciones(this.filtroAnio, 'anio')) this.filtroAnio = '';
+      // Puede existir cada valor por separado y no la combinación: se suelta el
+      // año y la carrera queda mostrando todas sus materias.
+      if (this.filtroAnio && !opciones.some(function (opt) {
+        return this.coinciden(opt, this.filtroCarrera, this.filtroAnio);
+      }, this)) {
+        this.filtroAnio = '';
+      }
+    },
+    aplicarFiltros() {
+      var opciones = this.opcionesDeMateria();
+      this.limpiarFiltrosSinOpciones(opciones);
+
+      // Cada lista se calcula mirando solo al OTRO filtro: así ninguna de las dos
+      // puede ofrecer una opción que deje a la otra sin materias.
+      var carrerasAdmisibles = new Set();
+      var aniosAdmisibles = new Set();
+      opciones.forEach(function (opt) {
+        if (this.coinciden(opt, '', this.filtroAnio)) carrerasAdmisibles.add(opt.dataset.carrera);
+        if (this.coinciden(opt, this.filtroCarrera, '')) aniosAdmisibles.add(opt.dataset.anio);
+      }, this);
+      this.aplicarVisibilidad(document.getElementById('filtroCarrera'), carrerasAdmisibles);
+      this.aplicarVisibilidad(document.getElementById('filtroAnio'), aniosAdmisibles);
+
       var mat = document.getElementById(this.idMateria);
       if (!mat) return;
-      var seleccionActualOculta = false;
+      var seleccionOculta = false;
       Array.from(mat.options).forEach(function (opt) {
         if (!opt.value) return; // opción vacía "---------"
-        var coincideCarrera = !this.filtroCarrera || opt.dataset.carrera === this.filtroCarrera;
-        var coincideAnio = !this.filtroAnio || opt.dataset.anio === this.filtroAnio;
-        var visible = coincideCarrera && coincideAnio;
+        var visible = this.coinciden(opt, this.filtroCarrera, this.filtroAnio);
         opt.hidden = !visible;
-        if (opt.selected && !visible) seleccionActualOculta = true;
+        if (opt.selected && !visible) seleccionOculta = true;
       }, this);
-      if (seleccionActualOculta) mat.value = '';
+      if (seleccionOculta) mat.value = '';
     },
     validar(e) {
       this.errores = { materia: '', llamado: '' };
