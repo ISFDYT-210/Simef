@@ -1,49 +1,34 @@
 {% extends 'base/base.html' %}
-{% include 'base/header.html' %}
 
 {% block title %}Recuperar contraseña{% endblock %}
 
 {% block content %}
 
-
-
-
-<div class="container-fluid login-screen align-center">
-  <div class="card login-card bg-trans no-border">
-    <div class="row g-0 bg-trans">
-      <div class="card-l border-rad40-l white-bg">
-        <div class="card-body card-body-login">
-          <h5 class="card-title">Recuperar contraseña</h5>
-          <form action='{% url "password_reset" %}' method="post" class="login-form">
-            {% csrf_token %}
-            <div class="form-fields">
-              <p class="fs-5">
-                <label for="id_username">Email:</label>
-                {{ form.email }}
-              </p>       
-            </div>
-            
-      
-            <div  class="center-content">
-              <div>
-                <button type="submit" class="btn btn-blue btn-pr">Enviar</button>
-              </div>
-              <a href="/accounts/login/" style="text-decoration: none; font-size: 20px;">Volver al Inicio de Sesión</a>
-            </div>
-          </form>
-
-        </div>
-      </div>
-      
-      <div class="card-r border-rad40-r purple-bg">
-        <img src="/static/imagenes/SIMEF.png" class="logo-login" style="width: 50%; height: 85%;padding-top: 80px;">
-      </div>
-
-    </div>
-  </div>
+<div class="mb-6 flex flex-col items-center text-center">
+  <img src="/static/imagenes/SIMEF.png" class="mb-3 h-16 object-contain" alt="SIMEF">
+  <h1 class="text-lg font-semibold text-tinta-900">Recuperar contraseña</h1>
 </div>
 
+{% if form.errors %}
+<div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+  Ingresá un email válido para continuar.
+</div>
+{% endif %}
+
+<form action="{% url 'password_reset' %}" method="post" class="space-y-4">
+  {% csrf_token %}
+
+  <div>
+    <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+    <input type="email" name="email" id="id_email" autocomplete="email" autofocus required
+           class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+  </div>
+
+  <button type="submit" class="w-full rounded-lg bg-tinta-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800">Enviar</button>
+
+  <p class="text-center text-sm">
+    <a href="/accounts/login/" class="font-medium text-celeste-600 hover:underline">Volver al Inicio de Sesión</a>
+  </p>
+</form>
+
 {% endblock %}
-{% include 'base/footer.html' %}
-
-
