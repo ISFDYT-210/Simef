@@ -39,7 +39,13 @@
 <div class="flex min-h-full">
 
   <!-- ══════════ SIDEBAR ══════════ -->
-  <aside class="fixed inset-y-0 left-0 z-40 flex flex-col bg-tinta-900 text-tinta-100 transition-all duration-200"
+  {% comment %}
+    overflow-hidden: con el menú cerrado el <aside> queda en w-0 en celular, pero su
+    contenido (el bloque del logo y el <nav>, que es un contenedor con scroll) sigue
+    midiendo ~24-32 px y se dibujaba fuera del panel, encima de la página: la barra de
+    scroll del nav aparecía como una línea gris en el margen izquierdo.
+  {% endcomment %}
+  <aside class="fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden bg-tinta-900 text-tinta-100 transition-all duration-200"
          :class="sidebar ? 'w-64' : 'w-0 lg:w-[4.5rem]'" x-cloak
          @click.outside="if (window.innerWidth < 1024 && !$event.target.closest('#sidebar-toggle-btn')) sidebar = false">
 
