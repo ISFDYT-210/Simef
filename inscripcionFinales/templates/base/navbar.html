@@ -72,7 +72,7 @@
             </div>
           </li>
           {% endif %}
-          {% if user.is_authenticated %}
+                    {% if user.is_authenticated %}
           <li class="nav-item">
             <div class="dropdown">
               <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownInformacion" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
@@ -83,12 +83,12 @@
                 <li><a class="dropdown-item" href="https://isfdyt210-bue.infd.edu.ar/sitio/datos-institucionales/">Información</a></li>
               </ul>
             </div>
-    
+          </li>
+
           <li class="nav-item">
             <a class="nav-link" href="https://biblioteca210.pythonanywhere.com/" rel="noopener noreferrer" style="text-decoration: none">Biblioteca</a>
           </li>
-  
-            {% endif %}
+          {% endif %}
         
 
 
@@ -118,32 +118,60 @@
             </a>
           </li>
 
-          <li class="nav-item last-nav-item">
-            <div class="dropdown">
-              <button class="btn btn-navbar dropdown-toggle nav-link" type="button" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none">
-                <span class="nav-user">{{ user.email }}</span>
-                {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
-                  <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
+                  <li class="nav-item last-nav-item">
+          <!-- Mobile -->
+          <div class="dropdown only-mob">
+            <button class="btn btn-navbar dropdown-toggle nav-link" type="button"
+                    id="dropdownMenuButtonUser" data-bs-toggle="dropdown" aria-expanded="false">
+              {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
+              {% else %}
+                {% if user.imagen %}
+                  <img class="icono-nav" src="{{ user.imagen.url }}" alt="User Image">
                 {% else %}
-                  {% if user.imagen %}
-                    <img class="icono-nav" src="{{ user.imagen.url }}" alt="User Image">
-                  {% else %}
-                    <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
-                  {% endif %}
+                  <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
                 {% endif %}
-              </button>
-              <ul class="dropdown-menu dropdown-menu-end user-dd" aria-labelledby="dropdownUser">
-                <li><a class="dropdown-item" href="/edit_user/{{ request.user.id }}">Editar perfil</a></li>
-                <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
-                <li>
-                  <form id="logoutForm" action="{% url 'logout' %}" method="post">
-                    {% csrf_token %}
-                    <button type="submit" class="dropdown-item">Cerrar Sesión</button>
-                  </form>
-                </li>
-              </ul>
-            </div>
-          </li>
+              {% endif %}
+              <span class="nav-user">{{ user.email }}</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButtonUser">
+              <li><a class="dropdown-item" href="/edit_user/{{ request.user.id }}">Editar perfil</a></li>
+              <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
+              <li>
+                <form id="logoutFormMob" action="{% url 'logout' %}" method="post">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Desktop -->
+          <div class="dropdown only-lt">
+            <button class="btn dropdown mrg-0 nav-link" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <span class="twhite">{{ user.email }}</span>
+              {% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+                <img class="icono-nav" src="/static/imagenes/Perfiladmin.png" alt="Default Image">
+              {% else %}
+                {% if user.imagen %}
+                  <img class="icono-nav" src="{{ user.imagen.url }}" alt="User Image">
+                {% else %}
+                  <img class="icono-nav" src="/static/imagenes/Perfil.png" alt="Default Image">
+                {% endif %}
+              {% endif %}
+            </button>
+            <ul class="dropdown-menu user-dd" aria-labelledby="dropdownMenuButtonUser">
+              <li><a class="dropdown-item" href="/edit_user/{{ request.user.id }}">Editar perfil</a></li>
+              <li><a class="dropdown-item" href="/change_password">Cambiar contraseña</a></li>
+              <li>
+                <form id="logoutForm" action="{% url 'logout' %}" method="post">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+        </li>
         {% endif %}
       </ul>
     </div>
@@ -153,40 +181,34 @@
 <style>
   @media (max-width: 768px) {
     .rotulo {
-        font-size: 11px; /* Tamaño de fuente más grande en pantallas más pequeñas */
+      font-size: 11px;
     }
   }
 
-  @media (max-width: 992px) { /* Para tabletas y móviles */
+  @media (max-width: 992px) {
     .navbar-nav {
-      flex-direction: column; /* Cambiar a columna para dispositivos más pequeños */
-      width: 100%; /* Asegurar que ocupe todo el ancho */
+      flex-direction: column;
+      width: 100%;
     }
 
-    .navbar-nav .nav-link, .nav-link only-mob {
-      text-align: left; /* Alinear el texto a la izquierda */
+    .navbar-nav .nav-link,
+    .only-mob {
+      text-align: left;
     }
 
-    .dropdown-menu, .navbar-nav {
-      left: 0; /* Alinear el menú desplegable a la izquierda */
+    .dropdown-menu,
+    .navbar-nav {
+      left: 0;
     }
+
     .last-nav-item {
-      text-align: left; /* Alinear el texto a la izquierda */
-      width: 100%; /* Asegurar que ocupe todo el ancho */
+      text-align: left;
+      width: 100%;
     }
 
     .last-nav-item a {
-        display: block; /* Asegura que el enlace ocupe todo el ancho */
-        width: 100%; /* Asegurar que ocupe todo el ancho */
+      display: block;
+      width: 100%;
     }
-  }
-
-  #dropdownUser .nav-user {
-    display: inline;
-    margin-right: 0.5rem;
-  }
-
-  #dropdownUser .icono-nav {
-    margin: 0;
   }
 </style>

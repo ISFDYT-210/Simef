@@ -12,7 +12,7 @@
       <div class="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
         <div>
           <label for="filtroCarrera" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por carrera</label>
-          <select id="filtroCarrera" x-model="filtroCarrera" @change="filtrarMaterias()"
+          <select id="filtroCarrera" x-model="filtroCarrera" @change="onCarreraChange()"
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
             <option value="">Todas las carreras</option>
             {% for carrera in carreras %}
@@ -53,49 +53,74 @@
 
 <script>
   function altaMesa() {
-    return {
-      errores: { materia: '', llamado: '' },
-      idMateria: '{{ form.materia.id_for_label }}',
-      idLlamado: '{{ form.llamado.id_for_label }}',
-      filtroCarrera: '',
-      filtroAnio: '',
-      init() {
-        var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
-        var mat = document.getElementById(this.idMateria);
-        var ll = document.getElementById(this.idLlamado);
-        if (mat) mat.classList.add.apply(mat.classList, c);
-        if (ll) {
-          ll.classList.add.apply(ll.classList, c);
-          ll.setAttribute('type', 'datetime-local');
-          var man = new Date(); man.setDate(man.getDate() + 1);
-          ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
+  return {
+    errores: { materia: '', llamado: '' },
+    idMateria: '{{ form.materia.id_for_label }}',
+    idLlamado: '{{ form.llamado.id_for_label }}',
+    filtroCarrera: '',
+    filtroAnio: '',
+    init() {
+      var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+      var mat = document.getElementById(this.idMateria);
+      var ll = document.getElementById(this.idLlamado);
+      if (mat) mat.classList.add.apply(mat.classList, c);
+      if (ll) {
+        ll.classList.add.apply(ll.classList, c);
+        ll.setAttribute('type', 'datetime-local');
+        var man = new Date(); man.setDate(man.getDate() + 1);
+        ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
+      }
+      this.actualizarAniosDisponibles();
+    },
+    onCarreraChange() {
+      this.actualizarAniosDisponibles();
+      this.filtrarMaterias();
+    },
+    actualizarAniosDisponibles() {
+      var anioSelect = document.getElementById('filtroAnio');
+      var mat = document.getElementById(this.idMateria);
+      if (!anioSelect || !mat) return;
+      var aniosDisponibles = new Set();
+      Array.from(mat.options).forEach(function (opt) {
+        if (!opt.value) return; // opción vacía "---------"
+        if (!this.filtroCarrera || opt.dataset.carrera === this.filtroCarrera) {
+          aniosDisponibles.add(opt.dataset.anio);
         }
-      },
-      filtrarMaterias() {
-        var mat = document.getElementById(this.idMateria);
-        if (!mat) return;
-        var seleccionActualOculta = false;
-        Array.from(mat.options).forEach(function (opt) {
-          if (!opt.value) return; // opción vacía "---------"
-          var coincideCarrera = !this.filtroCarrera || opt.dataset.carrera === this.filtroCarrera;
-          var coincideAnio = !this.filtroAnio || opt.dataset.anio === this.filtroAnio;
-          var visible = coincideCarrera && coincideAnio;
-          opt.hidden = !visible;
-          if (opt.selected && !visible) seleccionActualOculta = true;
-        }, this);
-        if (seleccionActualOculta) mat.value = '';
-      },
-      validar(e) {
-        this.errores = { materia: '', llamado: '' };
-        var mat = document.getElementById(this.idMateria);
-        var ll = document.getElementById(this.idLlamado);
-        var ok = true;
-        if (!mat || !mat.value || mat.value === '---------') { this.errores.materia = 'Debés seleccionar una materia.'; ok = false; }
-        if (!ll || !ll.value) { this.errores.llamado = 'Debés seleccionar fecha y hora.'; ok = false; }
-        else if (new Date(ll.value) <= new Date()) { this.errores.llamado = 'La fecha debe ser posterior a hoy.'; ok = false; }
-        if (!ok) e.preventDefault();
-      },
-    };
-  }
+      }, this);
+      var seleccionOculta = false;
+      Array.from(anioSelect.options).forEach(function (opt) {
+        if (!opt.value) return;
+        var visible = aniosDisponibles.has(opt.value);
+        opt.hidden = !visible;
+        if (opt.selected && !visible) seleccionOculta = true;
+      });
+      if (seleccionOculta) this.filtroAnio = '';
+    },
+    filtrarMaterias() {
+      var mat = document.getElementById(this.idMateria);
+      if (!mat) return;
+      var seleccionActualOculta = false;
+      Array.from(mat.options).forEach(function (opt) {
+        if (!opt.value) return; // opción vacía "---------"
+        var coincideCarrera = !this.filtroCarrera || opt.dataset.carrera === this.filtroCarrera;
+        var coincideAnio = !this.filtroAnio || opt.dataset.anio === this.filtroAnio;
+        var visible = coincideCarrera && coincideAnio;
+        opt.hidden = !visible;
+        if (opt.selected && !visible) seleccionActualOculta = true;
+      }, this);
+      if (seleccionActualOculta) mat.value = '';
+    },
+    validar(e) {
+      this.errores = { materia: '', llamado: '' };
+      var mat = document.getElementById(this.idMateria);
+      var ll = document.getElementById(this.idLlamado);
+      var ok = true;
+      if (!mat || !mat.value || mat.value === '---------') { this.errores.materia = 'Debés seleccionar una materia.'; ok = false; }
+      if (!ll || !ll.value) { this.errores.llamado = 'Debés seleccionar fecha y hora.'; ok = false; }
+      else if (new Date(ll.value) <= new Date()) { this.errores.llamado = 'La fecha debe ser posterior a hoy.'; ok = false; }
+      if (!ok) e.preventDefault();
+    },
+  };
+}
 </script>
 {% endblock %}
