@@ -14,7 +14,7 @@
         <tr class="hover:bg-slate-50">
           <td class="px-5 py-3 font-medium text-tinta-900">{{ final.materia }}</td>
           <td class="px-5 py-3">{{ final.llamado }}</td>
-          <td class="px-5 py-3">{{ final.materia.profesor.nombres|default:"—" }}</td>
+          <td class="px-5 py-3">{{ final.materia.profesor.nombre_completo|default:"—" }}</td>
           <td class="px-5 py-3 text-right"><a href="/inscribirse_final/{{ final.id }}" class="inline-block rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Inscribirse</a></td>
         </tr>
         {% empty %}
