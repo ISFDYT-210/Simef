@@ -303,10 +303,10 @@ class usuarios_materia(models.Model):
         return f"{self.materia} -> {self.usuario}"
     
     def puede_inscribirse_en_una_materia(self):
-        return ((self.nota_cursada >= 4 and self.nota_cursada is not None ) or self.modalidad == 'Libre') and self.aprobada == False
-    
+        return ((self.nota_cursada is not None and self.nota_cursada >= 4) or self.modalidad == 'Libre') and self.aprobada == False
+
     def puede_inscribirse_en_mesa_final(self):
-        return ((self.nota_cursada >= 4 and self.nota_cursada is not None ) or self.modalidad == 'Libre') and self.aprobada == False
+        return ((self.nota_cursada is not None and self.nota_cursada >= 4) or self.modalidad == 'Libre') and self.aprobada == False
     
 class MesaFinal(models.Model):
     materia = models.ForeignKey('Materia', on_delete=models.CASCADE, blank=False, null=False)

@@ -227,12 +227,14 @@ class deleteUser(CapacidadRequeridaMixin, DeleteView):
     template_name ='registration/delete_user.html'
     success_url = '/user_list'
     
-class deleteInscripcion(DeleteView):
+class deleteInscripcion(CapacidadRequeridaMixin, DeleteView):
+    capacidades_requeridas = ('gestionar_mesas',)
     model = InscripcionFinal
     template_name ='registration/delete_inscripcion.html'
     success_url = '/inscripcion_finales_lista'
 
-class deleteMesa(DeleteView):
+class deleteMesa(CapacidadRequeridaMixin, DeleteView):
+    capacidades_requeridas = ('gestionar_mesas',)
     model = MesaFinal
     template_name ='registration/delete_mesa.html'
     success_url = '/mesas_lista'
@@ -548,6 +550,7 @@ def listarMateriasFinal(request):
                 materias_final.append(mf)
     return render(request, 'listarMateriasFinal.html', {'materias_final' : materias_final})
 
+@capacidad_requerida('gestionar_mesas')
 def altaMesa(request):
     if request.method == 'POST':
         form = MesaFinalForm(request.POST)
@@ -667,6 +670,7 @@ def api_finales_inscriptos_adm(request):
         'count': paginator.count,
     })
 
+@capacidad_requerida('gestionar_mesas')
 def inscripcionMesa(request):
     if request.method == 'POST':
         form = InscripcionFinalForm(request.POST)
@@ -731,6 +735,7 @@ def inscripcionFinalEst(request, final_id):
     # Si es GET, mostrar el formulario de confirmación
     return render(request, 'finals/inscripcion_final_adm.html', {'final': final})
 
+@capacidad_requerida('abrir_inscripciones')
 def obtener_materias_estudiante(request):
     """Vista AJAX: materias con inscripción abierta que pertenecen a la carrera del estudiante"""
     estudiante_id = request.GET.get('estudiante_id')
@@ -748,6 +753,7 @@ def obtener_materias_estudiante(request):
         'materias': [{'id': m.id, 'nombre': m.nombre_materia} for m in materias]
     })
 
+@capacidad_requerida('abrir_inscripciones')
 def inscripcionMateria(request):
     if request.method == 'POST':
         inscripcion_usuario=request.POST['usuario']
@@ -1363,14 +1369,15 @@ def eliminar_mesa(request, id):
     return render(request, 'mesas/eliminar_mesa.html', {'mesa': mesa})
 
 def eliminar_inscripcion_final(request, id):
+    """Solo el personal que gestiona mesas puede dar de baja una inscripción a
+    final. El estudiante no puede: una vez inscripto en una mesa, la baja
+    queda a criterio de la institución."""
     final = get_object_or_404(InscripcionFinal, pk=id)
-    es_titular = request.user.id == final.usuario_id
-    es_admin = request.user.tiene_capacidad('gestionar_mesas')
-    if not (es_titular or es_admin):
+    if not request.user.tiene_capacidad('gestionar_mesas'):
         return render(request, '403_forbidden.html', status=403)
     if request.method == 'POST':
         final.delete()
-        return redirect('exito_final_eliminado_adm' if es_admin else 'exito_final_eliminado_est')
+        return redirect('exito_final_eliminado_adm')
     return render(request, 'finales/eliminar_final_est.html', {'final': final})
 
 @capacidad_requerida('gestionar_materias')
@@ -1567,6 +1574,7 @@ def acta_volante(request, final_id):
         pages_json = dumps(pages)
         return render(request, 'finales/lista_acta_volante.html', {'pages_json': pages_json})
 
+@capacidad_requerida('ver_materias')
 def listar_usuarios_materia(request):
     usuarios_materia_data = usuarios_materia.objects.all()  # Recupera todos los registros de usuarios_materia
     context = {'usuarios_materia_data': usuarios_materia_data}
@@ -1777,7 +1785,7 @@ def blanquear_password(request, usuario_id):
         return redirect('list_user')
     return render(request, 'registration/blanquear_password.html', {'usuario': usuario})
 
-@csrf_exempt  # TEMPORAL - solo para debugging
+@capacidad_requerida('gestionar_mesas')
 def inscribir_final(request):
     """Vista AJAX para realizar la inscripción al final"""
     usuario_id = request.POST.get('usuario')
@@ -2390,6 +2398,7 @@ def reporte_estudiante_html(request, usuario_id):
     context = obtener_contexto_reporte(usuario)
     
     return render(request, 'reportes/constancia_estudiante.html', context)
+@capacidad_requerida('gestionar_mesas')
 def obtener_finales_estudiante(request):
     """Vista AJAX para obtener finales disponibles para un estudiante específico"""
     if request.method == 'GET':
