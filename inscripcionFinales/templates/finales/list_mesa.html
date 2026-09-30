@@ -18,7 +18,7 @@
 
 {% block content %}
 
-{% if request.user.puede_gestionar_mesas %}
+{% if request.user.puede_gestionar_mesas or request.user.es_profesor %}
 
 <div x-data="mesasFinales()" x-init="init()">
 
@@ -28,13 +28,16 @@
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
       <div>
         <h2 class="text-sm font-semibold text-tinta-900">Mesas registradas</h2>
+        {% if request.user.puede_gestionar_mesas %}
         <p class="text-xs text-slate-500"><span x-text="contador"></span> seleccionada(s)</p>
+        {% endif %}
       </div>
 
       <div class="flex items-center gap-2">
         <input type="text" x-model="busqueda" placeholder="Buscar materia…"
                class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
 
+        {% if request.user.puede_gestionar_mesas %}
         <a href="{% url 'imprimir_mesas_finales_pdf' %}" target="_blank"
            title="Generar cartel PDF para imprimir"
            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-600">
@@ -62,6 +65,7 @@
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg>
           Eliminar
         </button>
+        {% endif %}
       </div>
     </div>
 
@@ -89,11 +93,13 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+              {% if request.user.puede_gestionar_mesas %}
               <th class="px-5 py-3">
                 <input type="checkbox" @change="toggleTodos($event)" x-ref="checkTodos"
                        title="Seleccionar todo"
                        class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
               </th>
+              {% endif %}
               <th class="px-5 py-3 font-semibold">Materia</th>
               <th class="px-5 py-3 font-semibold">Fecha</th>
               <th class="px-5 py-3 font-semibold">Horario</th>
@@ -104,11 +110,13 @@
           <tbody class="divide-y divide-slate-100" x-ref="cuerpo">
             <template x-for="mesa in filas" :key="mesa.id">
               <tr class="fila-mesa hover:bg-slate-50">
+                {% if request.user.puede_gestionar_mesas %}
                 <td class="px-5 py-3">
                   <input type="checkbox" name="mesa_ids" :value="mesa.id"
                          @change="sincronizar()"
                          class="mesa-check h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
                 </td>
+                {% endif %}
                 <td class="px-5 py-3 font-medium text-tinta-900" x-text="mesa.materia"></td>
                 <td class="px-5 py-3" x-text="mesa.fecha"></td>
                 <td class="px-5 py-3" x-text="mesa.hora"></td>
@@ -123,10 +131,12 @@
                 </td>
                 <td class="px-5 py-3">
                   <div class="flex items-center justify-end gap-2">
+                    {% if request.user.puede_gestionar_mesas %}
                     <a :href="'/edit_mesa/' + mesa.id" title="Editar mesa"
                        class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg>
                     </a>
+                    {% endif %}
                     <a :href="'/acta_volante/' + mesa.id" title="Acta volante individual" target="_blank"
                        class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500">
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
@@ -318,7 +328,6 @@
 
 <div class="grid min-h-[60vh] place-items-center text-center">
   <div>
-    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
     <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
     <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
   </div>

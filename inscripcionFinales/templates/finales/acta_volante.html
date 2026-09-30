@@ -1,5 +1,4 @@
 {% block content %}
-{% if request.user.puede_gestionar_mesas %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -187,14 +186,4 @@ if (mesElement.textContent == "1") {
 }
 </script>
 </html>
-
-
-
-{% else %}
-
-<div class="text-center">
-    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
-</div>
-{% endif %}
 {% endblock %}

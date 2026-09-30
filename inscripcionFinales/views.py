@@ -395,10 +395,14 @@ class listMesa(TemplateView):
 
 
 def api_lista_mesas(request):
-    if not request.user.puede_gestionar_mesas():
+    es_profesor = request.user.es_profesor() and not request.user.puede_gestionar_mesas()
+    if not (request.user.puede_gestionar_mesas() or es_profesor):
         return JsonResponse({'error': 'No autorizado'}, status=403)
 
     qs = MesaFinal.objects.select_related('materia').order_by('-llamado')
+    if es_profesor:
+        # El profesor solo ve las mesas de las materias que dicta
+        qs = qs.filter(materia__profesor=request.user)
 
     busqueda = _sin_acentos(request.GET.get('q', ''))
     if busqueda:
@@ -657,6 +661,7 @@ def api_finales_inscriptos_adm(request):
     return JsonResponse({
         'results': [{
             'id': f.id,
+            'mesa_id': f.llamado_id,
             'materia': str(f.llamado.materia),
             'anio': f.llamado.materia.anio,
             'fecha': f.llamado.llamado.strftime('%d/%m/%Y'),
@@ -1537,12 +1542,16 @@ def inscribir_mesa_final(request):
     context = {'mesas_finales': mesas_finales, 'filtro_form': filtro_form}
     return render(request, 'finales/inscribir_mesa_final.html', context)
 
-@capacidad_requerida('gestionar_mesas')
 def acta_volante(request, final_id):
-    """Genera el acta volante (planilla de examen) de una mesa de final, paginada de a 25 alumnos."""
+    """Genera el acta volante (planilla de examen) de una mesa de final, paginada de a 25 alumnos.
+
+    La puede ver quien gestiona mesas (Directivo/Secretario/Preceptor) o el
+    profesor de la materia de esta mesa en particular."""
+    final = get_object_or_404(MesaFinal, id=final_id)
+    if not request.user.is_authenticated or not request.user.puede_ver_acta_de(final):
+        return render(request, '403_forbidden.html', status=403)
     pages = []
     finales_inscriptos = InscripcionFinal.objects.filter(llamado=final_id).order_by('usuario__nombre_completo')
-    final = get_object_or_404(MesaFinal, id=final_id)
     if finales_inscriptos.count() <= 25:
         context = {
             'finales_inscriptos': finales_inscriptos,

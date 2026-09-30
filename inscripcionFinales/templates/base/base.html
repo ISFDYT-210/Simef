@@ -144,6 +144,8 @@
           <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
           <span x-show="sidebar" class="whitespace-nowrap">Alta mesa de final</span>
         </a>
+        {% endif %}
+        {% if request.user.puede_gestionar_mesas or request.user.es_profesor %}
         <a href="{% url 'list_mesa' %}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-tinta-800 hover:text-white">
           <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v3m8-3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
           <span x-show="sidebar" class="whitespace-nowrap">Listado de mesas</span>

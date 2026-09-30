@@ -159,6 +159,15 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
             return materia.profesor_id == self.id
         return False
 
+    def puede_ver_acta_de(self, mesa):
+        """True si puede ver el acta volante de ESTA mesa de final."""
+        if self.is_superuser or self.tiene_capacidad('gestionar_mesas'):
+            return True
+        # El profesor, solo las mesas de las materias que dicta
+        if self.es_profesor():
+            return mesa.materia.profesor_id == self.id
+        return False
+
     def puede_ver_reporte_de(self, estudiante):
         """True si puede ver el reporte/constancia de ESTE estudiante."""
         if self.is_superuser:
