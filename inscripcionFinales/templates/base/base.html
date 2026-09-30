@@ -1,19 +1,4 @@
 {% load static %}
-{% comment %}
-   ═══════════════════════════════════════════════════════════════
-   UBICACIÓN: inscripcionFinales/templates/base/base_nuevo.html
-   (al lado del base.html actual — conviven durante la migración)
-
-   Cada template se migra cambiando su primera línea:
-     extends 'base/base.html'  →  extends 'base/base_nuevo.html'
-
-   Compatible con los bloques existentes: title y content.
-   Bloques nuevos opcionales: encabezado, subtitulo, extra_head, extra_js.
-
-   El layout se elige solo: sin sesión → tarjeta centrada (login/recupero);
-   con sesión → sidebar + topbar.
-   ═══════════════════════════════════════════════════════════════
-{% endcomment %}
 <!DOCTYPE html>
 <html lang="es" class="h-full">
 <head>
@@ -24,9 +9,6 @@
 
   {# Tailwind compilado localmente (sin CDN) — funciona offline y en redes que bloquean CDNs. #}
   <link rel="stylesheet" href="{% static 'css/simef.css' %}">
-
-  {# Barra de scroll: CSS propio, fuera del que compila Tailwind (se ajusta sin recompilar). #}
-  <link rel="stylesheet" href="{% static 'css/scrollbar.css' %}">
 
   {# Alpine.js servido localmente (sin CDN). #}
   <script defer src="{% static 'js/alpine.min.js' %}"></script>
@@ -42,12 +24,6 @@
 <div class="flex min-h-full">
 
   <!-- ══════════ SIDEBAR ══════════ -->
-  {% comment %}
-    overflow-hidden: con el menú cerrado el <aside> queda en w-0 en celular, pero su
-    contenido (el bloque del logo y el <nav>, que es un contenedor con scroll) sigue
-    midiendo ~24-32 px y se dibujaba fuera del panel, encima de la página: la barra de
-    scroll del nav aparecía como una línea gris en el margen izquierdo.
-  {% endcomment %}
   <aside class="fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden bg-tinta-900 text-tinta-100 transition-all duration-200"
          :class="sidebar ? 'w-64' : 'w-0 lg:w-[4.5rem]'" x-cloak
          @click.outside="if (window.innerWidth < 1024 && !$event.target.closest('#sidebar-toggle-btn')) sidebar = false">
@@ -59,8 +35,7 @@
       </div>
     </div>
 
-    {# scroll-oscuro: sobre el azul tinta del sidebar va la versión clara de la barra de scroll (ver static/css/scrollbar.css) #}
-    <nav class="scroll-oscuro flex-1 space-y-6 overflow-y-auto px-3 py-5">
+    <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5">
 
       <div>
         <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">General</p>

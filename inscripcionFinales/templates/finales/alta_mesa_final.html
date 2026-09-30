@@ -72,13 +72,7 @@
       }
       this.aplicarFiltros();
     },
-    // ══ Filtro de carrera/año (bidireccional) ═════════════════════════════════
-    // El select de materias es la única fuente de datos: cada <option> trae
-    // data-carrera y data-anio (los agrega MateriaConFiltroSelect en forms.py),
-    // así que todo se resuelve en el cliente, sin volver a consultar la DB.
-    // Los dos selects llaman al MISMO recálculo: la carrera acota los años que
-    // se ofrecen y el año acota las carreras, en cualquier orden en que se
-    // elijan (y también al revés, al limpiar un filtro).
+    // Filtro de carrera/año (bidireccional) 
     opcionesDeMateria() {
       var mat = document.getElementById(this.idMateria);
       if (!mat) return [];
@@ -90,8 +84,7 @@
              (!anio || opt.dataset.anio === anio);
     },
     // Deja visibles (y elegibles) solo las opciones admisibles del select.
-    // No alcanza con hidden: Safari/iOS lo ignora y dejaría elegir una
-    // combinación que no tiene ninguna materia.
+    
     aplicarVisibilidad(select, admisibles) {
       if (!select) return;
       Array.from(select.options).forEach(function (opt) {
@@ -102,9 +95,7 @@
         opt.style.display = admisible ? '' : 'none';
       });
     },
-    // Un filtro puede haber quedado apuntando a algo que ya no existe (se borró
-    // la carrera o la materia mientras la página estaba abierta): se limpia
-    // antes de dibujar, porque un estado imposible dejaría las listas vacías.
+  
     limpiarFiltrosSinOpciones(opciones) {
       var sinOpciones = function (filtro, campo) {
         return !opciones.some(function (opt) { return opt.dataset[campo] === filtro; });
@@ -159,3 +150,4 @@
 }
 </script>
 {% endblock %}
+
