@@ -1,0 +1,58 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   BARRAS DE DESPLAZAMIENTO (scrollbar) — estilo SIMEF
+   ───────────────────────────────────────────────────────────────────────────
+   UBICACIÓN: inscripcionFinales/static/css/scrollbar.css
+   Lo carga inscripcionFinales/templates/base/base.html con un <link>, después
+   de simef.css. Va aparte del pipeline de Tailwind A PROPÓSITO: así se puede
+   ajustar sin recompilar nada. Si en algún momento se recompila simef.css,
+   NO hay que copiar este bloque a input.css (quedaría duplicado).
+
+   Antes se usaba la barra nativa de Windows: ~17px de ancho y gris. Acá se
+   reemplaza por una fina (8px de canal, 4px a la vista), de pista transparente
+   y con el "thumb" redondeado BLANCO, apenas contrastado: un pelín más claro
+   que el fondo gris de la app, más un "pelo" gris de 1px que le da el mínimo
+   relieve para que no se pierda sobre las tarjetas blancas.
+
+   Es a propósito discreta: se tiene que ver, pero sin llamar la atención. Al
+   pasar el mouse justo por encima se aclara a blanco pleno.
+
+   Dos caminos según el motor del navegador:
+     • Chromium / Edge / Safari → pseudo-elementos ::-webkit-scrollbar (control
+       total: ancho, redondeo y hover). OJO: Chromium sólo los respeta mientras
+       scrollbar-width / scrollbar-color sigan en "auto", por eso esas
+       propiedades van únicamente dentro del @supports de Firefox.
+     • Firefox (64+) → scrollbar-width: thin + scrollbar-color.
+
+   En el sidebar (fondo tinta-900) va la clase .scroll-oscuro — ya aplicada en
+   el <nav> de base.html — porque sobre ese azul tan oscuro un blanco al 75% se
+   vería de más, así que ahí baja a menos opacidad.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Chromium / Edge / Blink / WebKit ────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, .75);            /* blanco suave */
+  border: 2px solid transparent;                         /* recorta: se ve de 4px */
+  border-radius: 9999px;
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, .30);  /* pelo gris: contraste mínimo */
+}
+*:hover::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, .9); }
+::-webkit-scrollbar-thumb:hover { background-color: #FFFFFF; }
+::-webkit-scrollbar-thumb:active { background-color: #FFFFFF; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Firefox: mismas medidas por propiedades estándar ─────────────────────── */
+@supports (-moz-appearance: none) {
+  * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .95) transparent; }
+  /* Firefox no puede dibujar el "pelo" gris, así que si ahí el blanco se pierde
+     demasiado sobre el fondo claro, cambiar la línea de arriba por:
+     scrollbar-color: rgba(148, 163, 184, .65) transparent; */
+}
+
+/* ── Superficies oscuras (sidebar azul tinta) ────────────────────────────── */
+.scroll-oscuro { scrollbar-color: rgba(255, 255, 255, .45) transparent; }
+.scroll-oscuro::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, .35); }
+.scroll-oscuro::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, .60); }
+.scroll-oscuro::-webkit-scrollbar-thumb:active { background-color: #FFFFFF; }

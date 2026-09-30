@@ -25,6 +25,9 @@
   {# Tailwind compilado localmente (sin CDN) — funciona offline y en redes que bloquean CDNs. #}
   <link rel="stylesheet" href="{% static 'css/simef.css' %}">
 
+  {# Barra de scroll: CSS propio, fuera del que compila Tailwind (se ajusta sin recompilar). #}
+  <link rel="stylesheet" href="{% static 'css/scrollbar.css' %}">
+
   {# Alpine.js servido localmente (sin CDN). #}
   <script defer src="{% static 'js/alpine.min.js' %}"></script>
 
@@ -56,7 +59,8 @@
       </div>
     </div>
 
-    <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+    {# scroll-oscuro: sobre el azul tinta del sidebar va la versión clara de la barra de scroll (ver static/css/scrollbar.css) #}
+    <nav class="scroll-oscuro flex-1 space-y-6 overflow-y-auto px-3 py-5">
 
       <div>
         <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">General</p>
