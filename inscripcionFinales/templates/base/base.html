@@ -9,6 +9,7 @@
 
   {# Tailwind compilado localmente (sin CDN) — funciona offline y en redes que bloquean CDNs. #}
   <link rel="stylesheet" href="{% static 'css/simef.css' %}">
+  <link rel="stylesheet" href="{% static 'css/scrollbar.css' %}">
 
   {# Alpine.js servido localmente (sin CDN). #}
   <script defer src="{% static 'js/alpine.min.js' %}"></script>
@@ -35,7 +36,7 @@
       </div>
     </div>
 
-    <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+    <nav class="scroll-oscuro flex-1 space-y-6 overflow-y-auto px-3 py-5">
 
       <div>
         <p x-show="sidebar" class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-tinta-300">General</p>
