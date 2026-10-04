@@ -128,8 +128,12 @@
     </table>
 
     <div class="footer">
-        <p>Presidente: </p>
-        <p>Vocal:............................ Vocal:............................</p>
+        <p>Presidente: {% if presidente %}{{ presidente.docente.nombre_completo }}{% else %}...........................{% endif %}</p>
+        <p>
+            Vocal: {% if vocales.0 %}{{ vocales.0.docente.nombre_completo }}{% else %}............................{% endif %}
+            &nbsp;&nbsp;&nbsp;
+            Vocal: {% if vocales.1 %}{{ vocales.1.docente.nombre_completo }}{% else %}............................{% endif %}
+        </p>
 
         <table style="width: 450px; float: right;">
             <tr>

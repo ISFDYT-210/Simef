@@ -5,14 +5,14 @@
 {% block content %}
     <div class="card">
         <div class="card-headers">
-            <h4 class="card-title">Eliminar Materia</h4>
+            <h4 class="card-title">Dar de baja materia</h4>
         </div>
         <div class="card-body">
-            <h6>¿Estás seguro de que quieres eliminar la materia "<b>{{ materia.materia.nombre_materia }}</b>"?</h6>
+            <h6>¿Estás seguro de que querés dar de baja a <b>{{ materia.usuario.nombre_completo }}</b> de "<b>{{ materia.materia.nombre_materia }}</b>"? Queda registrado como abandono, no se borra el historial.</h6>
             <form method="post">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Eliminar</button>
-                <a href="/listaMateriasEst" class="btn btn-primary">Cancelar</a>
+                <button type="submit" class="btn btn-danger">Dar de baja</button>
+                <a href="/listaMateriasAdm" class="btn btn-primary">Cancelar</a>
             </form>
         </div>
     </div>

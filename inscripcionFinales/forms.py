@@ -583,35 +583,16 @@ class NotaCursadaForm(forms.ModelForm):
         cleaned_data = super().clean()
         nota_cursada = cleaned_data.get('nota_cursada')
         nota_final = cleaned_data.get('nota_final')
-        
-        # Obtener la modalidad del objeto actual si existe
+
         if self.instance and hasattr(self.instance, 'modalidad'):
             modalidad = self.instance.modalidad
-            
-            print(f"DEBUG - Modalidad encontrada: '{modalidad}'")
-            
-            # Para modalidad "Regular" o "Itinerante" validar la regla
-            # Verificar tanto el valor como el código numérico si existe
-            modalidades_con_restriccion = ['Regular', 'Itinerante', '02', '03', 2, 3]  # Agregar posibles códigos
-            
-            if modalidad in modalidades_con_restriccion:
-                # Obtener el valor actual de nota_cursada: del formulario o de la BD
+            if modalidad in ('Regular', 'Itinerante'):
                 nota_cursada_final = nota_cursada if nota_cursada is not None else getattr(self.instance, 'nota_cursada', None)
-                
-                print(f"DEBUG - Modalidad requiere validación: {modalidad}")
-                print(f"DEBUG - Nota cursada final considerada: {nota_cursada_final}")
-                print(f"DEBUG - ¿Se está intentando cargar nota final? {nota_final is not None}")
-                print(f"DEBUG - ¿Hay nota cursada? {nota_cursada_final is not None}")
-                
-                # Si se está intentando cargar nota final pero no hay nota cursada
                 if nota_final is not None and nota_cursada_final is None:
-                    print("DEBUG - DISPARANDO VALIDACIÓN")
-                    # Mostrar el nombre legible de la modalidad
-                    nombre_modalidad = "Regular/Itinerante" if str(modalidad) in ['02', '03', '2', '3'] else modalidad
                     raise forms.ValidationError(
-                        f'Para la modalidad "{nombre_modalidad}" debe cargar primero la nota de cursada antes de la nota final.'
+                        f'Para la modalidad "{modalidad}" debe cargar primero la nota de cursada antes de la nota final.'
                     )
-        
+
         return cleaned_data
     
     

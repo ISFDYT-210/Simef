@@ -288,6 +288,30 @@ class MateriaCorrelativa(models.Model):
     def __str__(self):
         return f"{self.materia} -> {self.materia_correlativa}"
 
+
+class EstadoCursada(models.TextChoices):
+    EN_CURSO = 'EN_CURSO', 'En curso'
+    REGULAR = 'REGULAR', 'Cursada aprobada / Habilitado a final'
+    PROMOCIONADO = 'PROMOCIONADO', 'Promocionado'
+    APROBADO = 'APROBADO', 'Final aprobado'
+    RECURSA = 'RECURSA', 'Recursa'
+    ABANDONO = 'ABANDONO', 'Abandono'
+
+
+# Estados que habilitan a cursar la correlativa siguiente.
+ESTADOS_CURSADA_APROBADA = {EstadoCursada.REGULAR, EstadoCursada.PROMOCIONADO, EstadoCursada.APROBADO}
+# Estados que habilitan a rendir la correlativa siguiente.
+ESTADOS_FINAL_APROBADO = {EstadoCursada.PROMOCIONADO, EstadoCursada.APROBADO}
+# Estados que son decisión manual (no se recalculan a partir de las notas).
+ESTADOS_CURSADA_MANUALES = {EstadoCursada.PROMOCIONADO, EstadoCursada.ABANDONO}
+
+# Vencimiento de la regularidad: el instituto confirmó que aplica, pero por
+# ahora se deja desactivado. Al definir el plazo, se activa acá sin tocar el
+# modelo ni la lógica de correlativas (fecha_regularidad ya se viene guardando).
+VENCIMIENTO_REGULARIDAD_ACTIVO = False
+VENCIMIENTO_REGULARIDAD_DIAS = None
+
+
 class usuarios_materia(models.Model):
     materia = models.ForeignKey('Materia', on_delete=models.CASCADE, null=False, blank=False)
     usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, null=False, blank=False)  # 'Usuario' con mayúscula
@@ -297,10 +321,16 @@ class usuarios_materia(models.Model):
     condicional = models.BooleanField(default=False)
     modalidad = models.CharField('Modalidad', choices=MODALIDAD_CHOICES, max_length=20, null=True, blank=True)
     ciclo_lectivo = models.CharField('Ciclo lectivo', null=True, blank=True, max_length=100)
-    
+
     # Nuevos campos agregados
     institucion = models.CharField('Institución', max_length=100, blank=True, null=True)
-    
+
+    estado = models.CharField('Estado', max_length=20, choices=EstadoCursada.choices, default=EstadoCursada.EN_CURSO)
+    fecha_regularidad = models.DateField(
+        'Fecha de regularidad', null=True, blank=True,
+        help_text='Fecha en que se aprobó la cursada. Reservado para cuando se active el vencimiento de regularidad.'
+    )
+
     TURNO_CHOICES = (
         ('Mañana','Mañana'),
         ('Tarde','Tarde'),
@@ -310,14 +340,46 @@ class usuarios_materia(models.Model):
 
     def __str__(self):
         return f"{self.materia} -> {self.usuario}"
-    
+
     def puede_inscribirse_en_una_materia(self):
         return ((self.nota_cursada is not None and self.nota_cursada >= 4) or self.modalidad == 'Libre') and self.aprobada == False
 
     def puede_inscribirse_en_mesa_final(self):
         return ((self.nota_cursada is not None and self.nota_cursada >= 4) or self.modalidad == 'Libre') and self.aprobada == False
-    
+
+    def save(self, *args, **kwargs):
+        self.recalcular_estado()
+        super().save(*args, **kwargs)
+
+    def recalcular_estado(self):
+        """
+        Deriva `estado` a partir de nota_cursada/nota_final/modalidad.
+        No pisa PROMOCIONADO ni ABANDONO: esos son decisión manual.
+        Se llama sola desde save(), así que cualquier lugar que cargue una
+        nota (vista, admin, script, test) la tiene siempre sincronizada.
+        """
+        if self.estado in ESTADOS_CURSADA_MANUALES:
+            return
+        if self.nota_final is not None and self.nota_final >= 4:
+            self.estado = EstadoCursada.APROBADO
+            return
+        if self.modalidad == 'Libre':
+            return
+        if self.nota_cursada is not None:
+            if self.nota_cursada >= 4:
+                self.estado = EstadoCursada.REGULAR
+                if self.fecha_regularidad is None:
+                    self.fecha_regularidad = timezone.now().date()
+            else:
+                self.estado = EstadoCursada.RECURSA
+
 class MesaFinal(models.Model):
+    # Inscripción excepcional: si la ventana normal (inscripcionAbierta) nunca
+    # se abrió o cerró antes de tiempo, Preceptor/Directivo/Secretario puede
+    # igual inscribir a un alumno, siempre que falten al menos esta cantidad
+    # de días para el examen.
+    LIMITE_DIAS_EXCEPCION = 2
+
     materia = models.ForeignKey('Materia', on_delete=models.CASCADE, blank=False, null=False)
     llamado= models.DateTimeField('Llamado', null=False, blank=False)
     vigente= models.BooleanField(default=True)
@@ -333,6 +395,55 @@ class MesaFinal(models.Model):
         haya apagado a mano.
         """
         return self.inscripcionAbierta and timezone.now().date() <= self.llamado.date()
+
+    def inscripcion_excepcional_vigente(self):
+        """
+        Ventana de la inscripción excepcional: no depende de inscripcionAbierta,
+        pero no se puede usar si faltan menos de LIMITE_DIAS_EXCEPCION días
+        para el examen.
+        """
+        return (self.llamado.date() - timezone.now().date()).days >= self.LIMITE_DIAS_EXCEPCION
+
+
+class TribunalMesa(models.Model):
+    """
+    Tribunal de una mesa de final: quién preside y quiénes son vocales.
+
+    Un mismo docente puede figurar en el tribunal de mesas distintas que
+    caen en el mismo horario (mesas paralelas): a propósito no se valida
+    ningún solapamiento.
+
+    Reemplazar a alguien no borra su registro: lo marca `activo=False` y crea
+    uno nuevo enlazado por `reemplaza_a`, para conservar el historial sin
+    tener que tocar un acta ya generada (el acta siempre lee los activos al
+    momento de imprimirse).
+    """
+    PRESIDENTE = 'Presidente'
+    VOCAL = 'Vocal'
+    ROL_CHOICES = (
+        (PRESIDENTE, 'Presidente'),
+        (VOCAL, 'Vocal'),
+    )
+
+    MAX_VOCALES_POR_MESA = 2
+
+    mesa = models.ForeignKey('MesaFinal', on_delete=models.CASCADE, related_name='tribunal')
+    docente = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='tribunales')
+    rol = models.CharField(max_length=20, choices=ROL_CHOICES)
+    activo = models.BooleanField(default=True)
+    reemplaza_a = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='reemplazado_por'
+    )
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['mesa_id', 'rol', 'fecha_asignacion']
+        verbose_name = 'Tribunal de mesa'
+        verbose_name_plural = 'Tribunales de mesa'
+
+    def __str__(self):
+        return f"{self.get_rol_display()}: {self.docente} ({self.mesa})"
+
 
 class InscripcionFinal(models.Model):
     usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, blank=False, null=False)  # 'Usuario' con mayúscula

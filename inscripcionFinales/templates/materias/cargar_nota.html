@@ -59,8 +59,7 @@
     var finalN = document.getElementById('id_nota_final');
     var modEl = document.getElementById('modalidadAlumno');
 
-    // ¿Es oyente? modalidad '01' = Oyente
-    var esOyente = modEl && modEl.getAttribute('data-modalidad') === '01';
+    var esOyente = modEl && modEl.getAttribute('data-modalidad') === 'Oyente';
 
     if (esOyente && divCursada && cursada) {
       divCursada.style.display = 'none';

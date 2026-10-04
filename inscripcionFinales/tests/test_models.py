@@ -146,3 +146,33 @@ class InscripcionVigenteTest(TestCase):
             inscripcionAbierta=True,
         )
         self.assertTrue(mesa.inscripcion_vigente())
+
+
+class InscripcionExcepcionalVigenteTest(TestCase):
+    """
+    inscripcion_excepcional_vigente(): no depende de inscripcionAbierta, pero
+    se corta si faltan menos de LIMITE_DIAS_EXCEPCION (2) días para el examen.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Carrera')
+        cls.materia = Materia.objects.create(nombre_materia='Materia', carrera=carrera, anio=1)
+
+    def mesa(self, dias, abierta=False):
+        return MesaFinal.objects.create(
+            materia=self.materia, llamado=timezone.now() + timedelta(days=dias),
+            inscripcionAbierta=abierta,
+        )
+
+    def test_cerrada_pero_con_margen_permite_excepcion(self):
+        self.assertTrue(self.mesa(dias=5).inscripcion_excepcional_vigente())
+
+    def test_justo_en_el_limite_permite_excepcion(self):
+        self.assertTrue(self.mesa(dias=2).inscripcion_excepcional_vigente())
+
+    def test_a_menos_de_2_dias_no_permite_excepcion(self):
+        self.assertFalse(self.mesa(dias=1).inscripcion_excepcional_vigente())
+
+    def test_ya_paso_no_permite_excepcion(self):
+        self.assertFalse(self.mesa(dias=-1).inscripcion_excepcional_vigente())
