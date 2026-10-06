@@ -80,7 +80,17 @@ class HomePageView(TemplateView):
     
 
 class CustomLoginView(LoginView):
-  pass
+    def form_valid(self, form):
+        # Checkbox name="recordarme" con value="recordarme" en login.html:320.
+        # Cuando está marcado, request.POST.get('recordarme') devuelve 'recordarme' (truthy);
+        # cuando está desmarcado, el key no está presente y devuelve None (falsy).
+        # set_expiry(1209600) -> 14 dias; set_expiry(0) -> expira al cerrar el navegador.
+        remember = self.request.POST.get('recordarme')
+        if remember:
+            self.request.session.set_expiry(1209600)
+        else:
+            self.request.session.set_expiry(0)
+        return super().form_valid(form)
 
        
 class CustomLogoutView(LogoutView):
