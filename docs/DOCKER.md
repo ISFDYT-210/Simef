@@ -155,6 +155,39 @@ Como mínimo revisá/completá:
 > Si ahi ves un host `...neon.tech`, **cortalo**: el override no se esta
 > aplicando (ver seccion 7).
 
+### Entonces, ¿cómo me conecto a Neon?
+
+Los contenedores ya no lo hacen, pero **todo lo que corrés fuera de Docker sí**:
+`settings.py` lee el `DATABASE_URL` del `.env`, que apunta a Neon. Así que
+`manage.py runserver`, `manage.py shell` y `manage.py dbshell` desde el venv ya
+están hablándole a la base compartida, sin configurar nada.
+
+```bash
+# Una consulta rápida con el ORM
+python manage.py shell -c "from inscripcionFinales.models import Usuario; print(Usuario.objects.count())"
+
+# SQL crudo (requiere el cliente: sudo apt install postgresql-client)
+python manage.py dbshell
+```
+
+Si necesitás llegar a Neon **desde un contenedor**, pasale el `DATABASE_URL` por
+`-e` y **salteá el entrypoint**, porque si no corre `migrate`:
+
+```bash
+docker compose run --rm --no-deps \
+  -e DATABASE_URL="$(grep -o '^DATABASE_URL=.*' .env | cut -d= -f2-)" \
+  --entrypoint sh web -c "python manage.py shell"
+```
+
+> **Lo peligroso no es conectarse, es migrar.** Leer, y hasta usar la app contra
+> Neon, no rompe nada. El problema es `migrate`, que aplica lo que tenga tu rama.
+> Si vas a correr migraciones contra la base con datos reales, sacá antes una
+> rama en la consola de Neon: tarda segundos y te deja un punto exacto al que
+> volver (ver [DESPLIEGUE.md](DESPLIEGUE.md), sección 8).
+>
+> Para trabajar seguido contra datos realistas, lo prolijo es usar una **rama de
+> Neon** en tu `.env` en vez de `main`: los mismos datos, aislados de producción.
+
 ## 3. Levantar el stack
 
 ```bash
