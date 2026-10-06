@@ -445,6 +445,7 @@ def lista_materias_inscriptas_user(request):
     
     return render(request, 'materias/lista_materias_inscriptas_user.html', {'materias': materias_inscriptas})
 
+@capacidad_requerida('ver_reportes', 'cargar_notas')
 def lista_materias_inscriptas_adm(request):
     if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
         return render(request, '403_forbidden.html', status=403)
@@ -627,7 +628,7 @@ def api_finales_inscriptos_adm(request):
         'count': paginator.count,
     })
 
-@capacidad_requerida('gestionar_mesas')
+@capacidad_requerida('abrir_inscripciones')
 def inscripcionMesa(request):
     if request.method == 'POST':
         form = InscripcionFinalForm(request.POST)
@@ -664,6 +665,7 @@ def inscripcionFinal(request):
     return render(request, 'finales/inscripcion_final_adm.html', context)
 
 
+@capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
     final = get_object_or_404(MesaFinal, id=final_id)
     
@@ -732,6 +734,7 @@ def inscripcionMateria(request):
         form = InscripcionMateriaForm()
     return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form}) 
 
+@capacidad_requerida('inscribirse')
 def inscripcionMateriaEst(request, materia_id,modalidad):
     materia = get_object_or_404(Materia, id=materia_id)
     
@@ -1306,6 +1309,7 @@ def alta_masiva_materia(request):
 @capacidad_requerida('gestionar_materias')
 def editar_materia(request, id):
     materia = get_object_or_404(Materia, id=id)
+    
     if request.method == 'POST':
         form = MateriaForm(request.POST, instance=materia)
         if form.is_valid():
@@ -1313,8 +1317,10 @@ def editar_materia(request, id):
             return redirect('exito_cambios_materia')
     else:
         form = MateriaForm(instance=materia)
-        return render(request, 'materias/editar_materia.html', {'form': form})
-
+        
+    # Este return ahora ataja tanto el método GET inicial 
+    # como los POST que hayan fallado en la validación
+    return render(request, 'materias/editar_materia.html', {'form': form})
 
     
 @capacidad_requerida('gestionar_materias')
@@ -1490,6 +1496,7 @@ class MesasFinalesListView(ListView):
     template_name = 'finales/mesas_finales_list.html'
     context_object_name = 'mesas_finales'
 
+@capacidad_requerida('abrir_inscripciones')
 def inscribir_mesa_final(request):
     if request.method == 'POST':
         filtro_form = FiltroInscripcionForm(request.POST)
@@ -2007,7 +2014,7 @@ def imprimir_mesas_finales_pdf(request):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=22,
-            textColor=colors.HexColor('#2c3e50'),
+            textColor=colors.HexColor('#0D2033'),
             spaceAfter=20,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -2018,7 +2025,7 @@ def imprimir_mesas_finales_pdf(request):
             'Subtitle',
             parent=styles['Normal'],
             fontSize=12,
-            textColor=colors.HexColor('#7f8c8d'),
+            textColor=colors.HexColor('#64748b'),
             spaceAfter=30,
             alignment=TA_CENTER,
             fontName='Helvetica'
@@ -2026,6 +2033,12 @@ def imprimir_mesas_finales_pdf(request):
         
         # Título principal
         elements.append(Paragraph("MESAS DE EXÁMENES FINALES", title_style))
+        inst_style = ParagraphStyle(
+            'Inst', parent=styles['Normal'], fontSize=12,
+            textColor=colors.HexColor('#3E9BD6'), spaceAfter=2,
+            alignment=TA_CENTER, fontName='Helvetica-Bold'
+        )
+        elements.append(Paragraph("ISFDyT N°210 · La Plata", inst_style))
         
         # Fecha de generación
         fecha_actual = now().strftime('%d/%m/%Y %H:%M')
@@ -2053,6 +2066,11 @@ def imprimir_mesas_finales_pdf(request):
         else:
             # Crear encabezados de la tabla
             data = [['Materia', 'Carrera', 'Fecha', 'Horario', 'Profesor', 'Inscripción']]
+
+            cell_style = ParagraphStyle(
+                'CeldaCartel', parent=styles['Normal'], fontSize=9, leading=11,
+                textColor=colors.black, alignment=TA_CENTER, fontName='Helvetica'
+            )
             
             # Agregar datos de cada mesa
             for mesa in mesas:
@@ -2066,28 +2084,28 @@ def imprimir_mesas_finales_pdf(request):
                 carrera = mesa.materia.carrera.nombre_carrera if mesa.materia.carrera else '-'
                 
                 data.append([
-                    mesa.materia.nombre_materia,
-                    carrera,
-                    mesa.llamado.strftime('%d/%m/%Y'),
-                    mesa.llamado.strftime('%H:%M'),
-                    profesor,
-                    inscripcion
+                    Paragraph(mesa.materia.nombre_materia, cell_style),
+                    Paragraph(carrera, cell_style),
+                    Paragraph(mesa.llamado.strftime('%d/%m/%Y'), cell_style),
+                    Paragraph(mesa.llamado.strftime('%H:%M'), cell_style),
+                    Paragraph(profesor, cell_style),
+                    Paragraph(inscripcion, cell_style),
                 ])
             
             # Crear tabla con anchos de columna personalizados
             table = Table(data, colWidths=[
-                2.2*inch,  # Materia
-                1.8*inch,  # Carrera
-                0.9*inch,  # Fecha
-                0.7*inch,  # Horario
-                1.5*inch,  # Profesor
-                0.9*inch   # Inscripción
+                1.7*inch,   # Materia
+                1.85*inch,  # Carrera
+                0.85*inch,  # Fecha
+                0.7*inch,   # Horario
+                1.35*inch,  # Profesor
+                0.85*inch   # Inscripción
             ])
             
             # Aplicar estilos a la tabla
             table.setStyle(TableStyle([
                 # Estilo del encabezado
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0D2033')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -2101,11 +2119,11 @@ def imprimir_mesas_finales_pdf(request):
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#3498db')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#3E9BD6')),
                 
                 # Alternancia de colores en filas
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecf0f1')]),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#EEF3F8')]),
                 
                 # Padding
                 ('TOPPADDING', (0, 1), (-1, -1), 8),
@@ -2123,7 +2141,7 @@ def imprimir_mesas_finales_pdf(request):
                 'Footer',
                 parent=styles['Normal'],
                 fontSize=9,
-                textColor=colors.HexColor('#95a5a6'),
+                textColor=colors.HexColor('#94a3b8'),
                 alignment=TA_CENTER
             )
             

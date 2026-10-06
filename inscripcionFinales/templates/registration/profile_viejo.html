@@ -1,0 +1,48 @@
+  <div class="row my-3 p-3">
+        <h1>Perfil de {{ request.user.email }}</h1>
+        <p>
+          Nombre de Usuario: {{ request.user.username }}
+        </p>
+        <p>
+          Nombre completo: {{ request.user.nombre_completo }}
+        </p>
+        <p>
+          Fecha de Nacimiento: {{ request.user.feca_nac }}
+        </p>
+        <p>
+          DNI: {{ request.user.dni }}
+        </p>
+        <p>
+          Dirección: {{ request.user.direccion }}
+        </p>
+        <p>
+          Localidad: {{ request.user.localidad }}
+        </p>
+        <p>
+          Ciudad: {{ request.user.ciudad }}
+        </p>
+        <p>
+          Nacionalidad: {{ request.user.nacionalidad }}
+        </p>
+        <p>
+          Teléfono_1: {{ request.user.teléfono_1 }}
+        </p>
+        <p>
+        Telefóno_2: {{ request.user.telefóno_2 }}
+      </p>
+      <p>
+        Estado Civil: {{ request.user.estado_civil }}
+      </p>
+      <p>
+        Sexo: {{ request.user.sexo }}
+      </p>
+      <p>
+        Género: {{ request.user.genero }}
+      </p>
+
+    </div>
+    
+    <p>
+      <a href="/">Volver a Inicio</a>
+    </p>
+      

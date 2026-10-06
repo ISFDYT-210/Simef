@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c5282;
+            margin: 0 0 10px 0;
+        }
+        .header h2 {
+            font-size: 18px;
+            color: #4a5568;
+            margin: 0 0 10px 0;
+        }
+        .info-fecha {
+            font-size: 11px;
+            color: #666;
+            margin-top: 10px;
+        }
+        .mesa-item {
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            page-break-inside: avoid;
+        }
+        .mesa-titulo {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c5282;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        .mesa-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .info-item {
+            margin: 5px 0;
+        }
+        .label {
+            font-weight: bold;
+            color: #4a5568;
+        }
+        .valor {
+            color: #2d3748;
+        }
+        .fecha-llamado {
+            background: #e6fffa;
+            padding: 8px;
+            border-left: 4px solid #38b2ac;
+            margin: 10px 0;
+        }
+        .inscripcion-estado {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .inscripcion-abierta {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        .inscripcion-cerrada {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        .resumen {
+            background: #f7fafc;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .resumen h3 {
+            margin: 0 0 10px 0;
+            color: #2d3748;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Mesas de Examen Final</h1>
+        {% if instituto %}
+        <h2>{{ instituto.nombre_instituto }}</h2>
+        {% endif %}
+        <div class="info-fecha">
+            Cartel generado el {{ fecha_impresion|date:"d/m/Y" }} a las {{ fecha_impresion|time:"H:i" }}
+        </div>
+    </div>
+
+    <div class="resumen">
+        <h3>Resumen</h3>
+        <p><strong>Total de mesas programadas:</strong> {{ total_mesas }}</p>
+    </div>
+
+    {% for mesa in mesas_finales %}
+    <div class="mesa-item">
+        <div class="mesa-titulo">
+            {{ mesa.materia.nombre_materia }}
+            {% if mesa.materia.carrera %}
+            - {{ mesa.materia.carrera.nombre_carrera }}
+            {% endif %}
+        </div>
+        
+        <div class="fecha-llamado">
+            <strong>Fecha y Hora de Llamado:</strong> {{ mesa.llamado|date:"d/m/Y H:i" }}
+        </div>
+        
+        <div class="mesa-info">
+            <div>
+                <div class="info-item">
+                    <span class="label">Año:</span> 
+                    <span class="valor">{{ mesa.materia.anio }}°</span>
+                </div>
+                
+                {% if mesa.materia.profesor %}
+                <div class="info-item">
+                    <span class="label">Profesor:</span> 
+                    <span class="valor">{{ mesa.materia.profesor.nombre_completo }}</span>
+                </div>
+                {% endif %}
+                
+                <div class="info-item">
+                    <span class="label">Aula:</span> 
+                    <span class="valor">{{ mesa.aula|default:"A designar" }}</span>
+                </div>
+            </div>
+            
+            <div>
+                <div class="info-item">
+                    <span class="label">Estado:</span>
+                    {% if mesa.inscripcionAbierta %}
+                        <span class="inscripcion-estado inscripcion-abierta">Inscripción Abierta</span>
+                    {% else %}
+                        <span class="inscripcion-estado inscripcion-cerrada">Inscripción Cerrada</span>
+                    {% endif %}
+                </div>
+                
+                <div class="info-item">
+                    <span class="label">Vigente:</span> 
+                    <span class="valor">{% if mesa.vigente %}Sí{% else %}No{% endif %}</span>
+                </div>
+                
+                {% if mesa.observaciones %}
+                <div class="info-item">
+                    <span class="label">Observaciones:</span> 
+                    <span class="valor">{{ mesa.observaciones }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="mesa-item">
+        <p style="text-align: center; color: #666; font-style: italic;">
+            No hay mesas finales programadas en este momento.
+        </p>
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        <p>Este cartel fue generado automáticamente por el sistema de gestión académica.</p>
+        <p>Para más información, contacte a la administración del instituto.</p>
+    </div>
+</body>
+</html>

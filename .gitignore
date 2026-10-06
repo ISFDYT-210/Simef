@@ -11,5 +11,7 @@ venv/
 tailwindcss
 tailwindcss.exe
 graft
-.claude
+.claude/
+.ignore
+.mcp.json
 backups/

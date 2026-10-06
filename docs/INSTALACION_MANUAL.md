@@ -179,6 +179,10 @@ reinstalá Python y marcá **Add Python to PATH**.
 **Error al instalar dependencias con pip**: actualizá pip con
 `python -m pip install --upgrade pip` (o `py -m pip install --upgrade pip`).
 
+**Error de GTK**: algunas dependencias de generación de PDF necesitan el runtime
+de GTK, que en Windows no viene instalado. Se baja del
+[instalador oficial](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe).
+
 ---
 
 ## Acceso al sistema (Linux y Windows)
