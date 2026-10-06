@@ -279,9 +279,15 @@ class profile_students_form(forms.ModelForm):
             'sexo',
         )
     
-    dni = forms.CharField(max_length=15, validators=[validador])
-    telefono_1 = forms.CharField(max_length=10, validators=[validador_telefono])
-    telefono_2 = forms.CharField(max_length=10, validators=[validador_telefono])
+    dni = forms.CharField(max_length=15, validators=[validador], required=False)
+    telefono_1 = forms.CharField(max_length=10, validators=[validador_telefono], required=False)
+    telefono_2 = forms.CharField(max_length=10, validators=[validador_telefono], required=False)
+
+    def clean_dni(self):
+        # dni es IntegerField en el modelo; sin esto, guardar '' revienta en
+        # la base (int('') no existe) apenas se permite dejarlo vacío.
+        dni = self.cleaned_data.get('dni')
+        return int(dni) if dni else None
 
     def __init__(self, *args, puede_editar_rol=False, **kwargs):
         super().__init__(*args, **kwargs)

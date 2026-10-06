@@ -127,7 +127,7 @@ class editUser(UpdateView):
         return super().dispatch(request, *args, **kwargs)
 
     def puede_editar_rol(self):
-        return self.request.user.is_superuser or self.request.user.es_directivo()
+        return self.request.user.is_superuser or self.request.user.es_directivo() or self.request.user.es_secretario()
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -284,37 +284,41 @@ def editar_carrera(request, id):
         form = carreraForm(instance=carrera)
     return render(request, 'carreras/editar_carrera.html', {'form': form, 'carrera': carrera})
 
-class listUser(CapacidadRequeridaMixin, ListView):
+class listUser(CapacidadRequeridaMixin, TemplateView):
+    """Solo sirve el HTML; las filas las pide el navegador a api_lista_usuarios."""
     capacidades_requeridas = ('gestionar_usuarios',)
-    model = Usuario
     template_name = 'registration/list_user.html'
 
-    def get_queryset(self):
-        queryset = Usuario.objects.all().order_by('rol', 'nombre_completo')
-        
-        # Filtrar por rol si se especifica
-        rol_filter = self.request.GET.get('rol')
-        if rol_filter:
-            queryset = queryset.filter(rol=rol_filter)
-            
-        # Filtrar por búsqueda si se especifica
-        search = self.request.GET.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(nombre_completo__icontains=search) |
-                Q(email__icontains=search) |
-                Q(dni__icontains=search)
-            )
-            
-        return queryset
-        
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Agregar opciones de roles para filtros
-        context['roles'] = Usuario.ROL_CHOICES
-        context['rol_actual'] = self.request.GET.get('rol', '')
-        context['search_actual'] = self.request.GET.get('search', '')
-        return context
+
+def api_lista_usuarios(request):
+    if not request.user.puede_gestionar_usuarios():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = Usuario.objects.all().order_by('rol', 'nombre_completo')
+
+    busqueda = _sin_acentos(request.GET.get('q', ''))
+    if busqueda:
+        # nombre_completo ignora tildes, igual que el resto de los buscadores
+        # del sistema; dni/email se buscan tal cual (ya son case-insensitive
+        # por icontains). La tabla de usuarios es chica, por eso resolver el
+        # nombre acá en Python no es un problema (mismo criterio que
+        # api_lista_mesas con las materias).
+        ids_por_nombre = [
+            uid for uid, nombre in qs.values_list('id', 'nombre_completo')
+            if busqueda in _sin_acentos(nombre)
+        ]
+        qs = qs.filter(
+            Q(id__in=ids_por_nombre) | Q(dni__icontains=busqueda) | Q(email__icontains=busqueda)
+        )
+
+    return _pagina_json(qs, request, lambda u: {
+        'id': u.id,
+        'email': u.email,
+        'nombre_completo': u.nombre_completo,
+        'dni': u.dni,
+        'rol': u.rol,
+        'rol_display': u.get_rol_display(),
+    })
 
 
 ROLES_AUDITABLES = ('Directivo', 'Secretario', 'Preceptor', 'Profesor')
@@ -850,6 +854,59 @@ class EstudianteDeleteView(DeleteView):
     
 
 
+def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
+    """
+    Si la fila del CSV de carga masiva de usuarios trae columna 'Materia',
+    busca (o crea) la inscripción de ese usuario a esa materia y le carga
+    Modalidad / Nota de cursada / Nota de final si vienen. Así una misma
+    carga sirve para dar de alta al usuario y para cargarle la nota, sin
+    necesidad de un archivo aparte. Devuelve True si cargó algo.
+    """
+    nombre_materia = (fila.get('Materia') or '').strip()
+    if not nombre_materia:
+        return False
+
+    materias_candidatas = Materia.objects.filter(nombre_materia__iexact=nombre_materia)
+    if carrera_obj:
+        materias_candidatas = materias_candidatas.filter(carrera=carrera_obj)
+    materia = materias_candidatas.first()
+    if not materia:
+        errores.append(f'Fila {numero_fila}: Materia no encontrada ({nombre_materia})')
+        return False
+
+    inscripcion, _creada = usuarios_materia.objects.get_or_create(usuario=usuario, materia=materia)
+
+    modalidad = (fila.get('Modalidad') or '').strip()
+    if modalidad:
+        modalidades_validas = {codigo for codigo, _etiqueta in MODALIDAD_CHOICES}
+        if modalidad not in modalidades_validas:
+            errores.append(
+                f'Fila {numero_fila}: Modalidad inválida ({modalidad}). Opciones: {", ".join(modalidades_validas)}'
+            )
+        else:
+            inscripcion.modalidad = modalidad
+
+    cargo_algo = False
+    for columna, campo in (('Nota de cursada', 'nota_cursada'), ('Nota de final', 'nota_final')):
+        valor = (fila.get(columna) or '').strip()
+        if not valor:
+            continue
+        try:
+            nota = float(valor.replace(',', '.'))
+            if not (0 <= nota <= 10):
+                raise ValueError
+        except ValueError:
+            errores.append(f'Fila {numero_fila}: {columna} inválida ({valor})')
+            continue
+        setattr(inscripcion, campo, nota)
+        if campo == 'nota_final':
+            inscripcion.aprobada = nota >= 4
+        cargo_algo = True
+
+    inscripcion.save()
+    return cargo_algo
+
+
 @capacidad_requerida('gestionar_usuarios')
 def cargar_usuarios(request):
     if request.method == 'POST':
@@ -884,6 +941,7 @@ def cargar_usuarios(request):
                 
                 usuarios_creados = 0
                 usuarios_duplicados = 0
+                notas_cargadas = 0
                 errores = []
                 
                 # Validar encabezados requeridos
@@ -921,11 +979,24 @@ def cargar_usuarios(request):
                             errores.append(f'Fila {numero_fila}: DNI inválido ({dni_str})')
                             continue
                         
-                        # Verificar duplicados
-                        if Usuario.objects.filter(Q(email=email) | Q(dni=dni)).exists():
+                        # Si el usuario ya existe no se recrea, pero igual se le
+                        # carga la materia/nota (y se le suma la carrera) si la
+                        # fila las trae: así no hace falta un CSV aparte para
+                        # cargar notas de alumnos que ya están en el sistema.
+                        usuario_existente = Usuario.objects.filter(Q(email=email) | Q(dni=dni)).first()
+                        if usuario_existente:
                             usuarios_duplicados += 1
+                            carrera_para_notas = None
+                            if fila.get('Carrera', '').strip():
+                                carrera_para_notas = Carrera.objects.filter(
+                                    nombre_carrera__iexact=fila['Carrera'].strip()
+                                ).first()
+                                if carrera_para_notas and not usuario_existente.carrera.filter(id=carrera_para_notas.id).exists():
+                                    usuario_existente.carrera.add(carrera_para_notas)
+                            if _cargar_nota_de_fila(usuario_existente, fila, carrera_para_notas, numero_fila, errores):
+                                notas_cargadas += 1
                             continue
-                        
+
                         # Campos opcionales con validaciones
                         username = fila.get('Username', '').strip() or str(dni)
                         
@@ -1110,7 +1181,10 @@ def cargar_usuarios(request):
                         # Asignar carrera si se encontró
                         if carrera_obj:
                             usuario.carrera.add(carrera_obj)
-                        
+
+                        if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
+                            notas_cargadas += 1
+
                         usuarios_creados += 1
                         
                     except IntegrityError as e:
@@ -1122,28 +1196,39 @@ def cargar_usuarios(request):
                         errores.append(f'Fila {numero_fila}: Error inesperado - {str(e)}')
                 
                 # Mostrar resultados
-                if usuarios_creados > 0 and not errores:
-                    messages.success(request, f'Se crearon {usuarios_creados} usuarios exitosamente')
-                    return render(request, 'registration/exito_carga_masiva.html', {
-                        'usuarios_creados': usuarios_creados,
-                        'usuarios_duplicados': usuarios_duplicados
-                    })
-                elif usuarios_creados > 0:
-                    messages.warning(request, f'Se crearon {usuarios_creados} usuarios con algunas advertencias')
+                if errores:
+                    partes = [f'{usuarios_creados} usuario(s) creado(s)']
+                    if notas_cargadas:
+                        partes.append(f'{notas_cargadas} nota(s) cargada(s)')
+                    messages.warning(request, ', '.join(partes) + ', con algunas advertencias.')
                     return render(request, 'registration/warning_carga_masiva.html', {
                         'usuarios_creados': usuarios_creados,
                         'usuarios_duplicados': usuarios_duplicados,
+                        'notas_cargadas': notas_cargadas,
                         'errores': errores[:20]  # Mostrar máximo 20 errores
                     })
-                elif usuarios_duplicados > 0 and not errores:
-                    messages.warning(request, f'{usuarios_duplicados} usuarios ya existían en el sistema')
+                elif usuarios_creados > 0 or notas_cargadas > 0:
+                    partes = []
+                    if usuarios_creados:
+                        partes.append(f'{usuarios_creados} usuario(s) creado(s)')
+                    if notas_cargadas:
+                        partes.append(f'{notas_cargadas} nota(s) cargada(s)')
+                    messages.success(request, ', '.join(partes) + ' correctamente.')
+                    return render(request, 'registration/exito_carga_masiva.html', {
+                        'usuarios_creados': usuarios_creados,
+                        'usuarios_duplicados': usuarios_duplicados,
+                        'notas_cargadas': notas_cargadas,
+                    })
+                elif usuarios_duplicados > 0:
+                    messages.warning(request, f'{usuarios_duplicados} usuario(s) ya existían en el sistema; no había notas para cargarles.')
                     return render(request, 'registration/warning_carga_masiva.html', {
                         'usuarios_creados': 0,
                         'usuarios_duplicados': usuarios_duplicados,
+                        'notas_cargadas': 0,
                         'errores': []
                     })
                 else:
-                    messages.error(request, 'No se pudieron crear usuarios')
+                    messages.error(request, 'No se pudo procesar ninguna fila del archivo.')
                     return render(request, 'registration/cargar_usuarios.html', {
                         'formulario': formulario,
                         'errores': errores[:20]
@@ -1764,7 +1849,6 @@ def editar_notas(request, id):
 
 
 
-
 @capacidad_requerida('abrir_inscripciones')
 def abrir_inscripcion_materia(request, carrera, anio):
     Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=True)
@@ -1805,9 +1889,9 @@ def eliminar_usuarios(request):
 
     return redirect('list_user')
 
-@rol_requerido('Directivo')
+@rol_requerido('Directivo', 'Secretario')
 def blanquear_password(request, usuario_id):
-    """Restablece la contraseña de un usuario a la predeterminada. Solo el Director (o super admin)."""
+    """Restablece la contraseña de un usuario a la predeterminada. Solo Directivo, Secretario o super admin."""
     usuario = get_object_or_404(Usuario, id=usuario_id)
     if request.method == 'POST':
         usuario.set_password(PASSWORD_PREDETERMINADA)
@@ -2264,118 +2348,68 @@ def reporte_estudiante_descarga(request, usuario_id):
     return HttpResponse("Error al generar el PDF", status=500)
 
 
+NUMEROS_EN_LETRAS_NOTA = {
+    10: "Diez", 9: "Nueve", 8: "Ocho", 7: "Siete", 6: "Seis",
+    5: "Cinco", 4: "Cuatro", 3: "Tres", 2: "Dos", 1: "Uno",
+}
+
+
 def obtener_contexto_reporte(usuario):
     """
-    Función auxiliar para obtener el contexto del reporte
+    Contexto de la constancia/reporte de un estudiante: sus materias reales
+    (de las carreras en las que está inscripto), notas y porcentaje de
+    avance. Antes esto usaba una lista de materias y un nombre de carrera
+    hardcodeados (de una tecnicatura en particular), así que cualquier
+    estudiante de otra carrera recibía una constancia con materias que no
+    eran las suyas.
     """
-    materias_hardcoded = {
-        1: [
-            "Ciencia, Tecnología y Sociedad",
-            "Inglés I",
-            "Álgebra",
-            "Algoritmo y Estructura de Datos I",
-            "Sistemas y Organizaciones",
-            "Arquitectura de Computadoras",
-        ],
-        2: [
-            "Inglés II",
-            "Probabilidad y Estadística II",
-            "Estadística",
-            "Algoritmo y Estructura de Datos II",
-            "Sistemas Operativos",
-            "Base de Datos",
-            "Prácticas Profesionalizantes II",
-        ],
-        3: [
-            "Inglés III",
-            "Aspectos Legales de la Profesión",
-            "Seminario de Actualización",
-            "Redes y Comunicaciones",
-            "Ingeniería de Software",
-            "Algoritmo y Estructura de Datos III",
-            "Prácticas Profesionalizantes III",
-        ]
+    carreras = list(usuario.carrera.all())
+    materias = Materia.objects.filter(carrera__in=carreras).order_by('anio', 'nombre_materia')
+    inscripciones = {
+        um.materia_id: um
+        for um in usuarios_materia.objects.filter(usuario=usuario, materia__in=materias)
     }
-    
+
     materias_por_anio = {}
     total_materias = 0
     materias_aprobadas = 0
-    
-    for anio, lista_materias in materias_hardcoded.items():
-        materias_por_anio[anio] = []
-        
-        for nombre_materia in lista_materias:
-            total_materias += 1
-            
-            nota_cursada = "-"
-            nota_final = "-"
-            calif_cursada = "-"
-            calif_final = "-"
-            fecha_cursada = "-"
-            aprobada = False
-            
-            try:
-                materia = Materia.objects.filter(nombre_materia__iexact=nombre_materia).first()
-                if materia:
-                    try:
-                        inscripcion = usuarios_materia.objects.get(usuario=usuario, materia=materia)
-                        
-                        if inscripcion.nota_cursada not in [None, '', 'None', 'none']:
-                            try:
-                                nota_cursada = int(float(inscripcion.nota_cursada))
-                                numeros_letras = {
-                                    10: "Diez", 9: "Nueve", 8: "Ocho", 7: "Siete",
-                                    6: "Seis", 5: "Cinco", 4: "Cuatro", 3: "Tres",
-                                    2: "Dos", 1: "Uno"
-                                }
-                                calif_cursada = numeros_letras.get(nota_cursada, "-")
-                            except (ValueError, TypeError):
-                                nota_cursada = "-"
-                                calif_cursada = "-"
-                        
-                        if inscripcion.nota_final not in [None, '', 'None', 'none']:
-                            try:
-                                nota_final = int(float(inscripcion.nota_final))
-                                numeros_letras = {
-                                    10: "Diez", 9: "Nueve", 8: "Ocho", 7: "Siete",
-                                    6: "Seis", 5: "Cinco", 4: "Cuatro", 3: "Tres",
-                                    2: "Dos", 1: "Uno"
-                                }
-                                calif_final = numeros_letras.get(nota_final, "-")
-                                
-                                if nota_final >= 4:
-                                    aprobada = True
-                                    materias_aprobadas += 1
-                            except (ValueError, TypeError):
-                                nota_final = "-"
-                                calif_final = "-"
-                        
-                        if inscripcion.ciclo_lectivo not in [None, '', 'None', 'none']:
-                            fecha_cursada = str(inscripcion.ciclo_lectivo)
-                        
-                        if inscripcion.aprobada and not aprobada:
-                            aprobada = True
-                            materias_aprobadas += 1
-                            
-                    except usuarios_materia.DoesNotExist:
-                        pass
-            except Exception:
-                pass
-            
-            materias_por_anio[anio].append({
-                'nombre': nombre_materia,
-                'nota_cursada': nota_cursada,
-                'nota_final': nota_final,
-                'calif_cursada': calif_cursada,
-                'calif_final': calif_final,
-                'fecha': fecha_cursada
-            })
-    
+
+    for materia in materias:
+        total_materias += 1
+        inscripcion = inscripciones.get(materia.id)
+
+        nota_cursada = calif_cursada = nota_final = calif_final = "-"
+        fecha_cursada = "-"
+
+        if inscripcion:
+            if inscripcion.nota_cursada is not None:
+                nota_cursada = int(float(inscripcion.nota_cursada))
+                calif_cursada = NUMEROS_EN_LETRAS_NOTA.get(nota_cursada, "-")
+            if inscripcion.nota_final is not None:
+                nota_final = int(float(inscripcion.nota_final))
+                calif_final = NUMEROS_EN_LETRAS_NOTA.get(nota_final, "-")
+            if inscripcion.ciclo_lectivo:
+                fecha_cursada = str(inscripcion.ciclo_lectivo)
+
+        if correlativas.tiene_final_aprobado(inscripcion):
+            materias_aprobadas += 1
+
+        materias_por_anio.setdefault(materia.anio, []).append({
+            'nombre': materia.nombre_materia,
+            'nota_cursada': nota_cursada,
+            'nota_final': nota_final,
+            'calif_cursada': calif_cursada,
+            'calif_final': calif_final,
+            'fecha': fecha_cursada,
+        })
+
     porcentaje_aprobadas = round((materias_aprobadas / total_materias * 100), 2) if total_materias > 0 else 0
     porcentaje_en_letras = numero_a_letras(porcentaje_aprobadas)
-    
+
     return {
         'usuario': usuario,
+        'nombre_carrera': ' y '.join(c.nombre_carrera for c in carreras) if carreras else None,
+        'resolucion_carrera': ', '.join(c.num_resolucion for c in carreras if c.num_resolucion),
         'materias_por_anio': materias_por_anio,
         'fecha_actual': now().strftime('%d/%m/%Y'),
         'total_materias': total_materias,
