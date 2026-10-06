@@ -2,57 +2,331 @@
 
 {% block title %}Inicio de sesion{% endblock %}
 
-{% block content %}
+{% block extra_head %}
+<style>
+.login-screen {
+  width: 100%;
+  margin: 0 auto;
+}
 
-<div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+.login-logo {
+  height: 60px;
+  width: auto;
+  margin: 0 auto 12px;
+  display: block;
+  object-fit: contain;
+}
+
+.login-title {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: #14304d;
+  margin: 0 0 4px;
+}
+
+.login-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0 0 1.5rem;
+}
+
+.login-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #fca5a5;
+  background-color: #fef2f2;
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+
+.login-error svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.login-field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background-color: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-input::placeholder {
+  color: #94a3b8;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: #3e9bd6;
+  box-shadow: 0 0 0 3px rgba(62, 155, 214, 0.2);
+}
+
+.login-password-wrapper {
+    position: relative;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    background-color: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-password-wrapper:focus-within {
+    outline: none;
+    border-color: #3e9bd6;
+    box-shadow: 0 0 0 3px rgba(62, 155, 214, 0.2);
+}
+
+.login-password-wrapper.login-input-error {
+    border-color: #fca5a5;
+}
+
+.login-password-wrapper.login-input-error:focus-within {
+    border-color: #fca5a5;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.login-password-wrapper .login-input {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    padding-right: 3rem;
+    border: none;
+    outline: none;
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+}
+
+.login-password-wrapper .login-input::placeholder {
+    color: #94a3b8;
+}
+
+.login-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 100%;
+    border: none;
+    border-top-right-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.login-toggle:hover {
+    color: #64748b;
+}
+
+.login-toggle:focus-within {
+    color: #3e9bd6;
+    outline: none;
+}
+
+.login-input-error {
+    border-color: #fca5a5;
+}
+
+.login-input-error:focus {
+    border-color: #fca5a5;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.login-error-msg {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: #dc2626;
+}
+
+.login-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 1rem;
+}
+
+.login-checkbox {
+  height: 1rem;
+  width: 1rem;
+  accent-color: #3e9bd6;
+  cursor: pointer;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 0.65rem 1.25rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #3e9bd6 0%, #2c82b8 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(62, 155, 214, 0.3);
+  transition: box-shadow 0.2s, filter 0.2s;
+}
+
+.login-submit:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 12px -2px rgba(62, 155, 214, 0.4);
+}
+
+.login-submit:active {
+  filter: brightness(0.95);
+}
+
+.login-footer {
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.login-footer a {
+  color: #3e9bd6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .login-title { font-size: 1.375rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-screen">
   <div class="mb-6 flex flex-col items-center text-center">
-    <img src="/static/imagenes/SIMEF.png" class="mb-3 h-16 object-contain" alt="SIMEF">
-    <h1 class="text-lg font-semibold text-tinta-900">Inicio de sesión</h1>
+    <img src="/static/imagenes/SIMEF.png" alt="SIMEF" class="login-logo">
+    <h1 class="login-title">Bienvenido a SIMEF</h1>
+    <p class="login-subtitle">Ingresá con tu cuenta institucional</p>
   </div>
 
   {% if form.errors %}
-  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-    El email o la contraseña son incorrectos. Intentalo nuevamente por favor.
+  <div class="login-error">
+    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill="#dc2626"/>
+      <path d="M15 9l-6 6m0-6l6 6" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+    </svg>
+    <span>El email o la contraseña son incorrectos. Intentá nuevamente.</span>
   </div>
   {% endif %}
 
-  <form method="post" class="space-y-4" x-data="{ mostrar: false }">
+  <form method="post" class="space-y-4" novalidate
+        x-data="{
+          mostrar: false,
+          errorPass: false,
+          errorEmail: false,
+          emailErrorMsg: '',
+          validarEmail() {
+            let v = this.$el.elements.username.value.trim();
+            if (v === '') {
+              this.errorEmail = true;
+              this.emailErrorMsg = 'Ingresá tu email para continuar.';
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+              this.errorEmail = true;
+              this.emailErrorMsg = 'Ingresá un email válido.';
+            } else {
+              this.errorEmail = false;
+              this.emailErrorMsg = '';
+            }
+          },
+          submitForm(event) {
+            this.validarEmail();
+            if (!this.$el.elements.password.value.trim()) {
+              this.errorPass = true;
+            } else {
+              this.errorPass = false;
+            }
+            if (this.errorEmail || this.errorPass) {
+              event.preventDefault();
+              if (this.errorEmail) {
+                this.$el.elements.username.focus();
+              } else {
+                this.$el.elements.password.focus();
+              }
+            }
+          }
+        }"
+        @submit="submitForm($event)">
     {% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
-    <div>
-      <label for="id_username" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
-      <input type="text" name="username" id="id_username" autofocus required
-             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+    <div class="login-field">
+      <label for="id_username">Email</label>
+      <input type="text" name="username" id="id_username" autofocus
+             class="login-input"
+             :class="{ 'login-input-error': errorEmail }"
+             @input="validarEmail()">
+      <span class="login-error-msg" x-show="errorEmail" x-cloak x-text="emailErrorMsg"></span>
     </div>
 
-    <div>
-      <label for="id_password" class="mb-1 block text-sm font-medium text-slate-700">Contraseña</label>
-      <div class="relative">
-        <input :type="mostrar ? 'text' : 'password'" name="password" id="id_password" required
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
-        <button type="button" @click="mostrar = !mostrar"
-                :title="mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-                class="absolute inset-y-0 right-0 grid w-10 place-items-center text-slate-400 hover:text-slate-600 focus:outline-none">
-          <!-- ojo abierto -->
-          <svg x-show="!mostrar" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
-          <!-- ojo tachado -->
-          <svg x-show="mostrar" x-cloak class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.4 5.7A9.3 9.3 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.8 15.8 0 0 1-3.4 4M6.3 7.8A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5c1 0 1.9-.1 2.7-.4"/></svg>
+    <div class="login-field">
+      <label for="id_password">Contraseña</label>
+      <div class="login-password-wrapper" :class="{ 'login-input-error': errorPass }">
+        <input :type="mostrar ? 'text' : 'password'" name="password" id="id_password"
+               class="login-input"
+               autocomplete="current-password"
+               @input="errorPass = false">
+        <button type="button"
+                @click="mostrar = !mostrar"
+                :aria-label="mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                class="login-toggle">
+          <svg x-show="!mostrar" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg x-show="mostrar" x-cloak class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.4 5.7A9.3 9.3 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.8 15.8 0 0 1-3.4 4M6.3 7.8A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5c1 0 1.9-.1 2.7-.4"/>
+          </svg>
         </button>
       </div>
+      <span class="login-error-msg" x-show="errorPass" x-cloak>Ingresá tu contraseña para continuar.</span>
     </div>
 
-    <label class="flex items-center gap-2 text-sm text-slate-600">
-      <input type="checkbox" id="recordarme" name="recordarme" value="recordarme" class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
-      Recordarme
-    </label>
+    <div class="login-row">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" id="recordarme" name="recordarme" value="recordarme" class="login-checkbox">
+        <span>Recordarme</span>
+      </label>
+    </div>
 
-    <button type="submit" class="w-full rounded-lg bg-tinta-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800">Ingresar</button>
+    <button type="submit" class="login-submit">Ingresar</button>
 
-    <p class="text-center text-sm">
-      <a href="/recuperar_pass/" class="font-medium text-celeste-600 hover:underline">¿Olvidaste tu contraseña?</a>
-    </p>
+    <div class="login-footer">
+      <a href="/recuperar_pass/">¿Olvidaste tu contraseña?</a>
+    </div>
   </form>
 </div>
-
 {% endblock %}
