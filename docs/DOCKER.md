@@ -133,6 +133,28 @@ Como mínimo revisá/completá:
 > Si `.env` falta o le faltan las variables de `POSTGRES_*`, el contenedor de
 > la base falla al arrancar con un error de "superuser password is not specified".
 
+> ### El `DATABASE_URL` del `.env` NO es el que usan los contenedores
+>
+> `docker-compose.override.yml` lo pisa a proposito, apuntando al servicio `db`
+> de este mismo compose. Es una proteccion, no un descuido.
+>
+> `entrypoint.sh` corre `migrate` en **cada arranque** del contenedor. Si el
+> `DATABASE_URL` del `.env` apunta a la base compartida de Neon —y el de varios
+> de nosotros apunta ahi, porque es el mismo archivo que usa `runserver`—
+> entonces cada `docker compose up` le aplica a la base del instituto las
+> migraciones de la rama en la que estes parado. Ya paso: el 2026-10-06 se le
+> aplicaron a Neon dos migraciones que existian unicamente en una rama de
+> integracion sin mergear.
+>
+> Al arrancar, el contenedor imprime contra que base va a migrar:
+>
+> ```
+> ==> base de datos: postgres://***:***@db:5432/simef
+> ```
+>
+> Si ahi ves un host `...neon.tech`, **cortalo**: el override no se esta
+> aplicando (ver seccion 7).
+
 ## 3. Levantar el stack
 
 ```bash
@@ -172,6 +194,8 @@ El repo incluye `docker-compose.override.yml`, que Docker Compose carga
   archivos `.py` se reflejan sin reconstruir la imagen.
 - Corre Gunicorn con `--reload`, que reinicia el worker solo cuando detecta
   un archivo modificado.
+- **Apunta `DATABASE_URL` al servicio `db` de este compose**, para que el
+  desarrollo local no le escriba a la base compartida (ver sección 2).
 
 Con esto, para iterar alcanza con guardar el archivo — no hace falta volver
 a correr `--build`. Reconstruir (`docker compose up -d --build`) sigue siendo
@@ -179,7 +203,13 @@ necesario solo cuando cambia `requirements.txt` o el `Dockerfile`.
 
 > Si tocás archivos estáticos (CSS/JS/imágenes), corré igual
 > `docker compose exec web python manage.py collectstatic --noinput` para
-> que Django los vuelva a juntar.
+> que Django los vuelva a juntar. Reiniciar el contenedor también sirve: el
+> `entrypoint.sh` lo corre al arrancar.
+>
+> Con `DEBUG=True` los estáticos se sirven en vivo desde el código montado, así
+> que un archivo nuevo parece funcionar sin `collectstatic`. **Con `DEBUG=False`
+> no**: ahí se sirve únicamente lo que esté en `staticfiles/`. Si agregás un CSS
+> nuevo, corré `collectstatic` antes de dar por bueno que anda.
 
 ## 6. Comandos útiles
 
