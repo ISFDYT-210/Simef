@@ -23,7 +23,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
       <div>
         <h2 class="text-sm font-semibold text-tinta-900">Usuarios registrados</h2>
-        <p class="text-xs text-slate-500"><span x-text="seleccionados().length"></span> seleccionado(s)</p>
+        <p class="text-xs text-slate-500"><span x-text="contador"></span> seleccionado(s)</p>
       </div>
 
       <div class="flex items-center gap-2">
@@ -97,8 +97,14 @@
                      class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg>
                   </a>
+                  {% if request.user.es_directivo or request.user.is_superuser %}
+                  <a href="{% url 'blanquear_password' usuario_id=usuarios.id %}" title="Blanquear contraseña"
+                     class="grid h-8 w-8 place-items-center rounded-lg bg-amber-500 text-white hover:bg-amber-600">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm10-10V7a4 4 0 1 0-8 0v2"/></svg>
+                  </a>
+                  {% endif %}
                   {% if usuarios.rol == 'Estudiante' %}
-                  <a href="/reporte_html/{{ usuarios.id }}" title="Ver reporte"
+                  <a href="/reporte_html/{{ usuarios.id }}" title="Ver reporte" target="_blank"
                      class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
                   </a>
@@ -182,7 +188,7 @@
 <script>
   function listaUsuarios() {
     return {
-      pagina: 1, porPagina: 10,
+      pagina: 1, porPagina: 10, contador: 0,
       dni: '', avisoDni: false, errorDni: false,
       modalEliminar: false, modalVacio: false, modalReporte: false,
       mensajeEliminar: '', rolReporte: '',
@@ -201,11 +207,13 @@
       toggleTodos(e) {
         this.filas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina)
           .forEach(f => { const c = f.querySelector('.usuario-check'); if (c) c.checked = e.target.checked; });
+        this.contador = this.seleccionados().length;
       },
       sincronizar() {
         const visibles = this.filas().slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina);
         const todas = visibles.every(f => f.querySelector('.usuario-check')?.checked);
         if (this.$refs.checkTodos) this.$refs.checkTodos.checked = visibles.length > 0 && todas;
+        this.contador = this.seleccionados().length;
       },
 
       buscarPorDni() {
@@ -238,7 +246,6 @@
 
 <div class="grid min-h-[60vh] place-items-center text-center">
   <div>
-    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
     <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
     <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
   </div>

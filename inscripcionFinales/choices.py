@@ -19,9 +19,10 @@ sexo=SEXO_CHOICES = [
     ('Otro','Otro'),
 ]
 modalidad=MODALIDAD_CHOICES=(
-        ('01','Oyente'),
-        ('02','Regular'),
-        ('03','Itinerante')
+        ('Oyente','Oyente'),
+        ('Regular','Regular'),
+        ('Libre','Libre'),
+        ('Itinerante','Itinerante'),
     )
 Turno=TURNO_CHOICES=(
         ('01','Mañana'),

@@ -69,6 +69,26 @@
           this.evaluar(mod);
           mod.addEventListener('change', () => this.evaluar(mod));
         }
+
+        // filtrar materias según la carrera del estudiante seleccionado
+        var userSel = document.getElementById('id_usuario');
+        var matSel = document.getElementById('id_materia');
+        if (userSel && matSel) {
+          userSel.addEventListener('change', () => this.cargarMaterias(userSel.value, matSel));
+          if (userSel.value) this.cargarMaterias(userSel.value, matSel, matSel.value);
+        }
+      },
+      cargarMaterias(estudianteId, matSel, preseleccionar) {
+        matSel.innerHTML = '';
+        matSel.appendChild(new Option('Seleccione una materia', ''));
+        if (!estudianteId) return;
+        fetch('/obtener_materias_estudiante/?estudiante_id=' + encodeURIComponent(estudianteId), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(r => r.json())
+          .then(d => {
+            if (d.status !== 'success') return;
+            d.materias.forEach((m) => matSel.appendChild(new Option(m.nombre, m.id)));
+            if (preseleccionar) matSel.value = preseleccionar;
+          });
       },
       evaluar(sel) {
         var txt = (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '').toLowerCase();
@@ -89,7 +109,6 @@
 {% else %}
 <div class="grid min-h-[60vh] place-items-center text-center">
   <div>
-    <img src="/static/imagenes/error403.jpg" class="mx-auto max-w-xs rounded-xl" alt="Acceso denegado">
     <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
     <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
   </div>

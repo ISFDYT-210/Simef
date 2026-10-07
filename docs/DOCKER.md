@@ -133,6 +133,78 @@ Como mínimo revisá/completá:
 > Si `.env` falta o le faltan las variables de `POSTGRES_*`, el contenedor de
 > la base falla al arrancar con un error de "superuser password is not specified".
 
+> ### El `DATABASE_URL` del `.env` NO es el que usan los contenedores
+>
+> `docker-compose.override.yml` lo pisa a proposito, apuntando al servicio `db`
+> de este mismo compose. Es una proteccion, no un descuido.
+>
+> `entrypoint.sh` corre `migrate` en **cada arranque** del contenedor. Si el
+> `DATABASE_URL` del `.env` apunta a la base compartida de Neon —y el de varios
+> de nosotros apunta ahi, porque es el mismo archivo que usa `runserver`—
+> entonces cada `docker compose up` le aplica a la base del instituto las
+> migraciones de la rama en la que estes parado. Ya paso: el 2026-10-06 se le
+> aplicaron a Neon dos migraciones que existian unicamente en una rama de
+> integracion sin mergear.
+>
+> Al arrancar, el contenedor imprime contra que base va a migrar:
+>
+> ```
+> ==> base de datos: postgres://***:***@db:5432/simef
+> ```
+>
+> Si ahi ves un host `...neon.tech`, **cortalo**: el override no se esta
+> aplicando (ver seccion 7).
+
+### Entonces, ¿cómo me conecto a Neon?
+
+Los contenedores ya no lo hacen, pero **todo lo que corrés fuera de Docker sí**:
+`settings.py` lee el `DATABASE_URL` del `.env`, que apunta a Neon. Así que
+`manage.py runserver`, `manage.py shell` y `manage.py dbshell` desde el venv ya
+están hablándole a la base compartida, sin configurar nada.
+
+```bash
+# Una consulta rápida con el ORM
+python manage.py shell -c "from inscripcionFinales.models import Usuario; print(Usuario.objects.count())"
+
+# SQL crudo (requiere el cliente: sudo apt install postgresql-client)
+python manage.py dbshell
+```
+
+Si necesitás llegar a Neon **desde un contenedor**, pasale el `DATABASE_URL` por
+`-e` y **salteá el entrypoint**, porque si no corre `migrate`:
+
+```bash
+docker compose run --rm --no-deps \
+  -e DATABASE_URL="$(grep -o '^DATABASE_URL=.*' .env | cut -d= -f2-)" \
+  --entrypoint sh web -c "python manage.py shell"
+```
+
+> **Lo peligroso no es conectarse, es migrar.** Leer, y hasta usar la app contra
+> Neon, no rompe nada. El problema es `migrate`, que aplica lo que tenga tu rama.
+> Si vas a correr migraciones contra la base con datos reales, sacá antes una
+> rama en la consola de Neon: tarda segundos y te deja un punto exacto al que
+> volver (ver [DESPLIEGUE.md](DESPLIEGUE.md), sección 8).
+>
+> Para trabajar seguido contra datos realistas, lo prolijo es usar una **rama de
+> Neon** en tu `.env` en vez de `main`: los mismos datos, aislados de producción.
+
+### Traer los datos de Neon a la base local
+
+La base local arranca vacía. Para llenarla con una copia de los datos reales, sin
+tocar la base del instituto:
+
+```bash
+docker compose up -d db
+./scripts/copiar_neon_a_local.sh
+docker compose restart web
+```
+
+Los requisitos, el detalle de qué hace cada paso y los problemas comunes están en
+**[COPIA_DATOS.md](COPIA_DATOS.md)**.
+
+> El dump queda en `backups/`, que está en el `.gitignore`: **son datos
+> personales de alumnos, no los commitees**.
+
 ## 3. Levantar el stack
 
 ```bash
@@ -172,6 +244,8 @@ El repo incluye `docker-compose.override.yml`, que Docker Compose carga
   archivos `.py` se reflejan sin reconstruir la imagen.
 - Corre Gunicorn con `--reload`, que reinicia el worker solo cuando detecta
   un archivo modificado.
+- **Apunta `DATABASE_URL` al servicio `db` de este compose**, para que el
+  desarrollo local no le escriba a la base compartida (ver sección 2).
 
 Con esto, para iterar alcanza con guardar el archivo — no hace falta volver
 a correr `--build`. Reconstruir (`docker compose up -d --build`) sigue siendo
@@ -179,7 +253,13 @@ necesario solo cuando cambia `requirements.txt` o el `Dockerfile`.
 
 > Si tocás archivos estáticos (CSS/JS/imágenes), corré igual
 > `docker compose exec web python manage.py collectstatic --noinput` para
-> que Django los vuelva a juntar.
+> que Django los vuelva a juntar. Reiniciar el contenedor también sirve: el
+> `entrypoint.sh` lo corre al arrancar.
+>
+> Con `DEBUG=True` los estáticos se sirven en vivo desde el código montado, así
+> que un archivo nuevo parece funcionar sin `collectstatic`. **Con `DEBUG=False`
+> no**: ahí se sirve únicamente lo que esté en `staticfiles/`. Si agregás un CSS
+> nuevo, corré `collectstatic` antes de dar por bueno que anda.
 
 ## 6. Comandos útiles
 
@@ -206,3 +286,26 @@ docker compose down -v                           # apagar y BORRAR los datos de 
   `POSTGRES_PASSWORD` y `DATABASE_URL` en `.env`.
 - **Puerto 8000 ocupado**: cambiá el mapeo de puertos en `docker-compose.yml`
   (`"8000:8000"` → por ejemplo `"8001:8000"`) o liberá el puerto.
+- **`failed to resolve source metadata for docker.io/library/python:3.11-slim`**,
+  con `i/o timeout` hacia `registry-1.docker.io`: no es el `Dockerfile`, es que
+  tu red no llega a Docker Hub. Pasa en algunos Codespaces y en redes con
+  egreso restringido.
+
+  La salida es traer la imagen base desde un espejo y etiquetarla con el nombre
+  que espera el `Dockerfile`. `mirror.gcr.io` espeja Docker Hub y suele estar
+  alcanzable:
+
+  ```bash
+  docker pull mirror.gcr.io/library/python:3.11-slim
+  docker tag  mirror.gcr.io/library/python:3.11-slim python:3.11-slim
+  docker compose build web
+  ```
+
+  Con la imagen ya etiquetada localmente, BuildKit la resuelve sin salir a la
+  red. **No cambies el `FROM` del `Dockerfile`**: sería meter al repositorio un
+  arreglo que sólo le hace falta a una red en particular.
+
+  Antes de hacer todo esto, fijate si realmente necesitás reconstruir: con el
+  `docker-compose.override.yml` activo el código va montado, así que para
+  cambios en `.py` o en plantillas **no hace falta** (ver sección 5). Reconstruir
+  sólo es necesario cuando cambia `requirements.txt` o el `Dockerfile`.

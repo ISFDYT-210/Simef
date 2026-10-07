@@ -1,51 +1,76 @@
 from django import template
+import datetime
 
 register = template.Library()
 
 
 @register.filter
-def concatenate(arg1, arg2):
-    return str(arg1) + str(arg2)
-
-
-def _esta_aprobada(m):
-    """Una materia cuenta como rendida/aprobada si el backend marcó 'aprobada'
-    o, en su defecto, si tiene una nota de cursada válida (no vacía / no '-')."""
-    if isinstance(m, dict):
-        if m.get('aprobada') is not None:
-            return bool(m.get('aprobada'))
-        nota = m.get('nota_cursada')
-    else:
-        nota = getattr(m, 'nota_cursada', None)
-    return str(nota).strip() not in ('', '-', 'None', 'none', 'None')
-
-
-@register.filter
 def resumen_anio(materias):
-    """Devuelve {plan, rendidas, faltan} para una lista de materias de un año."""
-    materias = list(materias or [])
+    """
+    Recibe la lista de materias de un año (tal como vienen en el dict
+    materias_por_anio del contexto: cada item con 'nombre', 'nota_cursada',
+    'nota_final', 'calif_cursada', 'calif_final', 'fecha') y devuelve un
+    dict con:
+      - plan: cantidad total de materias del plan para ese año
+      - rendidas: cuántas ya tienen nota_final cargada (aprobada o no)
+      - faltan: plan - rendidas
+    """
+    if not materias:
+        return {'plan': 0, 'rendidas': 0, 'faltan': 0}
+
     plan = len(materias)
-    rendidas = sum(1 for m in materias if _esta_aprobada(m))
-    return {'plan': plan, 'rendidas': rendidas, 'faltan': plan - rendidas}
+    rendidas = sum(
+        1 for m in materias
+        if m.get('nota_final') not in (None, '-', '', 'None', 'none')
+    )
+    faltan = plan - rendidas
+
+    return {'plan': plan, 'rendidas': rendidas, 'faltan': faltan}
 
 
 @register.filter
-def restar(a, b):
+def concatenate(value, arg):
+    """Concatena value y arg como strings."""
+    return f"{value}{arg}"
+
+
+@register.filter
+def restar(value, arg):
+    """Resta arg a value, tolerando que lleguen como string."""
     try:
-        return int(a) - int(b)
+        return int(value) - int(arg)
     except (TypeError, ValueError):
-        return ''
-
-
-_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio',
-          'agosto','septiembre','octubre','noviembre','diciembre']
+        try:
+            return float(value) - float(arg)
+        except (TypeError, ValueError):
+            return ''
 
 
 @register.filter
-def fecha_larga(fecha_str):
-    """'31/07/2026' -> 'a los 31 días del mes de julio de 2026'."""
-    try:
-        d, m, y = str(fecha_str).split('/')
-        return 'a los %d días del mes de %s de %s' % (int(d), _MESES[int(m)-1], y)
-    except Exception:
-        return str(fecha_str)
+def fecha_larga(value):
+    """
+    Convierte una fecha a texto largo en español.
+    Acepta un string 'dd/mm/aaaa' (formato que usa obtener_contexto_reporte
+    para fecha_actual), 'aaaa-mm-dd', o un objeto date/datetime.
+    Ej: '09/09/2026' -> '09 de septiembre de 2026'
+    """
+    meses = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ]
+
+    dt = None
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        dt = value
+    elif isinstance(value, str):
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d'):
+            try:
+                dt = datetime.datetime.strptime(value, fmt)
+                break
+            except ValueError:
+                continue
+
+    if dt is None:
+        return value
+
+    return f"{dt.day:02d} de {meses[dt.month - 1]} de {dt.year}"

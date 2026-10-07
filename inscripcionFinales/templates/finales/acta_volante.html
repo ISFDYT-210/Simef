@@ -1,5 +1,4 @@
 {% block content %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -129,8 +128,12 @@
     </table>
 
     <div class="footer">
-        <p>Presidente: </p>
-        <p>Vocal:............................ Vocal:............................</p>
+        <p>Presidente: {% if presidente %}{{ presidente.docente.nombre_completo }}{% else %}...........................{% endif %}</p>
+        <p>
+            Vocal: {% if vocales.0 %}{{ vocales.0.docente.nombre_completo }}{% else %}............................{% endif %}
+            &nbsp;&nbsp;&nbsp;
+            Vocal: {% if vocales.1 %}{{ vocales.1.docente.nombre_completo }}{% else %}............................{% endif %}
+        </p>
 
         <table style="width: 450px; float: right;">
             <tr>
@@ -187,14 +190,4 @@ if (mesElement.textContent == "1") {
 }
 </script>
 </html>
-
-
-
-{% else %}
-
-<div class="text-center">
-    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
-</div>
-{% endif %}
 {% endblock %}

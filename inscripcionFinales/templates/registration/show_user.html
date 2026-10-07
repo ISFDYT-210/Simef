@@ -31,6 +31,11 @@
       {% endif %}
     </dl>
   </div>
-  <div class="mt-5"><a href="/user_list/" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver a usuarios</a></div>
+  <div class="mt-5 flex flex-wrap gap-2">
+    <a href="/user_list/" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver a usuarios</a>
+    {% if request.user.es_directivo or request.user.is_superuser %}
+    <a href="{% url 'blanquear_password' usuario_id=object.id %}" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-600">Blanquear contraseña</a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
