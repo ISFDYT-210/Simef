@@ -169,25 +169,14 @@ py -m pip install -r requirements.txt
 
 ### 6. Configurar el archivo de settings
 
-Ingresar a la carpeta principal del proyecto Django:
+**No hay nada que copiar.** El `settings.py` versionado ya sirve para
+desarrollo: `DEBUG` viene en `True` y, si no definís `DATABASE_URL`, usa un
+SQLite local sin que tengas que instalar Postgres.
 
-```powershell
-cd gestionInstituto
-```
-
-Copiar el archivo de configuración de desarrollo:
-
-#### En PowerShell
-
-```powershell
-Copy-Item settings_DEV.py settings.py
-```
-
-#### En CMD
-
-```cmd
-copy settings_DEV.py settings.py
-```
+Si querés apuntar a una base Postgres, definí las variables en un `.env`
+(ver [docs/ENV.md](docs/ENV.md)). **No copies ningún archivo sobre
+`settings.py`**: pisarías un archivo versionado y perderías la lectura de
+variables de entorno, que es de donde salen la clave secreta y las credenciales.
 
 ---
 

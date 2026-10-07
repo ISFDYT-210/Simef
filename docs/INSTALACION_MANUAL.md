@@ -64,10 +64,13 @@ python manage.py migrate
 > que instalar Postgres. Si querés apuntar a una base Postgres, definí
 > `DATABASE_URL` en un `.env` (ver [ENV.md](ENV.md)).
 >
-> El repo incluye además `settings_DEV.py`, `settings_MAIN.py` y
-> `settings_TEST.py`, que son variantes históricas con valores fijos.
-> **No las copies sobre `settings.py`**: pisarían un archivo versionado y
-> perderías la lectura de variables de entorno.
+> El repo incluye además `settings_TEST.py`, que se usa para correr los tests
+> (ver más abajo). **No lo copies sobre `settings.py`**: pisarías un archivo
+> versionado y perderías la lectura de variables de entorno.
+>
+> Antes había también `settings_DEV.py` y `settings_MAIN.py`, variantes con
+> valores fijos. Se eliminaron: `settings_DEV.py` tenía una contraseña de
+> aplicación de Gmail en texto plano, en un repositorio público.
 
 ### 7. Crear un usuario administrador
 
