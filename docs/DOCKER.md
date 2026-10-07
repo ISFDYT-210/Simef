@@ -293,3 +293,26 @@ docker compose down -v                           # apagar y BORRAR los datos de 
   `POSTGRES_PASSWORD` y `DATABASE_URL` en `.env`.
 - **Puerto 8000 ocupado**: cambiá el mapeo de puertos en `docker-compose.yml`
   (`"8000:8000"` → por ejemplo `"8001:8000"`) o liberá el puerto.
+- **`failed to resolve source metadata for docker.io/library/python:3.11-slim`**,
+  con `i/o timeout` hacia `registry-1.docker.io`: no es el `Dockerfile`, es que
+  tu red no llega a Docker Hub. Pasa en algunos Codespaces y en redes con
+  egreso restringido.
+
+  La salida es traer la imagen base desde un espejo y etiquetarla con el nombre
+  que espera el `Dockerfile`. `mirror.gcr.io` espeja Docker Hub y suele estar
+  alcanzable:
+
+  ```bash
+  docker pull mirror.gcr.io/library/python:3.11-slim
+  docker tag  mirror.gcr.io/library/python:3.11-slim python:3.11-slim
+  docker compose build web
+  ```
+
+  Con la imagen ya etiquetada localmente, BuildKit la resuelve sin salir a la
+  red. **No cambies el `FROM` del `Dockerfile`**: sería meter al repositorio un
+  arreglo que sólo le hace falta a una red en particular.
+
+  Antes de hacer todo esto, fijate si realmente necesitás reconstruir: con el
+  `docker-compose.override.yml` activo el código va montado, así que para
+  cambios en `.py` o en plantillas **no hace falta** (ver sección 5). Reconstruir
+  sólo es necesario cuando cambia `requirements.txt` o el `Dockerfile`.
