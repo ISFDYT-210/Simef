@@ -173,7 +173,7 @@
                     <strong>{{ usuario.nombre_completo|upper|default:"___________________" }}</strong>,
                     DNI: <strong>{{ usuario.dni|default:"_____________" }}</strong>,
                     alumno regular de este establecimiento en la
-                    <strong>TECNICATURA SUPERIOR EN ANÁLISIS DE SISTEMAS</strong> (Resolución Nº6716/13)
+                    <strong>{{ nombre_carrera|upper|default:"___________________" }}</strong>{% if resolucion_carrera %} (Resolución Nº{{ resolucion_carrera }}){% endif %}
                     y las asignaturas de Perspectivas, Espacios y Áreas del plan de estudios,
                     cuyo detalle figura al pie, que realizan el <strong>{{ porcentaje_aprobadas }}%</strong>
                     <strong>{{ porcentaje_en_letras }}</strong> expresado en Perspectivas, Espacios y Áreas
