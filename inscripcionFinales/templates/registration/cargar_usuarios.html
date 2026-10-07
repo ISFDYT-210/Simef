@@ -131,6 +131,30 @@
               <td class="px-4 py-2 text-slate-500">Ingeniería en Sistemas</td>
               <td class="px-4 py-2 text-slate-500">Debe existir previamente en el sistema</td>
             </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Materia</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Programación I</td>
+              <td class="px-4 py-2 text-slate-500">Si viene, carga la nota de esa materia para este usuario (nuevo o ya existente). Sin esta columna, las de nota se ignoran.</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Modalidad</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">Regular</td>
+              <td class="px-4 py-2 text-slate-500">Regular, Libre, Itinerante u Oyente</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Nota de cursada</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">8</td>
+              <td class="px-4 py-2 text-slate-500">De 0 a 10. Requiere la columna Materia.</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Nota de final</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">7</td>
+              <td class="px-4 py-2 text-slate-500">De 0 a 10. Requiere la columna Materia.</td>
+            </tr>
         </tbody>
       </table>
     </div>
@@ -160,6 +184,7 @@
       <li>Los emails y DNI deben ser únicos en el sistema.</li>
       <li>Las carreras deben estar creadas previamente.</li>
       <li>Para estudiantes, se usa el DNI como matrícula por defecto.</li>
+      <li>Si el email o DNI ya existe, no se crea un usuario nuevo, pero igual se le carga la Materia/Nota/Carrera de esa fila si las trae: sirve para cargar notas de alumnos que ya están en el sistema con el mismo archivo.</li>
     </ul>
   </div>
 </div>

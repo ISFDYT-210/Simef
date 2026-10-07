@@ -24,3 +24,6 @@ backups/
 
 # Salida de graphify, si alguna vez se adopta la herramienta.
 graphify-out/
+
+# Archivos de bloqueo que deja LibreOffice mientras una planilla esta abierta.
+.~lock.*#

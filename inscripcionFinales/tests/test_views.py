@@ -11,6 +11,7 @@ Correr con:
 """
 from datetime import timedelta
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -440,3 +441,250 @@ class TribunalMesaTest(TestCase):
         contenido = respuesta.content.decode()
         self.assertIn('Profesor Uno', contenido)
         self.assertIn('Profesor Dos', contenido)
+
+
+class ApiListaUsuariosTest(TestCase):
+    """api_lista_usuarios: búsqueda por nombre (sin tildes), DNI o email."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/api/usuarios/'
+        cls.directivo = crear_usuario('dir_busq@test.com', 'Directivo', 'Directiva Busqueda', 70)
+        cls.estudiante = crear_usuario('est_busq@test.com', 'Estudiante', 'Estudiante Uno', 71)
+
+    def test_solo_personal_administrativo_accede(self):
+        self.client.force_login(self.estudiante)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_busqueda_por_nombre_ignora_tildes(self):
+        crear_usuario('maria@test.com', 'Estudiante', 'María José', 72)
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url, {'q': 'maria jose'}).json()
+        self.assertEqual(datos['count'], 1)
+        self.assertEqual(datos['results'][0]['nombre_completo'], 'María José')
+
+    def test_busqueda_por_dni(self):
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url, {'q': '71'}).json()
+        dnis = {r['dni'] for r in datos['results']}
+        self.assertIn(71, dnis)
+
+    def test_busqueda_por_email(self):
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url, {'q': 'est_busq'}).json()
+        self.assertEqual(datos['count'], 1)
+        self.assertEqual(datos['results'][0]['email'], 'est_busq@test.com')
+
+    def test_sin_busqueda_trae_todos_paginado(self):
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url).json()
+        self.assertEqual(datos['count'], Usuario.objects.count())
+
+    def test_busqueda_sin_coincidencias(self):
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url, {'q': 'zzzNoExiste'}).json()
+        self.assertEqual(datos['count'], 0)
+
+
+class EditUserCambioDeRolTest(TestCase):
+    """
+    El Directivo puede cambiar el rol de un usuario sin tocar sus datos
+    personales, incluso si a ese usuario le faltan dni/teléfonos (antes el
+    form se los exigía igual y bloqueaba el cambio).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.directivo = crear_usuario('dir_rol@test.com', 'Directivo', 'Directiva', 80)
+        cls.profesor = crear_usuario('prof_rol@test.com', 'Profesor', 'Profesor Incompleto', 81)
+        cls.profesor.dni = None
+        cls.profesor.save()
+
+    def datos_formulario(self, usuario, **overrides):
+        datos = {
+            'username': usuario.username, 'nombre_completo': usuario.nombre_completo,
+            'fecha_nac': '', 'dni': '', 'direccion': '', 'localidad': '', 'ciudad': '',
+            'nacionalidad': '', 'telefono_1': '', 'telefono_2': '', 'estado_civil': '', 'sexo': '',
+        }
+        datos.update(overrides)
+        return datos
+
+    def test_directivo_cambia_el_rol_sin_tocar_datos_personales(self):
+        self.client.force_login(self.directivo)
+        response = self.client.post(
+            f'/edit_user/{self.profesor.id}',
+            self.datos_formulario(self.profesor, rol='Preceptor'),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.profesor.refresh_from_db()
+        self.assertEqual(self.profesor.rol, 'Preceptor')
+        self.assertEqual(self.profesor.nombre_completo, 'Profesor Incompleto')
+        self.assertIsNone(self.profesor.dni)
+
+    def test_secretario_tambien_puede_cambiar_el_rol(self):
+        """Secretario comparte el resto de la matriz con Directivo; esto ya no era la excepción."""
+        secretario = crear_usuario('sec_rol@test.com', 'Secretario', 'Secretaria', 82)
+        self.client.force_login(secretario)
+        response = self.client.post(
+            f'/edit_user/{self.profesor.id}',
+            self.datos_formulario(self.profesor, rol='Preceptor'),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.profesor.refresh_from_db()
+        self.assertEqual(self.profesor.rol, 'Preceptor')
+
+    def test_profesor_no_puede_cambiar_roles(self):
+        otro_profesor = crear_usuario('prof_otro@test.com', 'Profesor', 'Otro Profesor', 83)
+        self.client.force_login(otro_profesor)
+        self.client.post(
+            f'/edit_user/{self.profesor.id}',
+            self.datos_formulario(self.profesor, rol='Directivo'),
+        )
+        self.profesor.refresh_from_db()
+        self.assertEqual(self.profesor.rol, 'Profesor')
+
+
+class BlanquearPasswordTest(TestCase):
+    """Directivo y Secretario pueden resetear contraseñas; nadie más."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.directivo = crear_usuario('dir_bp@test.com', 'Directivo', 'Directiva', 90)
+        cls.secretario = crear_usuario('sec_bp@test.com', 'Secretario', 'Secretaria', 91)
+        cls.preceptor = crear_usuario('prec_bp@test.com', 'Preceptor', 'Preceptora', 92)
+        cls.alumno = crear_usuario('alu_bp@test.com', 'Estudiante', 'Alumno', 93)
+        cls.alumno.set_password('vieja-clave')
+        cls.alumno.first_login = False
+        cls.alumno.save()
+
+    def test_directivo_puede_blanquear(self):
+        self.client.force_login(self.directivo)
+        self.client.post(f'/blanquear_password/{self.alumno.id}/')
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.first_login)
+
+    def test_secretario_puede_blanquear(self):
+        self.client.force_login(self.secretario)
+        self.client.post(f'/blanquear_password/{self.alumno.id}/')
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.first_login)
+
+    def test_preceptor_no_puede_blanquear(self):
+        self.client.force_login(self.preceptor)
+        response = self.client.post(f'/blanquear_password/{self.alumno.id}/')
+        self.assertEqual(response.status_code, 403)
+        self.alumno.refresh_from_db()
+        self.assertFalse(self.alumno.first_login)
+
+
+class ObtenerContextoReporteTest(TestCase):
+    """
+    obtener_contexto_reporte usaba una lista de materias y un nombre de
+    carrera hardcodeados (de una tecnicatura en particular): cualquier
+    estudiante de otra carrera recibía una constancia con materias ajenas.
+    Ahora arma todo a partir de la carrera real del alumno.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(
+            nombre_carrera='Tecnicatura Superior en Enfermería', num_resolucion='RES-006/2023')
+        cls.materia1 = Materia.objects.create(
+            nombre_materia='Fundamentos del Cuidado', carrera=cls.carrera, anio=1)
+        cls.materia2 = Materia.objects.create(
+            nombre_materia='Farmacología en Enfermería', carrera=cls.carrera, anio=2)
+        # Materia de OTRA carrera: no debe aparecer en el reporte de este alumno.
+        otra_carrera = Carrera.objects.create(nombre_carrera='Análisis de sistemas')
+        Materia.objects.create(nombre_materia='Álgebra', carrera=otra_carrera, anio=1)
+
+        cls.alumno = crear_usuario('rep_enf@test.com', 'Estudiante', 'Alumno Enfermeria', 95)
+        cls.alumno.carrera.add(cls.carrera)
+
+    def test_usa_la_carrera_real_del_alumno_no_una_hardcodeada(self):
+        from inscripcionFinales.views import obtener_contexto_reporte
+        ctx = obtener_contexto_reporte(self.alumno)
+        self.assertEqual(ctx['nombre_carrera'], 'Tecnicatura Superior en Enfermería')
+        self.assertEqual(ctx['resolucion_carrera'], 'RES-006/2023')
+
+    def test_solo_trae_materias_de_la_carrera_del_alumno(self):
+        from inscripcionFinales.views import obtener_contexto_reporte
+        ctx = obtener_contexto_reporte(self.alumno)
+        nombres = {m['nombre'] for materias in ctx['materias_por_anio'].values() for m in materias}
+        self.assertEqual(nombres, {'Fundamentos del Cuidado', 'Farmacología en Enfermería'})
+        self.assertEqual(ctx['total_materias'], 2)
+
+    def test_final_aprobado_cuenta_para_el_porcentaje(self):
+        from inscripcionFinales.views import obtener_contexto_reporte
+        usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia1).update(
+            nota_cursada=8, nota_final=7, estado=EstadoCursada.APROBADO)
+        ctx = obtener_contexto_reporte(self.alumno)
+        self.assertEqual(ctx['materias_aprobadas'], 1)
+        self.assertEqual(ctx['porcentaje_aprobadas'], 50.0)
+
+
+class CargarUsuariosConNotaTest(TestCase):
+    """
+    La carga masiva de usuarios (CSV) también puede cargar la nota de una
+    materia en la misma fila: si el usuario es nuevo, se crea y se le carga;
+    si ya existe, no se duplica pero igual se le carga la nota (y la carrera,
+    si no la tenía) — así no hace falta un archivo aparte para eso.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(nombre_materia='Programación I', carrera=cls.carrera, anio=1)
+        cls.directivo = crear_usuario('dir_csv@test.com', 'Directivo', 'Directiva', 110)
+
+    def csv_file(self, contenido):
+        return SimpleUploadedFile('usuarios.csv', contenido.encode('utf-8'), content_type='text/csv')
+
+    def test_usuario_nuevo_se_crea_y_queda_con_la_nota(self):
+        self.client.force_login(self.directivo)
+        contenido = (
+            "Correo electrónico,Nombre estudiante,Documento estudiante,Carrera,Materia,Nota de cursada\n"
+            "nuevo@test.com,Alumno Nuevo,777,Tecnicatura,Programación I,9\n"
+        )
+        self.client.post('/cargaMasivaEstudiantes/', {'csv_file': self.csv_file(contenido)})
+
+        nuevo = Usuario.objects.get(dni=777)
+        self.assertIn(self.carrera, nuevo.carrera.all())
+        inscripcion = usuarios_materia.objects.get(usuario=nuevo, materia=self.materia)
+        self.assertEqual(inscripcion.nota_cursada, 9)
+        self.assertEqual(inscripcion.estado, EstadoCursada.REGULAR)
+
+    def test_usuario_existente_no_se_duplica_pero_se_le_carga_la_nota(self):
+        alumno = crear_usuario('existe@test.com', 'Estudiante', 'Alumno Existente', 555)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.materia)
+
+        self.client.force_login(self.directivo)
+        contenido = (
+            "Correo electrónico,Nombre estudiante,Documento estudiante,Materia,Nota de cursada\n"
+            "existe@test.com,Alumno Existente,555,Programación I,6\n"
+        )
+        self.client.post('/cargaMasivaEstudiantes/', {'csv_file': self.csv_file(contenido)})
+
+        self.assertEqual(Usuario.objects.filter(dni=555).count(), 1)
+        inscripcion = usuarios_materia.objects.get(usuario=alumno, materia=self.materia)
+        self.assertEqual(inscripcion.nota_cursada, 6)
+
+    def test_fila_sin_columna_materia_no_toca_notas(self):
+        """Comportamiento de siempre: si no hay columna Materia, la carga es solo de datos personales."""
+        self.client.force_login(self.directivo)
+        contenido = "Correo electrónico,Nombre estudiante,Documento estudiante\nsinnota@test.com,Sin Nota,888\n"
+        self.client.post('/cargaMasivaEstudiantes/', {'csv_file': self.csv_file(contenido)})
+
+        nuevo = Usuario.objects.get(dni=888)
+        self.assertFalse(usuarios_materia.objects.filter(usuario=nuevo).exists())
+
+    def test_materia_inexistente_queda_como_error_sin_romper_la_creacion(self):
+        self.client.force_login(self.directivo)
+        contenido = (
+            "Correo electrónico,Nombre estudiante,Documento estudiante,Materia,Nota de cursada\n"
+            "otro@test.com,Otro Alumno,999,Materia Que No Existe,8\n"
+        )
+        response = self.client.post('/cargaMasivaEstudiantes/', {'csv_file': self.csv_file(contenido)})
+
+        self.assertTrue(Usuario.objects.filter(dni=999).exists())
+        self.assertIn('Materia no encontrada', response.content.decode())
+
