@@ -61,14 +61,37 @@ if [ -z "$DUMP" ]; then
   mkdir -p backups
   DUMP="backups/neon-$(date +%Y-%m-%d-%H%M).sql"
   echo "==> Bajando dump de ${ORIGEN_HOST} (solo lectura)"
+
+  # Chequeo previo de alcanzabilidad. Sin esto, pg_dump se queda esperando para
+  # siempre cuando un firewall descarta el SYN en silencio en vez de rechazarlo,
+  # y no hay forma de distinguir "colgado" de "tardando".
+  if ! docker exec "$SERVICIO_DB" sh -c \
+       "timeout 15 nc -z '$ORIGEN_HOST' '$ORIGEN_PORT'" >/dev/null 2>&1; then
+    echo "ERROR: no hay salida al puerto ${ORIGEN_PORT} de ${ORIGEN_HOST}." >&2
+    echo "       El host resuelve y responde en 443, pero el 5432 queda sin respuesta:" >&2
+    echo "       es un firewall de la red, no un problema de Neon ni de este script." >&2
+    echo "       Corre el script desde una maquina con salida al 5432, o descarga el" >&2
+    echo "       dump desde la consola de Neon y pasalo como argumento:" >&2
+    echo "         ./scripts/copiar_neon_a_local.sh backups/mi-dump.sql" >&2
+    rm -f "$DUMP"
+    exit 1
+  fi
+
   # pg_dump corre DENTRO del contenedor: ahi esta la version 16 del cliente,
   # asi no hace falta instalar postgresql-client en la maquina.
-  docker exec -i \
-    -e PGPASSWORD="$ORIGEN_PASS" -e PGSSLMODE=require \
+  # PGPASSWORD se pasa por nombre, sin valor: docker toma el del entorno del
+  # cliente y la contraseña NO queda visible en `ps` para todo el mundo.
+  if ! PGPASSWORD="$ORIGEN_PASS" docker exec -i \
+    -e PGPASSWORD -e PGSSLMODE=require -e PGCONNECT_TIMEOUT=20 \
     "$SERVICIO_DB" \
     pg_dump -h "$ORIGEN_HOST" -p "$ORIGEN_PORT" -U "$ORIGEN_USER" -d "$ORIGEN_DB" \
             --no-owner --no-privileges --clean --if-exists \
-    > "$DUMP"
+    > "$DUMP"; then
+    echo "ERROR: pg_dump fallo. Se descarta el archivo incompleto." >&2
+    rm -f "$DUMP"
+    exit 1
+  fi
+  [ -s "$DUMP" ] || { echo "ERROR: el dump salio vacio. Se descarta." >&2; rm -f "$DUMP"; exit 1; }
   echo "    $DUMP  ($(du -h "$DUMP" | cut -f1))"
 else
   [ -f "$DUMP" ] || { echo "ERROR: no existe $DUMP" >&2; exit 1; }
