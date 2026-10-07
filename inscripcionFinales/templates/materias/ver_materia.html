@@ -1,44 +1,23 @@
 {% extends 'base/base.html' %}
-
 {% block title %}Ver materia{% endblock %}
-
+{% block encabezado %}Detalle de materia{% endblock %}
 {% block content %}
-  <div style="margin-top: -170px">
-    {% comment %} <form method="post" class="">
-      {% csrf_token %} {% endcomment %}
-    <div class="card p-3 mb-2 bg-light" style="margin-top: 150px">
-      <div class="card-body p-3 mb-2">
-        <h1 style="text-align: center;">{{ materia.nombre_materia }}</h1>
-      </div>
-    
-      <div class="position-absolute top-50 start-50 translate-middle"></div>
-      <p class="h6 fw-semibold">
-        Nombre de la materia: {{ materia.nombre_materia }}
-      </p>
-      <p class="h6 fw-semibold">
-        Carrera: {{materia.carrera.nombre_carrera}}
-      </p>
-      <p class="h6 fw-semibold">
-        Profesor: {{materia.profesor.nombres }}
-      </p>
-      <p class="h6 fw-semibold">
-        Año: {{ materia.anio }}
-      </p>
-      <p class="h6 fw-semibold">
-        Dia: {{ materia.dia }}
-      </p>
-      <p class="h6 fw-semibold">
-        Horario: {{ materia.Horario }}
-      </p>
-      <div class="text-center">
-        <div class="d-inline">
-          <a href="{% url 'editar_materia' id=materia.id %}" class="btn btn-primary me-2">Editar</a>
-        </div>
-        <div class="d-inline">
-          <a href="/lista_materias_admin/" class="btn btn-primary">Volver</a>
-        </div>
-      </div>
+<div class="mx-auto max-w-2xl">
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="bg-tinta-900 px-6 py-6">
+      <h2 class="text-xl font-bold text-white">{{ materia.nombre_materia }}</h2>
     </div>
+    <dl class="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2">
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Carrera</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.carrera.nombre_carrera|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Profesor</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.profesor.nombres|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Año</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.anio|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Día</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.dia|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4 sm:col-span-2"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Horario</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.Horario|default:"—" }}</dd></div>
+    </dl>
   </div>
+  <div class="mt-5 flex flex-wrap gap-2">
+    <a href="{% url 'editar_materia' id=materia.id %}" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Editar</a>
+    <a href="/lista_materias_admin/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver</a>
+  </div>
+</div>
 {% endblock %}
-

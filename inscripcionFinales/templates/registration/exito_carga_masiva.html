@@ -18,7 +18,7 @@
                     <h4 class="text-success mb-3">¡Usuarios cargados exitosamente!</h4>
                     
                     <div class="row">
-                        <div class="col-6">
+                        <div class="col-4">
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <h2 class="text-success mb-0">{{ usuarios_creados }}</h2>
@@ -26,11 +26,19 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-6">
+                        <div class="col-4">
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <h2 class="text-warning mb-0">{{ usuarios_duplicados|default:0 }}</h2>
                                     <small class="text-muted">Ya existían</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h2 class="text-success mb-0">{{ notas_cargadas|default:0 }}</h2>
+                                    <small class="text-muted">Notas cargadas</small>
                                 </div>
                             </div>
                         </div>
