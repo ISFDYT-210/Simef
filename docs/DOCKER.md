@@ -188,6 +188,30 @@ docker compose run --rm --no-deps \
 > Para trabajar seguido contra datos realistas, lo prolijo es usar una **rama de
 > Neon** en tu `.env` en vez de `main`: los mismos datos, aislados de producción.
 
+### Traer los datos de Neon a la base local
+
+Para probar contra datos reales sin tocar la base del instituto, hay un script
+que copia Neon a la Postgres del compose:
+
+```bash
+./scripts/copiar_neon_a_local.sh
+```
+
+A Neon lo **lee y nada más** (`pg_dump` no escribe). Lo que borra y recrea es la
+base local. Deja el dump en `backups/`, que está en el `.gitignore` —
+**importante, porque son datos personales de alumnos: no los commitees**.
+
+Para volver a cargar un dump que ya tenés, sin bajarlo de nuevo:
+
+```bash
+./scripts/copiar_neon_a_local.sh backups/neon-2026-10-07-1030.sql
+```
+
+Después, `docker compose restart web` para que la app tome la base recargada.
+
+> `pg_dump` corre **dentro del contenedor `db`**, que ya trae el cliente de
+> Postgres 16. No hace falta instalar `postgresql-client` en tu máquina.
+
 ## 3. Levantar el stack
 
 ```bash
