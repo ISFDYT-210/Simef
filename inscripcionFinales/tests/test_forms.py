@@ -12,7 +12,7 @@ Correr con:
 """
 from django.test import TestCase
 
-from inscripcionFinales.forms import MesaFinalForm
+from inscripcionFinales.forms import MesaFinalForm, profile_students_form
 from inscripcionFinales.models import (
     Carrera, Materia, MateriaCorrelativa, Usuario, usuarios_materia,
 )
@@ -124,3 +124,50 @@ class MesaFinalFormTest(TestCase):
         html = str(MesaFinalForm()['materia'])
         self.assertIn(f'value="{self.sin_carrera.id}"', html)
         self.assertIn('data-anio="3"', html)
+
+
+class ProfileStudentsFormTest(TestCase):
+    """
+    dni/telefono_1/telefono_2 son opcionales en el modelo (blank=True,
+    null=True) y el propio template dice "los campos vacíos se pueden
+    completar más tarde" — pero el form los pedía como obligatorios, así que
+    cualquier edición (incluido un simple cambio de rol) quedaba bloqueada si
+    a alguien le faltaba uno de esos tres datos. Estos tests fijan que ahora
+    sí se puede dejar en blanco.
+    """
+
+    def datos_base(self, usuario, **overrides):
+        datos = {
+            'username': usuario.username, 'nombre_completo': usuario.nombre_completo,
+            'fecha_nac': '', 'dni': '', 'direccion': '', 'localidad': '', 'ciudad': '',
+            'nacionalidad': '', 'telefono_1': '', 'telefono_2': '', 'estado_civil': '', 'sexo': '',
+        }
+        datos.update(overrides)
+        return datos
+
+    def test_valido_con_dni_y_telefonos_en_blanco(self):
+        usuario = Usuario.objects.create(
+            email='sintelefono@test.com', username='sintelefono',
+            nombre_completo='Sin Telefono', rol='Profesor', dni=None,
+        )
+        form = profile_students_form(self.datos_base(usuario), instance=usuario)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_dni_en_blanco_se_guarda_como_none_no_como_string_vacio(self):
+        """dni es IntegerField en el modelo: guardar '' directamente rompería en la base."""
+        usuario = Usuario.objects.create(
+            email='otro@test.com', username='otro', nombre_completo='Otro', rol='Profesor', dni=None,
+        )
+        form = profile_students_form(self.datos_base(usuario), instance=usuario)
+        self.assertTrue(form.is_valid(), form.errors)
+        guardado = form.save()
+        self.assertIsNone(guardado.dni)
+
+    def test_dni_con_valor_se_guarda_como_entero(self):
+        usuario = Usuario.objects.create(
+            email='condni@test.com', username='condni', nombre_completo='Con Dni', rol='Profesor', dni=None,
+        )
+        form = profile_students_form(self.datos_base(usuario, dni='12345678'), instance=usuario)
+        self.assertTrue(form.is_valid(), form.errors)
+        guardado = form.save()
+        self.assertEqual(guardado.dni, 12345678)

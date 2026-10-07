@@ -39,12 +39,12 @@
             </form>
             <form method="post" action="{% url 'quitar_tribunal' presidente.id %}" onsubmit="return confirm('¿Quitar a {{ presidente.docente.nombre_completo }} de la presidencia?');">
               {% csrf_token %}
-              <button type="submit" class="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Quitar</button>
+              <button type="submit" class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Quitar</button>
             </form>
           </div>
         </div>
         {% else %}
-        <form method="post" class="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 p-3">
+        <form method="post" class="flex items-center gap-2 rounded-xl border border-slate-300 p-3">
           {% csrf_token %}
           <input type="hidden" name="rol" value="Presidente">
           <select name="docente" required class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
@@ -78,7 +78,7 @@
               </form>
               <form method="post" action="{% url 'quitar_tribunal' vocal.id %}" onsubmit="return confirm('¿Quitar a {{ vocal.docente.nombre_completo }} del tribunal?');">
                 {% csrf_token %}
-                <button type="submit" class="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Quitar</button>
+                <button type="submit" class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Quitar</button>
               </form>
             </div>
           </div>
@@ -86,7 +86,7 @@
         </div>
 
         {% if vocales|length < max_vocales %}
-        <form method="post" class="mt-2 flex items-center gap-2 rounded-xl border border-dashed border-slate-300 p-3">
+        <form method="post" class="mt-2 flex items-center gap-2 rounded-xl border border-slate-300 p-3">
           {% csrf_token %}
           <input type="hidden" name="rol" value="Vocal">
           <select name="docente" required class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
