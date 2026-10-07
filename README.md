@@ -35,6 +35,7 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 | [docs/DOCKER.md](docs/DOCKER.md) | Levantar el proyecto completo (Django + Postgres) con Docker Compose. |
 | [docs/ENV.md](docs/ENV.md) | Qué es cada variable de `.env.example` y cómo armar tu `.env`. |
 | [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md) | Copiar los datos de Neon a tu base local para probar sin tocar la del instituto. |
+| [docs/GITFLOW.md](docs/GITFLOW.md) | Cómo se organizan las ramas y cómo entra un cambio: todo a `develop` por Pull Request. |
 | [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
 | [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + Postgres en Neon) en Debian. |
 | [docs/tailwind.md](docs/tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
