@@ -17,11 +17,16 @@
 
 name: Deploy Vercel
 
+# DESACTIVADO POR AHORA: no hay proyecto de Vercel ni secrets cargados, asi que
+# el workflow solo corre a mano desde la pestaña Actions ("Run workflow").
+# Para reactivarlo cuando exista el proyecto: cargar los tres secrets de abajo
+# y descomentar los disparadores automaticos.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
 
 concurrency:
   group: deploy-vercel-${{ github.ref }}
@@ -40,12 +45,12 @@ jobs:
       pull-requests: write # para comentar la URL de preview en el PR
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node (para la CLI de Vercel)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Instalar Vercel CLI
         run: npm install --global vercel@latest
@@ -78,7 +83,7 @@ jobs:
 
       - name: Comentar la URL de preview en el PR
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
