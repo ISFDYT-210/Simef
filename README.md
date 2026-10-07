@@ -34,8 +34,9 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 |---|---|
 | [docs/DOCKER.md](docs/DOCKER.md) | Levantar el proyecto completo (Django + Postgres) con Docker Compose. |
 | [docs/ENV.md](docs/ENV.md) | Qué es cada variable de `.env.example` y cómo armar tu `.env`. |
+| [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md) | Copiar los datos de Neon a tu base local para probar sin tocar la del instituto. |
 | [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
-| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + MariaDB) en Debian. |
+| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + Postgres en Neon) en Debian. |
 | [docs/tailwind.md](docs/tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
 | [docs/TARJETAS_GH.md](docs/TARJETAS_GH.md) | Cómo cargar tarjetas de trabajo (issues) al tablero con la CLI `gh`. |
 | [docs/INFORME_MODIFICACIONES.md](docs/INFORME_MODIFICACIONES.md) | Registro de cambios del proyecto. |
@@ -169,25 +170,14 @@ py -m pip install -r requirements.txt
 
 ### 6. Configurar el archivo de settings
 
-Ingresar a la carpeta principal del proyecto Django:
+**No hay nada que copiar.** El `settings.py` versionado ya sirve para
+desarrollo: `DEBUG` viene en `True` y, si no definís `DATABASE_URL`, usa un
+SQLite local sin que tengas que instalar Postgres.
 
-```powershell
-cd gestionInstituto
-```
-
-Copiar el archivo de configuración de desarrollo:
-
-#### En PowerShell
-
-```powershell
-Copy-Item settings_DEV.py settings.py
-```
-
-#### En CMD
-
-```cmd
-copy settings_DEV.py settings.py
-```
+Si querés apuntar a una base Postgres, definí las variables en un `.env`
+(ver [docs/ENV.md](docs/ENV.md)). **No copies ningún archivo sobre
+`settings.py`**: pisarías un archivo versionado y perderías la lectura de
+variables de entorno, que es de donde salen la clave secreta y las credenciales.
 
 ---
 

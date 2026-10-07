@@ -9,6 +9,28 @@
       <h2 class="text-sm font-semibold text-tinta-900">Completá los siguientes campos</h2>
     </div>
     <div class="space-y-4 px-6 py-6">
+      <div class="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+        <div>
+          <label for="filtroCarrera" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por carrera</label>
+          <select id="filtroCarrera" x-model="filtroCarrera" @change="aplicarFiltros()"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+            <option value="">Todas las carreras</option>
+            {% for carrera in carreras %}
+            <option value="{{ carrera.id }}">{{ carrera.nombre_carrera }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="filtroAnio" class="mb-1 block text-xs font-medium text-slate-500">Filtrar por año</label>
+          <select id="filtroAnio" x-model="filtroAnio" @change="aplicarFiltros()"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+            <option value="">Todos los años</option>
+            {% for valor, etiqueta in anios %}
+            <option value="{{ valor }}">{{ etiqueta }}° año</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
       <div>
         <label for="{{ form.materia.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Materia</label>
         {{ form.materia }}
@@ -31,33 +53,101 @@
 
 <script>
   function altaMesa() {
-    return {
-      errores: { materia: '', llamado: '' },
-      idMateria: '{{ form.materia.id_for_label }}',
-      idLlamado: '{{ form.llamado.id_for_label }}',
-      init() {
-        var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
-        var mat = document.getElementById(this.idMateria);
-        var ll = document.getElementById(this.idLlamado);
-        if (mat) mat.classList.add.apply(mat.classList, c);
-        if (ll) {
-          ll.classList.add.apply(ll.classList, c);
-          ll.setAttribute('type', 'datetime-local');
-          var man = new Date(); man.setDate(man.getDate() + 1);
-          ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
-        }
-      },
-      validar(e) {
-        this.errores = { materia: '', llamado: '' };
-        var mat = document.getElementById(this.idMateria);
-        var ll = document.getElementById(this.idLlamado);
-        var ok = true;
-        if (!mat || !mat.value || mat.value === '---------') { this.errores.materia = 'Debés seleccionar una materia.'; ok = false; }
-        if (!ll || !ll.value) { this.errores.llamado = 'Debés seleccionar fecha y hora.'; ok = false; }
-        else if (new Date(ll.value) <= new Date()) { this.errores.llamado = 'La fecha debe ser posterior a hoy.'; ok = false; }
-        if (!ok) e.preventDefault();
-      },
-    };
-  }
+  return {
+    errores: { materia: '', llamado: '' },
+    idMateria: '{{ form.materia.id_for_label }}',
+    idLlamado: '{{ form.llamado.id_for_label }}',
+    filtroCarrera: '',
+    filtroAnio: '',
+    init() {
+      var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+      var mat = document.getElementById(this.idMateria);
+      var ll = document.getElementById(this.idLlamado);
+      if (mat) mat.classList.add.apply(mat.classList, c);
+      if (ll) {
+        ll.classList.add.apply(ll.classList, c);
+        ll.setAttribute('type', 'datetime-local');
+        var man = new Date(); man.setDate(man.getDate() + 1);
+        ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
+      }
+      this.aplicarFiltros();
+    },
+    // Filtro de carrera/año (bidireccional) 
+    opcionesDeMateria() {
+      var mat = document.getElementById(this.idMateria);
+      if (!mat) return [];
+      // Se descarta la opción vacía ("---------") que agrega Django.
+      return Array.from(mat.options).filter(function (opt) { return !!opt.value; });
+    },
+    coinciden(opt, carrera, anio) {
+      return (!carrera || opt.dataset.carrera === carrera) &&
+             (!anio || opt.dataset.anio === anio);
+    },
+    // Deja visibles (y elegibles) solo las opciones admisibles del select.
+    
+    aplicarVisibilidad(select, admisibles) {
+      if (!select) return;
+      Array.from(select.options).forEach(function (opt) {
+        if (!opt.value) return; // "Todas las carreras" / "Todos los años"
+        var admisible = admisibles.has(opt.value);
+        opt.hidden = !admisible;
+        opt.disabled = !admisible;
+        opt.style.display = admisible ? '' : 'none';
+      });
+    },
+  
+    limpiarFiltrosSinOpciones(opciones) {
+      var sinOpciones = function (filtro, campo) {
+        return !opciones.some(function (opt) { return opt.dataset[campo] === filtro; });
+      };
+      if (this.filtroCarrera && sinOpciones(this.filtroCarrera, 'carrera')) this.filtroCarrera = '';
+      if (this.filtroAnio && sinOpciones(this.filtroAnio, 'anio')) this.filtroAnio = '';
+      // Puede existir cada valor por separado y no la combinación: se suelta el
+      // año y la carrera queda mostrando todas sus materias.
+      if (this.filtroAnio && !opciones.some(function (opt) {
+        return this.coinciden(opt, this.filtroCarrera, this.filtroAnio);
+      }, this)) {
+        this.filtroAnio = '';
+      }
+    },
+    aplicarFiltros() {
+      var opciones = this.opcionesDeMateria();
+      this.limpiarFiltrosSinOpciones(opciones);
+
+      // Cada lista se calcula mirando solo al OTRO filtro: así ninguna de las dos
+      // puede ofrecer una opción que deje a la otra sin materias.
+      var carrerasAdmisibles = new Set();
+      var aniosAdmisibles = new Set();
+      opciones.forEach(function (opt) {
+        if (this.coinciden(opt, '', this.filtroAnio)) carrerasAdmisibles.add(opt.dataset.carrera);
+        if (this.coinciden(opt, this.filtroCarrera, '')) aniosAdmisibles.add(opt.dataset.anio);
+      }, this);
+      this.aplicarVisibilidad(document.getElementById('filtroCarrera'), carrerasAdmisibles);
+      this.aplicarVisibilidad(document.getElementById('filtroAnio'), aniosAdmisibles);
+
+      var mat = document.getElementById(this.idMateria);
+      if (!mat) return;
+      var seleccionOculta = false;
+      Array.from(mat.options).forEach(function (opt) {
+        if (!opt.value) return; // opción vacía "---------"
+        var visible = this.coinciden(opt, this.filtroCarrera, this.filtroAnio);
+        opt.hidden = !visible;
+        if (opt.selected && !visible) seleccionOculta = true;
+      }, this);
+      if (seleccionOculta) mat.value = '';
+    },
+    validar(e) {
+      this.errores = { materia: '', llamado: '' };
+      var mat = document.getElementById(this.idMateria);
+      var ll = document.getElementById(this.idLlamado);
+      var ok = true;
+      if (!mat || !mat.value || mat.value === '---------') { this.errores.materia = 'Debés seleccionar una materia.'; ok = false; }
+      if (!ll || !ll.value) { this.errores.llamado = 'Debés seleccionar fecha y hora.'; ok = false; }
+      else if (new Date(ll.value) <= new Date()) { this.errores.llamado = 'La fecha debe ser posterior a hoy.'; ok = false; }
+      if (!ok) e.preventDefault();
+    },
+  };
+}
 </script>
 {% endblock %}
+

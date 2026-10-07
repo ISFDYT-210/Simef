@@ -52,27 +52,33 @@ source env/bin/activate
 pip3 install -r requirements.txt
 ```
 
-### 6. Configurar el archivo de settings
-
-```bash
-cd gestionInstituto
-cp settings_DEV.py settings.py
-cd ..
-```
-
-### 7. Ejecutar las migraciones
+### 6. Ejecutar las migraciones
 
 ```bash
 python manage.py migrate
 ```
 
-### 8. Crear un usuario administrador
+> **No hace falta tocar `settings.py`.** El `settings.py` versionado ya sirve
+> para desarrollo: `DEBUG` viene en `True` por defecto y, si no definís la
+> variable `DATABASE_URL`, usa un SQLite local (`db.sqlite3`) sin que tengas
+> que instalar Postgres. Si querés apuntar a una base Postgres, definí
+> `DATABASE_URL` en un `.env` (ver [ENV.md](ENV.md)).
+>
+> El repo incluye además `settings_TEST.py`, que se usa para correr los tests
+> (ver más abajo). **No lo copies sobre `settings.py`**: pisarías un archivo
+> versionado y perderías la lectura de variables de entorno.
+>
+> Antes había también `settings_DEV.py` y `settings_MAIN.py`, variantes con
+> valores fijos. Se eliminaron: `settings_DEV.py` tenía una contraseña de
+> aplicación de Gmail en texto plano, en un repositorio público.
+
+### 7. Crear un usuario administrador
 
 ```bash
 python manage.py createsuperuser
 ```
 
-### 9. Ejecutar el servidor de desarrollo
+### 8. Ejecutar el servidor de desarrollo
 
 ```bash
 python manage.py runserver
@@ -136,41 +142,30 @@ pip install -r requirements.txt
 > Si `pip` no responde correctamente, probá `python -m pip install -r requirements.txt`
 > o `py -m pip install -r requirements.txt`.
 
-### 6. Configurar el archivo de settings
-
-```powershell
-cd gestionInstituto
-
-# PowerShell
-Copy-Item settings_DEV.py settings.py
-
-# CMD
-copy settings_DEV.py settings.py
-```
-
-### 7. Ejecutar las migraciones
+### 6. Ejecutar las migraciones
 
 ```powershell
 python manage.py migrate
 # si fuera necesario: py manage.py migrate
 ```
 
-### 8. Crear un usuario administrador
+> Igual que en Linux: **no copies ningún `settings_*.py` sobre `settings.py`**.
+> El versionado ya funciona para desarrollo y usa SQLite si no definís
+> `DATABASE_URL` (ver [ENV.md](ENV.md)).
+
+### 7. Crear un usuario administrador
 
 ```powershell
 python manage.py createsuperuser
 ```
 
-### 9. Ejecutar el servidor de desarrollo
+### 8. Ejecutar el servidor de desarrollo
 
 ```powershell
 python manage.py runserver
 ```
 
 ### Problemas comunes en Windows
-
-**Error GTK**: en Windows hace falta instalar GTK. Bajalo de acá:
-(https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe)
 
 **Error de ejecución de scripts en PowerShell**: si PowerShell bloquea la
 activación del entorno virtual:
@@ -187,6 +182,10 @@ reinstalá Python y marcá **Add Python to PATH**.
 **Error al instalar dependencias con pip**: actualizá pip con
 `python -m pip install --upgrade pip` (o `py -m pip install --upgrade pip`).
 
+**Error de GTK**: algunas dependencias de generación de PDF necesitan el runtime
+de GTK, que en Windows no viene instalado. Se baja del
+[instalador oficial](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe).
+
 ---
 
 ## Acceso al sistema (Linux y Windows)
@@ -196,14 +195,21 @@ Una vez iniciado el servidor:
 - Panel de administración (backoffice): http://127.0.0.1:8000/admin
 - Pantalla de login: http://127.0.0.1:8000/
 
-### Redirección luego del login
+Después de iniciar sesión, el sistema redirige a la vista `inicio`; ya viene
+configurado con `LOGIN_REDIRECT_URL` en `gestionInstituto/settings.py`, no hay
+que agregar nada.
 
-Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista
-`inicio`, agregá la siguiente línea en `gestionInstituto/settings.py`:
+---
 
-```python
-LOGIN_REDIRECT_URL = 'inicio'
+## Correr los tests
+
+```bash
+python manage.py test inscripcionFinales --settings=gestionInstituto.settings_TEST
 ```
+
+> **El `--settings` no es opcional.** `settings_TEST` levanta una base SQLite en
+> memoria. Sin ese parámetro, Django toma el `DATABASE_URL` de tu `.env` y, si
+> apunta a la base compartida (Neon), intenta crear ahí una base de prueba.
 
 ---
 
