@@ -37,15 +37,24 @@ print(f"LOCAL_PASS={q(os.environ['POSTGRES_PASSWORD'])}")
 PY
 )"
 
-# Guarda: el destino es siempre el servicio db del compose, nunca algo remoto.
-DESTINO_HOST=db
-case "$DESTINO_HOST" in
-  *neon.tech*|*amazonaws.com*)
-    echo "ERROR: el destino apunta a un host remoto. Abortando." >&2; exit 1 ;;
-esac
-
 SERVICIO_DB=$(docker compose ps -q db)
 [ -n "$SERVICIO_DB" ] || { echo "ERROR: el contenedor 'db' no esta corriendo. Corre: docker compose up -d db" >&2; exit 1; }
+
+# Guarda real: antes de borrar nada, preguntarle al servidor de DESTINO donde
+# esta. Las ordenes de abajo entran por `docker exec` sin -h, asi que pegan al
+# socket del contenedor; esto lo verifica en vez de darlo por sentado.
+DESTINO_ADDR=$(docker exec -i -e PGPASSWORD="$LOCAL_PASS" "$SERVICIO_DB" \
+  psql -U "$LOCAL_USER" -d postgres -tAc \
+  "SELECT coalesce(host(inet_server_addr()), 'socket-local');" 2>/dev/null | tr -d '[:space:]')
+
+case "$DESTINO_ADDR" in
+  socket-local|127.0.0.1|::1|10.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|192.168.*)
+    echo "==> Destino verificado: $DESTINO_ADDR (dentro del contenedor)" ;;
+  "")
+    echo "ERROR: no se pudo verificar donde esta el servidor de destino. Abortando." >&2; exit 1 ;;
+  *)
+    echo "ERROR: el destino ($DESTINO_ADDR) no es local. Me niego a borrar esa base." >&2; exit 1 ;;
+esac
 
 DUMP=${1:-}
 if [ -z "$DUMP" ]; then
@@ -78,7 +87,7 @@ SQL
 
 echo "==> Restaurando"
 docker exec -i -e PGPASSWORD="$LOCAL_PASS" "$SERVICIO_DB" \
-  psql -U "$LOCAL_USER" -d "$LOCAL_DB" -q > /dev/null < "$DUMP"
+  psql -U "$LOCAL_USER" -d "$LOCAL_DB" -q -v ON_ERROR_STOP=1 > /dev/null < "$DUMP"
 
 echo "==> Listo. Contenido de la copia local:"
 docker exec -i -e PGPASSWORD="$LOCAL_PASS" "$SERVICIO_DB" \
