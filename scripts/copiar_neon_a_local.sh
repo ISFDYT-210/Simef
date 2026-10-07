@@ -14,27 +14,42 @@ cd "$(dirname "$0")/.."
 
 [ -f .env ] || { echo "ERROR: falta .env en la raiz del repo" >&2; exit 1; }
 
-# Las credenciales salen del .env con Python, no con grep: la contraseña puede
+# Las credenciales salen del .env con Python, no con grep: la contrasena puede
 # traer caracteres que rompen el parseo a mano o el de la URI de psql.
-eval "$(python3 - <<'PY'
-import os
+# Solo biblioteca estandar, a proposito: asi el unico requisito es python3, sin
+# venv armado ni dependencias instaladas.
+eval "$(python3 - <<'PYENV'
 from urllib.parse import urlparse, unquote
-from dotenv import load_dotenv
-load_dotenv('.env')
-url = os.environ.get('DATABASE_URL', '')
-if not url:
-    raise SystemExit("echo 'ERROR: DATABASE_URL no esta definido en .env' >&2; exit 1")
-u = urlparse(url)
-def q(s): return "'" + str(s).replace("'", "'\\''") + "'"
+
+env = {}
+with open('.env', encoding='utf-8') as fh:
+    for linea in fh:
+        linea = linea.strip()
+        if not linea or linea.startswith('#') or '=' not in linea:
+            continue
+        clave, _, valor = linea.partition('=')
+        valor = valor.strip()
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in ('"', "'"):
+            valor = valor[1:-1]
+        env[clave.strip()] = valor
+
+faltan = [k for k in ('DATABASE_URL', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD')
+          if not env.get(k)]
+if faltan:
+    raise SystemExit("echo 'ERROR: faltan variables en .env: %s' >&2; exit 1" % ', '.join(faltan))
+
+u = urlparse(env['DATABASE_URL'])
+def q(s):
+    return "'" + str(s).replace("'", "'\\''") + "'"
 print(f"ORIGEN_HOST={q(u.hostname)}")
 print(f"ORIGEN_PORT={q(u.port or 5432)}")
 print(f"ORIGEN_DB={q(u.path.lstrip('/'))}")
 print(f"ORIGEN_USER={q(unquote(u.username or ''))}")
 print(f"ORIGEN_PASS={q(unquote(u.password or ''))}")
-print(f"LOCAL_DB={q(os.environ['POSTGRES_DB'])}")
-print(f"LOCAL_USER={q(os.environ['POSTGRES_USER'])}")
-print(f"LOCAL_PASS={q(os.environ['POSTGRES_PASSWORD'])}")
-PY
+print(f"LOCAL_DB={q(env['POSTGRES_DB'])}")
+print(f"LOCAL_USER={q(env['POSTGRES_USER'])}")
+print(f"LOCAL_PASS={q(env['POSTGRES_PASSWORD'])}")
+PYENV
 )"
 
 SERVICIO_DB=$(docker compose ps -q db)

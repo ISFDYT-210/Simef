@@ -191,7 +191,21 @@ docker compose run --rm --no-deps \
 ### Traer los datos de Neon a la base local
 
 Para probar contra datos reales sin tocar la base del instituto, hay un script
-que copia Neon a la Postgres del compose:
+que copia Neon a la Postgres del compose.
+
+**Lo que necesitás, si recién clonaste el repo:**
+
+1. El `.env` creado y completo (paso 2 de esta guía). El script usa de ahí el
+   `DATABASE_URL` de Neon como origen, y `POSTGRES_DB`/`POSTGRES_USER`/
+   `POSTGRES_PASSWORD` como destino. Si falta alguno, te lo dice por nombre.
+2. El contenedor de la base levantado: `docker compose up -d db`. Es ahí donde
+   corre `pg_dump`, así que **no hace falta instalar `postgresql-client`**.
+3. `python3` disponible. Nada más: el script lee el `.env` con la biblioteca
+   estándar, así que **no necesita el venv armado ni dependencias instaladas**.
+4. Salida de red al puerto 5432 de Neon. Si no la tenés, el script aborta en 15
+   segundos y te lo dice, en vez de quedarse colgado.
+
+Con eso:
 
 ```bash
 ./scripts/copiar_neon_a_local.sh
