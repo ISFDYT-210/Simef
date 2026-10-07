@@ -51,7 +51,6 @@ path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estu
     path('alta_masiva_materia/', login_required(alta_masiva_materia), name= 'AltaMasivaMaterias'),
     path('editar_materia/<int:id>/', login_required(editar_materia), name='editar_materia'),
     path('exito_cambios_materia/', login_required(exito_cambios_materia), name='exito_cambios_materia'),
-    path('alerta_materia_existente', login_required(alerta_materia_existente), name='alerta_materia_existente'),
     path('ver_materias/<int:id>/', ver_materias, name='ver_materias'),
     path('abrir_inscripcion_materia/<int:carrera>/<int:anio>', abrir_inscripcion_materia, name='abrir_inscripcion_materia'),
     path('cerrar_inscripcion_materia/<int:carrera>/<int:anio>', cerrar_inscripcion_materia, name='cerrar_inscripcion_materia'),
@@ -72,7 +71,6 @@ path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_est
     path('imprimir_mesas_finales_pdf/', imprimir_mesas_finales_pdf, name='imprimir_mesas_finales_pdf'),
 
     #Alta e Inscripcion mesa de final Administrativo
-    path('mesas_finales/', MesasFinalesListView.as_view(), name='mesas_finales_list'),
     path('inscribir_mesa_final/', inscribir_mesa_final, name='inscribir_mesa_final'),
     #Alta e Inscripcion mesa de final
 

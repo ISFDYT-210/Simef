@@ -512,9 +512,6 @@ def exito_cambios_materia(request):
 
 def exito_alta_materia(request):
     return render(request, 'materias/exito_alta_materia.html')
-def alerta_materia_existente(request):
-    return render(request, 'alerta_materia_existente')
-
 def listarMateriasFinal(request):
     materias_final = []
     materias_disponibles=usuarios_materia.objects.filter(usuario=request.user,aprobada=False)
@@ -1501,11 +1498,6 @@ def alta_estudiante(request):
             form = EstudianteForm()
             return render(request, 'alta_estudiante.html', {'form': form})
         
-class MesasFinalesListView(ListView):
-    model = MesaFinal
-    template_name = 'finales/mesas_finales_list.html'
-    context_object_name = 'mesas_finales'
-
 @capacidad_requerida('abrir_inscripciones')
 def inscribir_mesa_final(request):
     if request.method == 'POST':
