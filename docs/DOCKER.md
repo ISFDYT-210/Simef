@@ -190,41 +190,20 @@ docker compose run --rm --no-deps \
 
 ### Traer los datos de Neon a la base local
 
-Para probar contra datos reales sin tocar la base del instituto, hay un script
-que copia Neon a la Postgres del compose.
-
-**Lo que necesitás, si recién clonaste el repo:**
-
-1. El `.env` creado y completo (paso 2 de esta guía). El script usa de ahí el
-   `DATABASE_URL` de Neon como origen, y `POSTGRES_DB`/`POSTGRES_USER`/
-   `POSTGRES_PASSWORD` como destino. Si falta alguno, te lo dice por nombre.
-2. El contenedor de la base levantado: `docker compose up -d db`. Es ahí donde
-   corre `pg_dump`, así que **no hace falta instalar `postgresql-client`**.
-3. `python3` disponible. Nada más: el script lee el `.env` con la biblioteca
-   estándar, así que **no necesita el venv armado ni dependencias instaladas**.
-4. Salida de red al puerto 5432 de Neon. Si no la tenés, el script aborta en 15
-   segundos y te lo dice, en vez de quedarse colgado.
-
-Con eso:
+La base local arranca vacía. Para llenarla con una copia de los datos reales, sin
+tocar la base del instituto:
 
 ```bash
+docker compose up -d db
 ./scripts/copiar_neon_a_local.sh
+docker compose restart web
 ```
 
-A Neon lo **lee y nada más** (`pg_dump` no escribe). Lo que borra y recrea es la
-base local. Deja el dump en `backups/`, que está en el `.gitignore` —
-**importante, porque son datos personales de alumnos: no los commitees**.
+Los requisitos, el detalle de qué hace cada paso y los problemas comunes están en
+**[COPIA_DATOS.md](COPIA_DATOS.md)**.
 
-Para volver a cargar un dump que ya tenés, sin bajarlo de nuevo:
-
-```bash
-./scripts/copiar_neon_a_local.sh backups/neon-2026-10-07-1030.sql
-```
-
-Después, `docker compose restart web` para que la app tome la base recargada.
-
-> `pg_dump` corre **dentro del contenedor `db`**, que ya trae el cliente de
-> Postgres 16. No hace falta instalar `postgresql-client` en tu máquina.
+> El dump queda en `backups/`, que está en el `.gitignore`: **son datos
+> personales de alumnos, no los commitees**.
 
 ## 3. Levantar el stack
 

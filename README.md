@@ -34,8 +34,9 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 |---|---|
 | [docs/DOCKER.md](docs/DOCKER.md) | Levantar el proyecto completo (Django + Postgres) con Docker Compose. |
 | [docs/ENV.md](docs/ENV.md) | Qué es cada variable de `.env.example` y cómo armar tu `.env`. |
+| [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md) | Copiar los datos de Neon a tu base local para probar sin tocar la del instituto. |
 | [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
-| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + MariaDB) en Debian. |
+| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + Postgres en Neon) en Debian. |
 | [docs/tailwind.md](docs/tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
 | [docs/TARJETAS_GH.md](docs/TARJETAS_GH.md) | Cómo cargar tarjetas de trabajo (issues) al tablero con la CLI `gh`. |
 | [docs/INFORME_MODIFICACIONES.md](docs/INFORME_MODIFICACIONES.md) | Registro de cambios del proyecto. |
