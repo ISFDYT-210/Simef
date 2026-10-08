@@ -39,6 +39,12 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h]
 
+# Origenes HTTPS desde los que se aceptan formularios POST, separados por coma.
+# Hace falta cuando la app se abre detras de un proxy con otro esquema, como la
+# URL reenviada de un Codespace (https://*.app.github.dev): sin esto, Django
+# rechaza el login con 403 por CSRF.
+CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o]
+
 
 # Application definition
 
