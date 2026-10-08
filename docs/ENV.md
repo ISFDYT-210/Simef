@@ -20,6 +20,7 @@ credenciales reales: cada persona/entorno tiene el suyo.
 | `SECRET_KEY` | Clave secreta de Django. Para uso local cualquier valor sirve; en producción tiene que ser una clave real y secreta. |
 | `DEBUG` | `True` en desarrollo, `False` en producción. |
 | `ALLOWED_HOSTS` | Hosts/dominios permitidos, separados por coma. |
+| `CSRF_TRUSTED_ORIGINS` | Orígenes HTTPS desde los que se aceptan formularios, separados por coma (con esquema, por ejemplo `https://*.app.github.dev`). Vacío por defecto. En un Codespace hace falta, junto con `.app.github.dev` en `ALLOWED_HOSTS`, para abrir la app desde la URL reenviada; sin eso Django responde 400 al entrar y 403 al iniciar sesión. |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Credenciales de la base Postgres que levanta Docker. |
 | `DATABASE_URL` | URL de conexión a la base. Si no la definís, Django usa un SQLite local. La usan `manage.py runserver` y los tests sin `--settings`; **los contenedores de Docker la ignoran**, porque `docker-compose.override.yml` la pisa apuntando a la base local del compose (ver [DOCKER.md](DOCKER.md)). En producción apunta a Neon (ver [DESPLIEGUE.md](DESPLIEGUE.md)). |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | Credenciales SMTP, solo necesarias si vas a probar el envío de mails (recuperar contraseña, etc.). |
