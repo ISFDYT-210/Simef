@@ -694,7 +694,7 @@ def inscripcionFinalEst(request, final_id):
             return redirect('/inscripcionFinalEst/')
 
         # Validar la inscripción
-        if validar_inscripcion_final(inscripcion_usuario.id, final.materia):
+        if validar_inscripcion_final(inscripcion_usuario.id, final.materia_id):
             # Crear el objeto InscripcionFinal
             nueva_inscripcion = InscripcionFinal(
                 usuario=inscripcion_usuario,

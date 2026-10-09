@@ -366,6 +366,43 @@ class InscripcionExcepcionalMesaTest(TestCase):
         self.assertEqual(respuesta['status'], 'error')
 
 
+class InscripcionFinalEstudianteTest(TestCase):
+    """
+    inscripcionFinalEst: el alumno se inscribe solo desde /inscribirse_final/<id>.
+
+    La vista le pasaba a validar_inscripcion_final() la Materia entera en vez de
+    su id, y la consulta usuarios_materia.objects.get(materia_id=...) explotaba
+    con TypeError: ningún alumno podía inscribirse a un final por su cuenta.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        # anio=2 por el mismo motivo que en InscripcionExcepcionalMesaTest.
+        cls.materia = Materia.objects.create(nombre_materia='Psicología', carrera=carrera, anio=2)
+        cls.alumno = crear_usuario('alu_est@test.com', 'Estudiante', 'Alumno', 50)
+        cls.alumno.carrera.add(carrera)
+        cls.mesa = MesaFinal.objects.create(
+            materia=cls.materia, llamado=timezone.now() + timedelta(days=5),
+            inscripcionAbierta=True,
+        )
+        cls.url = f'/inscribirse_final/{cls.mesa.id}'
+
+    def test_alumno_que_cumple_los_requisitos_queda_inscripto(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url)
+        self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+    def test_alumno_que_no_cumple_los_requisitos_no_queda_inscripto(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url)
+        self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+
 class TribunalMesaTest(TestCase):
     """
     Asignación de tribunal: Preceptor asigna Presidente/Vocales, puede
