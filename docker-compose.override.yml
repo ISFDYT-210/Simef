@@ -1,0 +1,27 @@
+# Ajustes SOLO para desarrollo local. Docker Compose lee este archivo
+# automaticamente y lo superpone a docker-compose.yml.
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  web:
+    volumes:
+      # El codigo fuente montado: editar y recargar sin reconstruir la imagen.
+      - .:/app
+
+    environment:
+      # IMPORTANTE: esto pisa el DATABASE_URL del .env a proposito.
+      #
+      # entrypoint.sh corre `migrate` en cada arranque del contenedor. Si el
+      # DATABASE_URL del .env apunta a Neon, cada `docker compose up` aplica a
+      # la base del instituto las migraciones de la rama en la que estes parado.
+      # Ya paso: el 2026-10-06 se aplicaron a Neon dos migraciones que solo
+      # existian en una rama de integracion sin mergear.
+      #
+      # Apuntando al servicio `db` de este compose, el desarrollo local queda
+      # aislado y Neon solo se toca desde un despliegue deliberado.
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+    command: ["gunicorn", "gestionInstituto.wsgi:application", "--bind", "0.0.0.0:8000", "--reload"]

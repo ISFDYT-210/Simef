@@ -1,65 +1,54 @@
 {% extends 'base/base.html' %}
-{% block title %}Alta de Materia{% endblock %}
+{% block title %}Alta de materia{% endblock %}
+{% block encabezado %}Alta de materia{% endblock %}
 {% block content %}
-{% load static %}
-<div id="crear-materia"> 
-    <form method="POST" class="form">
-        <div class="edit-rectangulo1" style="margin-top: 50px;">
-            {% csrf_token %}
-            <p class="text-center reg-titles">
-                Completar los siguientes campos:
-                <br>
-            </p>
-            <p class="text-left form-items">
-                <label for="id_nombreDeMateria">Nombre de materia:</label>
-                {{ form.nombre_materia }}
-            </p>
-            <p class="text-left form-items">
-                <label for="id_carrera">Carrera:</label>
-                {{ form.carrera }}
-            </p>
-            <p class="text-left form-items">
-                <label for="id_profesor">Profesor:</label>
-                {{ form.profesor }}
-            </p>
-            <p class="form-left-horario form-items">
-                <label for="id_anio">Año:</label>
-                {{ form.anio }}
-            </p>
-            <p class="form-left-horario form-items">
-                <label for="id_dia">Día:</label>
-                {{ form.dia }}
-            </p>
-            <p class="form-left-horario form-items">
-                <label for="id_horario">Horario:</label>
-                {{ form.Horario }}
-            </p>
-
-            <br>
-        </div>
-        <div class="cp-rectangulo2">
-            <div class="logo-registracion only-lt">
-                <img src="/static/imagenes/SIMEF.png" class="logo-reg only-lt" style="width: 300px;height: 320px;">
-            </div>
-            <div class="botones-edituser">
-                <button type="submit" class="btn btn-blue" style="transition: 0.6s">Guardar</button>
-    
-                <div id="volver_materias">
-                    <a href='/' style="font-size: 20px; text-decoration: none"> Volver </a>
-                </div>
-            </div>
-        </div>
-    </form>
+<div class="mx-auto max-w-2xl">
+  <form method="POST" id="materiaForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {% csrf_token %}
+    <div class="border-b border-slate-200 px-6 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Completá los siguientes campos</h2>
+    </div>
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 px-6 py-6 sm:grid-cols-2">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Nombre de materia</label>
+        {{ form.nombre_materia }}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Carrera</label>
+        {{ form.carrera }}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Profesor</label>
+        {{ form.profesor }}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Año</label>
+        {{ form.anio }}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Día</label>
+        {{ form.dia }}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">Horario</label>
+        {{ form.Horario }}
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+      <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-celeste-500">Guardar</button>
+      <a href="/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver</a>
+    </div>
+  </form>
 </div>
 <script>
-    function findElementByInnerHTML(innerHTML) {
-        const allElements = document.querySelectorAll('*');
-        return Array.from(allElements).find(element => element.innerHTML.trim() === innerHTML.trim());
-    }
-    nocorresponde = findElementByInnerHTML('No corresponde')
-    if (nocorresponde != null)
-    {
-        nocorresponde.remove()
-    }
+  document.addEventListener('DOMContentLoaded', function () {
+    var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
+    document.querySelectorAll('#materiaForm input:not([type=hidden]):not([type=checkbox]), #materiaForm select, #materiaForm textarea')
+      .forEach(function (el) { el.classList.add.apply(el.classList, c); });
+    // quita la opción vacía "No corresponde" de los select, como el original
+    document.querySelectorAll('#materiaForm option').forEach(function (o) {
+      if (o.textContent.trim() === 'No corresponde') o.remove();
+    });
+  });
 </script>
 {% endblock %}

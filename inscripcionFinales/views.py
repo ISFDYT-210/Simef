@@ -1,7 +1,11 @@
+import re
+import unicodedata
+from collections import defaultdict
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.views import LoginView, LogoutView    
+from django.contrib.auth.views import LoginView, LogoutView
 from .models import *
 from .forms import *
+from . import correlativas
 from django.views.generic import CreateView,TemplateView,ListView,UpdateView,DeleteView,FormView
 from django.core.mail import send_mail
 from django.contrib.auth import *
@@ -62,6 +66,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas
 import io
 from django.utils.timezone import now
+from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
+from .audit import registrar_auditoria
 
 # ... aquí van tus otros imports existentes
 
@@ -74,7 +80,17 @@ class HomePageView(TemplateView):
     
 
 class CustomLoginView(LoginView):
-  pass
+    def form_valid(self, form):
+        # Checkbox name="recordarme" con value="recordarme" en login.html:320.
+        # Cuando está marcado, request.POST.get('recordarme') devuelve 'recordarme' (truthy);
+        # cuando está desmarcado, el key no está presente y devuelve None (falsy).
+        # set_expiry(1209600) -> 14 dias; set_expiry(0) -> expira al cerrar el navegador.
+        remember = self.request.POST.get('recordarme')
+        if remember:
+            self.request.session.set_expiry(1209600)
+        else:
+            self.request.session.set_expiry(0)
+        return super().form_valid(form)
 
        
 class CustomLogoutView(LogoutView):
@@ -86,33 +102,23 @@ class CustomLogoutView(LogoutView):
 
 
 
-class registerView(CreateView):
+class registerView(CapacidadRequeridaMixin, CreateView):
+    capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     form_class = registri_user_form
     
     def form_valid(self, form):
         usuario_email = form.cleaned_data.get('email')
-        password1 = form.cleaned_data.get('password1')
-        
-        # Crear el usuario
-        nuevo_usuario = form.save(commit=False)
-        nuevo_usuario.first_login = True
-        nuevo_usuario.save()
-        
-        # DESCOMENTA Y CORRIGE ESTA LÍNEA:
-        from django.core.mail import send_mail
-        try:
-            send_mail(
-                subject='Credenciales de acceso - Sistema Instituto',
-                message=f'Bienvenido al sistema.\n\nTus credenciales de acceso son:\n- Email: {usuario_email}\n- Contraseña temporal: {password1}\n\nPor seguridad, deberás cambiar esta contraseña en tu primer ingreso.',
-                from_email='proyec.i210@gmail.com',
-                recipient_list=[usuario_email],
-                fail_silently=False,
-            )
-            messages.success(self.request, f'Usuario creado exitosamente. Se han enviado las credenciales a {usuario_email}')
-        except Exception as e:
-            messages.warning(self.request, f'Usuario creado, pero hubo un error al enviar el email: {str(e)}')
-        
+        password_generado = form.password_generado
+
+        form.instance.first_login = True
+        form.save()  # guarda el usuario, asigna carrera y (si puede) manda el mail
+
+        messages.success(
+            self.request,
+            f'Usuario {usuario_email} creado correctamente. Contraseña: {password_generado}'
+        )
+        registrar_auditoria(self.request, f'Creó el usuario {usuario_email}', 'Usuario', form.instance.pk)
         return redirect('/user_list')
     
 
@@ -124,26 +130,45 @@ class editUser(UpdateView):
     template_name = 'registration/edit_profile.html'
     success_url = '/user_list/'  # Cambiar a lista de usuarios
     
+    def dispatch(self, request, *args, **kwargs):
+        es_perfil_propio = str(request.user.pk) == str(kwargs.get('pk'))
+        if not es_perfil_propio and not request.user.tiene_capacidad('gestionar_usuarios'):
+            return render(request, '403_forbidden.html', status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def puede_editar_rol(self):
+        return self.request.user.is_superuser or self.request.user.es_directivo() or self.request.user.es_secretario()
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['puede_editar_rol'] = self.puede_editar_rol()
+        return kwargs
+
     def form_valid(self, form):
         # Validaciones adicionales antes de guardar
         dni = form.cleaned_data.get('dni')
         telefono_1 = form.cleaned_data.get('telefono_1')
         telefono_2 = form.cleaned_data.get('telefono_2')
-        
+
         # Validar DNI único (excluyendo el usuario actual)
         if dni and Usuario.objects.filter(dni=dni).exclude(id=self.object.id).exists():
             messages.error(self.request, 'Ya existe un usuario con ese DNI.')
             return self.form_invalid(form)
-        
+
         # Validar teléfonos si están presentes
-        if telefono_1 and (len(str(telefono_1)) < 6 or len(str(telefono_1)) > 15):
-            messages.error(self.request, 'El teléfono debe tener entre 6 y 15 dígitos.')
+        if telefono_1 and not re.fullmatch(r'\d{10}', telefono_1):
+            messages.error(self.request, 'El teléfono debe tener exactamente 10 dígitos.')
             return self.form_invalid(form)
-            
-        if telefono_2 and (len(str(telefono_2)) < 6 or len(str(telefono_2)) > 15):
-            messages.error(self.request, 'El celular debe tener entre 6 y 15 dígitos.')
+
+        if telefono_2 and not re.fullmatch(r'\d{10}', telefono_2):
+            messages.error(self.request, 'El celular debe tener exactamente 10 dígitos.')
             return self.form_invalid(form)
-        
+
+        # El campo 'rol' es dinámico y no forma parte de Meta.fields, así que
+        # ModelForm no lo aplica solo: lo asignamos a mano si el usuario tiene permiso.
+        if self.puede_editar_rol() and 'rol' in form.cleaned_data:
+            form.instance.rol = form.cleaned_data['rol']
+
         # Si todo está bien, guardar y mostrar mensaje de éxito
         response = super().form_valid(form)
         messages.success(self.request, 'El usuario se ha editado correctamente.')
@@ -158,6 +183,7 @@ class editUser(UpdateView):
     
 
 
+@capacidad_requerida('gestionar_mesas')
 def editMesa(request, pk):
     mesa = get_object_or_404(MesaFinal, pk=pk)
     
@@ -206,17 +232,20 @@ class profileviews(TemplateView):
     model = Usuario 
   
 
-class deleteUser(DeleteView):
+class deleteUser(CapacidadRequeridaMixin, DeleteView):
+    capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     template_name ='registration/delete_user.html'
     success_url = '/user_list'
     
-class deleteInscripcion(DeleteView):
+class deleteInscripcion(CapacidadRequeridaMixin, DeleteView):
+    capacidades_requeridas = ('gestionar_mesas',)
     model = InscripcionFinal
     template_name ='registration/delete_inscripcion.html'
     success_url = '/inscripcion_finales_lista'
 
-class deleteMesa(DeleteView):
+class deleteMesa(CapacidadRequeridaMixin, DeleteView):
+    capacidades_requeridas = ('gestionar_mesas',)
     model = MesaFinal
     template_name ='registration/delete_mesa.html'
     success_url = '/mesas_lista'
@@ -244,49 +273,172 @@ class carreraView(CreateView):
         form.save()
         Carrera = form.cleaned_data.get('nombre_carrera')
         Resolucion = form.cleaned_data.get('num_resolucion')
-      
-        
+
+
         return redirect('/')
 
-class listUser(ListView):
-    model = Usuario
+@capacidad_requerida('gestionar_materias')
+def lista_carreras(request):
+    carreras = Carrera.objects.all().order_by('nombre_carrera')
+    return render(request, 'carreras/lista_carreras.html', {'carreras': carreras})
+
+@capacidad_requerida('gestionar_materias')
+def editar_carrera(request, id):
+    carrera = get_object_or_404(Carrera, id=id)
+    if request.method == 'POST':
+        form = carreraForm(request.POST, instance=carrera)
+        if form.is_valid():
+            form.save()
+            return redirect('lista_carreras')
+    else:
+        form = carreraForm(instance=carrera)
+    return render(request, 'carreras/editar_carrera.html', {'form': form, 'carrera': carrera})
+
+class listUser(CapacidadRequeridaMixin, TemplateView):
+    """Solo sirve el HTML; las filas las pide el navegador a api_lista_usuarios."""
+    capacidades_requeridas = ('gestionar_usuarios',)
     template_name = 'registration/list_user.html'
-    paginate_by = 20  # Agregar paginación
-    
+
+
+def api_lista_usuarios(request):
+    if not request.user.puede_gestionar_usuarios():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = Usuario.objects.all().order_by('rol', 'nombre_completo')
+
+    busqueda = _sin_acentos(request.GET.get('q', ''))
+    if busqueda:
+        # nombre_completo ignora tildes, igual que el resto de los buscadores
+        # del sistema; dni/email se buscan tal cual (ya son case-insensitive
+        # por icontains). La tabla de usuarios es chica, por eso resolver el
+        # nombre acá en Python no es un problema (mismo criterio que
+        # api_lista_mesas con las materias).
+        ids_por_nombre = [
+            uid for uid, nombre in qs.values_list('id', 'nombre_completo')
+            if busqueda in _sin_acentos(nombre)
+        ]
+        qs = qs.filter(
+            Q(id__in=ids_por_nombre) | Q(dni__icontains=busqueda) | Q(email__icontains=busqueda)
+        )
+
+    return _pagina_json(qs, request, lambda u: {
+        'id': u.id,
+        'email': u.email,
+        'nombre_completo': u.nombre_completo,
+        'dni': u.dni,
+        'rol': u.rol,
+        'rol_display': u.get_rol_display(),
+    })
+
+
+ROLES_AUDITABLES = ('Directivo', 'Secretario', 'Preceptor', 'Profesor')
+
+
+class listAuditoria(CapacidadRequeridaMixin, ListView):
+    capacidades_requeridas = ('ver_auditoria',)
+    model = RegistroAuditoria
+    template_name = 'registration/list_auditoria.html'
+    paginate_by = 25
+
     def get_queryset(self):
-        queryset = Usuario.objects.all().order_by('rol', 'nombre_completo')
-        
-        # Filtrar por rol si se especifica
+        queryset = RegistroAuditoria.objects.select_related('usuario').filter(
+            usuario__rol__in=ROLES_AUDITABLES
+        )
+
         rol_filter = self.request.GET.get('rol')
-        if rol_filter:
-            queryset = queryset.filter(rol=rol_filter)
-            
-        # Filtrar por búsqueda si se especifica
+        if rol_filter in ROLES_AUDITABLES:
+            queryset = queryset.filter(usuario__rol=rol_filter)
+
         search = self.request.GET.get('search')
         if search:
             queryset = queryset.filter(
-                Q(nombre_completo__icontains=search) |
-                Q(email__icontains=search) |
-                Q(dni__icontains=search)
+                Q(usuario__nombre_completo__icontains=search) |
+                Q(usuario__email__icontains=search) |
+                Q(accion__icontains=search)
             )
-            
+
         return queryset
-        
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Agregar opciones de roles para filtros
-        context['roles'] = Usuario.ROL_CHOICES
+        context['roles'] = [(r, dict(Usuario.ROL_CHOICES)[r]) for r in ROLES_AUDITABLES]
         context['rol_actual'] = self.request.GET.get('rol', '')
         context['search_actual'] = self.request.GET.get('search', '')
         return context
-    
-class listInscripcion(ListView):
-    model = InscripcionFinal
+
+
+def _sin_acentos(texto):
+    """'Matemática' -> 'matematica'. Para que buscar sin tildes igual encuentre."""
+    sin_tildes = unicodedata.normalize('NFD', str(texto or ''))
+    sin_tildes = ''.join(c for c in sin_tildes if unicodedata.category(c) != 'Mn')
+    return sin_tildes.lower().strip()
+
+
+def _pagina_json(queryset, request, armar_fila, por_pagina=10):
+    """Pagina en la base (LIMIT/OFFSET) y devuelve el JSON que consumen los listados."""
+    paginator = Paginator(queryset, por_pagina)
+    page = paginator.get_page(request.GET.get('page', 1))
+    return JsonResponse({
+        'results': [armar_fila(obj) for obj in page.object_list],
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
+
+
+class listInscripcion(TemplateView):
+    """Solo sirve el HTML; las filas las pide el navegador a api_lista_inscripciones."""
     template_name = 'registration/list_inscripcion.html'
 
-class listMesa(ListView):
-    model = MesaFinal
+
+def api_lista_inscripciones(request):
+    if not request.user.puede_administrar():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = InscripcionFinal.objects.select_related('usuario', 'llamado__materia').order_by('usuario__nombre_completo')
+
+    return _pagina_json(qs, request, lambda insc: {
+        'id': insc.id,
+        'usuario': str(insc.usuario),
+        'llamado': str(insc.llamado),
+    })
+
+
+class listMesa(TemplateView):
+    """Solo sirve el HTML; las filas las pide el navegador a api_lista_mesas."""
     template_name = 'registration/mesas_finales_lista.html'
+
+
+def api_lista_mesas(request):
+    es_profesor = request.user.es_profesor() and not request.user.puede_gestionar_mesas()
+    if not (request.user.puede_gestionar_mesas() or es_profesor):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = MesaFinal.objects.select_related('materia').order_by('-llamado')
+    if es_profesor:
+        # El profesor solo ve las mesas de las materias que dicta
+        qs = qs.filter(materia__profesor=request.user)
+
+    busqueda = _sin_acentos(request.GET.get('q', ''))
+    if busqueda:
+        # La búsqueda del listado ignora tildes. Como 'translate' no existe en
+        # SQLite, resolvemos las materias que coinciden acá (la tabla es chica)
+        # y filtramos por id, que funciona igual en Postgres y en SQLite.
+        ids = [
+            mid for mid, nombre in Materia.objects.values_list('id', 'nombre_materia')
+            if busqueda in _sin_acentos(nombre)
+        ]
+        qs = qs.filter(materia_id__in=ids)
+
+    return _pagina_json(qs, request, lambda mesa: {
+        'id': mesa.id,
+        'materia': str(mesa.materia),
+        'fecha': mesa.llamado.strftime('%d/%m/%Y'),
+        'hora': mesa.llamado.strftime('%H:%M'),
+        # inscripcion_vigente distingue "abierta de verdad" de "quedó abierta pero venció"
+        'vigente': mesa.inscripcion_vigente(),
+        'abierta': mesa.inscripcionAbierta,
+    })
    
    
 class showUser(ListView):
@@ -295,13 +447,8 @@ class showUser(ListView):
 
 
 def lista_materias_user(request):
-    usuario = request.user.id
-    materias_disponibles = []
-    materias = Materia.objects.all()
-    for materia in materias:
-        if validar_inscripcion_materias(usuario, materia.id) and materia.inscripcionAbierta:
-            materias_disponibles.append(materia)
-    return render(request, 'materias/lista_materias_disponibles_user.html', {'materias': materias_disponibles})
+    materias_con_requisitos = correlativas.materias_con_requisitos(request.user)
+    return render(request, 'materias/lista_materias_disponibles_user.html', {'materias_con_requisitos': materias_con_requisitos})
 
 def lista_materias_inscriptas_user(request):
     usuario = request.user.id
@@ -312,10 +459,17 @@ def lista_materias_inscriptas_user(request):
     
     return render(request, 'materias/lista_materias_inscriptas_user.html', {'materias': materias_inscriptas})
 
+@capacidad_requerida('ver_reportes', 'cargar_notas')
 def lista_materias_inscriptas_adm(request):
-    materias_inscriptas = usuarios_materia.objects.select_related('materia')
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return render(request, '403_forbidden.html', status=403)
+    materias_inscriptas = usuarios_materia.objects.select_related('materia', 'usuario').order_by('usuario__nombre_completo')
+    if request.user.es_profesor() and not request.user.is_superuser:
+        # El profesor solo ve a sus propios alumnos, no los de toda la escuela
+        materias_inscriptas = materias_inscriptas.filter(materia__profesor=request.user)
     return render(request, 'materias/lista_materias_inscriptas_adm.html', {'materias': materias_inscriptas})
 
+@capacidad_requerida('ver_materias')
 def lista_materias_admin(request):
     carreras = Carrera.objects.all()
     materias_all = Materia.objects.all().order_by('anio')  
@@ -343,6 +497,7 @@ def lista_materias_admin(request):
     
     return render(request, 'materias/lista_materias_admin.html', {'materias': materias, 'carreras': carreras})    
 
+@capacidad_requerida('gestionar_materias')
 def alta_materia(request):
     if request.method == 'POST':
         form = MateriaForm(request.POST)
@@ -361,18 +516,16 @@ def exito_cambios_materia(request):
 
 def exito_alta_materia(request):
     return render(request, 'materias/exito_alta_materia.html')
-def alerta_materia_existente(request):
-    return render(request, 'alerta_materia_existente')
-
 def listarMateriasFinal(request):
     materias_final = []
     materias_disponibles=usuarios_materia.objects.filter(usuario=request.user,aprobada=False)
     for m in materias_disponibles:
-        if m.puede_inscribirse_en_mesa_final() and MesaFinal.objects.filter(materia=m.materia,vigente=True).exist():
+        if m.puede_inscribirse_en_mesa_final() and MesaFinal.objects.filter(materia=m.materia,vigente=True).exists():
             for mf in MesaFinal.objects.filter(materia=m.materia,vigente=True):
                 materias_final.append(mf)
     return render(request, 'listarMateriasFinal.html', {'materias_final' : materias_final})
 
+@capacidad_requerida('gestionar_mesas')
 def altaMesa(request):
     if request.method == 'POST':
         form = MesaFinalForm(request.POST)
@@ -404,19 +557,17 @@ def altaMesa(request):
             return JsonResponse({'status': 'error', 'message': 'Formato de fecha inválido'})
     else:
         form = MesaFinalForm()
-    
-    return render(request, 'finales/alta_mesa_final.html', {'form': form})
+
+    context = {
+        'form': form,
+        'carreras': Carrera.objects.all().order_by('nombre_carrera'),
+        'anios': Materia.ANIO_CHOICES,
+    }
+    return render(request, 'finales/alta_mesa_final.html', context)
 
 def lista_finales_user(request):
-    usuario = request.user.id
-    finales_disponibles = []
-    finales = MesaFinal.objects.all()
-    for final in finales:
-        if validar_inscripcion_final(usuario, final.materia.id) and final.inscripcionAbierta and InscripcionFinal.objects.filter(usuario=usuario, llamado__materia_id=final.materia.id).count()<1:
-            print(final.materia)
-            print(validar_inscripcion_final(usuario, final.materia.id))
-            finales_disponibles.append(final)
-    return render(request, 'finales/lista_finales_disponibles_user.html', {'finales': finales_disponibles})
+    finales_con_requisitos = correlativas.finales_con_requisitos(request.user)
+    return render(request, 'finales/lista_finales_disponibles_user.html', {'finales_con_requisitos': finales_con_requisitos})
 
 def lista_finales_inscriptos_user(request):
     usuario = request.user.id
@@ -426,17 +577,69 @@ def lista_finales_inscriptos_user(request):
     )
     return render(request, 'finales/lista_finales_inscriptos_user.html', {'finales': finales_inscriptos})
 
-def lista_finales_inscriptos_adm(request):
-    finales_inscriptos = InscripcionFinal.objects.filter(
+def _finales_inscriptos_visibles(usuario):
+    """Inscripciones a final pendientes que este usuario tiene permitido ver."""
+    qs = InscripcionFinal.objects.filter(
         Q(aprobada=False) | Q(aprobada__isnull=True)
     ).select_related('llamado__materia', 'usuario')
-    for final in finales_inscriptos:
-        final.notas = usuarios_materia.objects.filter(
-            usuario=final.usuario,
-            materia=final.llamado.materia
-    )
-    return render(request, 'finales/lista_finales_inscriptos_adm.html', {'finales': finales_inscriptos})
+    if usuario.es_profesor() and not usuario.is_superuser:
+        # El profesor solo ve a sus propios alumnos, no los de toda la escuela
+        qs = qs.filter(llamado__materia__profesor=usuario)
+    return qs
 
+
+def lista_finales_inscriptos_adm(request):
+    """Solo sirve el HTML; las filas las pide el navegador a api_finales_inscriptos_adm."""
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return render(request, '403_forbidden.html', status=403)
+    return render(request, 'finales/lista_finales_inscriptos_adm.html')
+
+
+def api_finales_inscriptos_adm(request):
+    if not (request.user.puede_administrar() or request.user.puede_cargar_notas()):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    qs = _finales_inscriptos_visibles(request.user).order_by('usuario__nombre_completo')
+
+    busqueda = request.GET.get('q', '').strip()
+    if busqueda:
+        qs = qs.filter(
+            Q(llamado__materia__nombre_materia__icontains=busqueda) |
+            Q(usuario__nombre_completo__icontains=busqueda)
+        )
+
+    paginator = Paginator(qs, 10)
+    page = paginator.get_page(request.GET.get('page', 1))
+    finales = list(page.object_list)
+
+    # Una sola query para las notas de toda la página, en vez de una por fila
+    pares = {(f.usuario_id, f.llamado.materia_id) for f in finales}
+    notas_por_par = defaultdict(list)
+    if pares:
+        for nota in usuarios_materia.objects.filter(
+            usuario_id__in={p[0] for p in pares},
+            materia_id__in={p[1] for p in pares},
+        ):
+            notas_por_par[(nota.usuario_id, nota.materia_id)].append(nota.nota_final)
+
+    return JsonResponse({
+        'results': [{
+            'id': f.id,
+            'mesa_id': f.llamado_id,
+            'materia': str(f.llamado.materia),
+            'anio': f.llamado.materia.anio,
+            'fecha': f.llamado.llamado.strftime('%d/%m/%Y'),
+            'hora': f.llamado.llamado.strftime('%H:%M'),
+            'estudiante': f.usuario.nombre_completo,
+            'dni': f.usuario.dni,
+            'notas': notas_por_par.get((f.usuario_id, f.llamado.materia_id), []),
+        } for f in finales],
+        'page': page.number,
+        'num_pages': paginator.num_pages,
+        'count': paginator.count,
+    })
+
+@capacidad_requerida('abrir_inscripciones')
 def inscripcionMesa(request):
     if request.method == 'POST':
         form = InscripcionFinalForm(request.POST)
@@ -451,22 +654,29 @@ def exito_inscripcion_final(request):
     return render(request, 'finales/exito_inscripcion_final.html')
 
 ################################################################
+@capacidad_requerida('gestionar_mesas')
 def inscripcionFinal(request):
-    """Vista principal para mostrar el formulario de inscripción"""
-    # Verificar que solo estudiantes puedan acceder
-    if request.user.rol != 'Estudiante':
-        messages.error(request, 'Solo los estudiantes pueden inscribirse a mesas finales.')
-        return redirect('/')
-    
-    # Obtener todos los estudiantes para el dropdown
-    estudiantes = Usuario.objects.filter(rol='Estudiante').order_by('nombre_completo')
-    
+    """Inscripción manual de un estudiante a una mesa de final (Preceptor/Directivo/Secretario)."""
+    anios_por_estudiante = defaultdict(set)
+    for anio, usuario_id in usuarios_materia.objects.values_list('materia__anio', 'usuario_id'):
+        anios_por_estudiante[usuario_id].add(str(anio))
+
+    estudiantes = list(
+        Usuario.objects.filter(rol='Estudiante').prefetch_related('carrera').order_by('nombre_completo')
+    )
+    for estudiante in estudiantes:
+        estudiante.anios_csv = ','.join(sorted(anios_por_estudiante.get(estudiante.id, [])))
+        estudiante.carreras_csv = ','.join(str(c.id) for c in estudiante.carrera.all())
+
     context = {
-        'estudiantes': estudiantes
+        'estudiantes': estudiantes,
+        'carreras': Carrera.objects.all().order_by('nombre_carrera'),
+        'anios': Materia.ANIO_CHOICES,
     }
     return render(request, 'finales/inscripcion_final_adm.html', context)
 
 
+@capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
     final = get_object_or_404(MesaFinal, id=final_id)
     
@@ -477,9 +687,14 @@ def inscripcionFinalEst(request, final_id):
         if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
             messages.warning(request, 'Ya estás inscrito en este final.')
             return redirect('/inscripcionFinalEst/')
-        
+
+        # Verificar que la mesa esté dentro de su período de inscripción
+        if not final.inscripcion_vigente():
+            messages.error(request, 'La inscripción para esta mesa de final está cerrada.')
+            return redirect('/inscripcionFinalEst/')
+
         # Validar la inscripción
-        if validar_inscripcion_final(inscripcion_usuario.id, final.materia):
+        if validar_inscripcion_final(inscripcion_usuario.id, final.materia_id):
             # Crear el objeto InscripcionFinal
             nueva_inscripcion = InscripcionFinal(
                 usuario=inscripcion_usuario,
@@ -496,6 +711,25 @@ def inscripcionFinalEst(request, final_id):
     # Si es GET, mostrar el formulario de confirmación
     return render(request, 'finals/inscripcion_final_adm.html', {'final': final})
 
+@capacidad_requerida('abrir_inscripciones')
+def obtener_materias_estudiante(request):
+    """Vista AJAX: materias con inscripción abierta que pertenecen a la carrera del estudiante"""
+    estudiante_id = request.GET.get('estudiante_id')
+    if not estudiante_id:
+        return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
+
+    estudiante = get_object_or_404(Usuario, id=estudiante_id)
+    materias = Materia.objects.filter(
+        inscripcionAbierta=True,
+        carrera__in=estudiante.carrera.all()
+    ).order_by('nombre_materia')
+
+    return JsonResponse({
+        'status': 'success',
+        'materias': [{'id': m.id, 'nombre': m.nombre_materia} for m in materias]
+    })
+
+@capacidad_requerida('abrir_inscripciones')
 def inscripcionMateria(request):
     if request.method == 'POST':
         inscripcion_usuario=request.POST['usuario']
@@ -511,14 +745,16 @@ def inscripcionMateria(request):
         form = InscripcionMateriaForm()
     return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form}) 
 
+@capacidad_requerida('inscribirse')
 def inscripcionMateriaEst(request, materia_id,modalidad):
     materia = get_object_or_404(Materia, id=materia_id)
     
     if request.method == 'GET':
         inscripcion_usuario = request.user
         
-        # Verificar si ya existe la inscripción
-        if usuarios_materia.objects.filter(usuario=inscripcion_usuario, materia=materia).exists():
+        # Si ya tiene una cursada activa de esta materia no puede reinscribirse;
+        # si lo que tiene es RECURSA/ABANDONO, sí puede (recursar).
+        if correlativas.tiene_inscripcion_activa(inscripcion_usuario.id, materia_id):
             messages.warning(request, 'Ya estás inscrito en esta materia.')
             return redirect('/inscripcionMateriaEst')
         
@@ -628,6 +864,60 @@ class EstudianteDeleteView(DeleteView):
     
 
 
+def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
+    """
+    Si la fila del CSV de carga masiva de usuarios trae columna 'Materia',
+    busca (o crea) la inscripción de ese usuario a esa materia y le carga
+    Modalidad / Nota de cursada / Nota de final si vienen. Así una misma
+    carga sirve para dar de alta al usuario y para cargarle la nota, sin
+    necesidad de un archivo aparte. Devuelve True si cargó algo.
+    """
+    nombre_materia = (fila.get('Materia') or '').strip()
+    if not nombre_materia:
+        return False
+
+    materias_candidatas = Materia.objects.filter(nombre_materia__iexact=nombre_materia)
+    if carrera_obj:
+        materias_candidatas = materias_candidatas.filter(carrera=carrera_obj)
+    materia = materias_candidatas.first()
+    if not materia:
+        errores.append(f'Fila {numero_fila}: Materia no encontrada ({nombre_materia})')
+        return False
+
+    inscripcion, _creada = usuarios_materia.objects.get_or_create(usuario=usuario, materia=materia)
+
+    modalidad = (fila.get('Modalidad') or '').strip()
+    if modalidad:
+        modalidades_validas = {codigo for codigo, _etiqueta in MODALIDAD_CHOICES}
+        if modalidad not in modalidades_validas:
+            errores.append(
+                f'Fila {numero_fila}: Modalidad inválida ({modalidad}). Opciones: {", ".join(modalidades_validas)}'
+            )
+        else:
+            inscripcion.modalidad = modalidad
+
+    cargo_algo = False
+    for columna, campo in (('Nota de cursada', 'nota_cursada'), ('Nota de final', 'nota_final')):
+        valor = (fila.get(columna) or '').strip()
+        if not valor:
+            continue
+        try:
+            nota = float(valor.replace(',', '.'))
+            if not (0 <= nota <= 10):
+                raise ValueError
+        except ValueError:
+            errores.append(f'Fila {numero_fila}: {columna} inválida ({valor})')
+            continue
+        setattr(inscripcion, campo, nota)
+        if campo == 'nota_final':
+            inscripcion.aprobada = nota >= 4
+        cargo_algo = True
+
+    inscripcion.save()
+    return cargo_algo
+
+
+@capacidad_requerida('gestionar_usuarios')
 def cargar_usuarios(request):
     if request.method == 'POST':
         formulario = ArchivoForm(request.POST, request.FILES)
@@ -661,6 +951,7 @@ def cargar_usuarios(request):
                 
                 usuarios_creados = 0
                 usuarios_duplicados = 0
+                notas_cargadas = 0
                 errores = []
                 
                 # Validar encabezados requeridos
@@ -698,11 +989,24 @@ def cargar_usuarios(request):
                             errores.append(f'Fila {numero_fila}: DNI inválido ({dni_str})')
                             continue
                         
-                        # Verificar duplicados
-                        if Usuario.objects.filter(Q(email=email) | Q(dni=dni)).exists():
+                        # Si el usuario ya existe no se recrea, pero igual se le
+                        # carga la materia/nota (y se le suma la carrera) si la
+                        # fila las trae: así no hace falta un CSV aparte para
+                        # cargar notas de alumnos que ya están en el sistema.
+                        usuario_existente = Usuario.objects.filter(Q(email=email) | Q(dni=dni)).first()
+                        if usuario_existente:
                             usuarios_duplicados += 1
+                            carrera_para_notas = None
+                            if fila.get('Carrera', '').strip():
+                                carrera_para_notas = Carrera.objects.filter(
+                                    nombre_carrera__iexact=fila['Carrera'].strip()
+                                ).first()
+                                if carrera_para_notas and not usuario_existente.carrera.filter(id=carrera_para_notas.id).exists():
+                                    usuario_existente.carrera.add(carrera_para_notas)
+                            if _cargar_nota_de_fila(usuario_existente, fila, carrera_para_notas, numero_fila, errores):
+                                notas_cargadas += 1
                             continue
-                        
+
                         # Campos opcionales con validaciones
                         username = fila.get('Username', '').strip() or str(dni)
                         
@@ -728,23 +1032,15 @@ def cargar_usuarios(request):
                         telefono_2 = None
                         
                         if fila.get('Telefono 1', '').strip():
-                            try:
-                                telefono_1 = int(fila['Telefono 1'].strip())
-                                if len(str(telefono_1)) < 6 or len(str(telefono_1)) > 15:
-                                    errores.append(f'Fila {numero_fila}: Teléfono 1 debe tener entre 6 y 15 dígitos')
-                                    continue
-                            except ValueError:
-                                errores.append(f'Fila {numero_fila}: Teléfono 1 inválido')
+                            telefono_1 = fila['Telefono 1'].strip()
+                            if not re.fullmatch(r'\d{10}', telefono_1):
+                                errores.append(f'Fila {numero_fila}: Teléfono 1 debe tener exactamente 10 dígitos')
                                 continue
-                        
+
                         if fila.get('Telefono 2', '').strip():
-                            try:
-                                telefono_2 = int(fila['Telefono 2'].strip())
-                                if len(str(telefono_2)) < 6 or len(str(telefono_2)) > 15:
-                                    errores.append(f'Fila {numero_fila}: Teléfono 2 debe tener entre 6 y 15 dígitos')
-                                    continue
-                            except ValueError:
-                                errores.append(f'Fila {numero_fila}: Teléfono 2 inválido')
+                            telefono_2 = fila['Telefono 2'].strip()
+                            if not re.fullmatch(r'\d{10}', telefono_2):
+                                errores.append(f'Fila {numero_fila}: Teléfono 2 debe tener exactamente 10 dígitos')
                                 continue
                         
                         # Estado civil (validar que sea una opción válida)
@@ -783,7 +1079,7 @@ def cargar_usuarios(request):
                                 continue
                         
                         # Crear usuario según el rol
-                        password = str(dni)  # Usar DNI como contraseña inicial
+                        password = PASSWORD_PREDETERMINADA  # Contraseña inicial antes del primer login
                         
                         if rol == 'Estudiante':
                             matricula = fila.get('Matricula', str(dni))  # Usar DNI como matrícula por defecto
@@ -895,7 +1191,10 @@ def cargar_usuarios(request):
                         # Asignar carrera si se encontró
                         if carrera_obj:
                             usuario.carrera.add(carrera_obj)
-                        
+
+                        if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
+                            notas_cargadas += 1
+
                         usuarios_creados += 1
                         
                     except IntegrityError as e:
@@ -907,28 +1206,39 @@ def cargar_usuarios(request):
                         errores.append(f'Fila {numero_fila}: Error inesperado - {str(e)}')
                 
                 # Mostrar resultados
-                if usuarios_creados > 0 and not errores:
-                    messages.success(request, f'Se crearon {usuarios_creados} usuarios exitosamente')
-                    return render(request, 'registration/exito_carga_masiva.html', {
-                        'usuarios_creados': usuarios_creados,
-                        'usuarios_duplicados': usuarios_duplicados
-                    })
-                elif usuarios_creados > 0:
-                    messages.warning(request, f'Se crearon {usuarios_creados} usuarios con algunas advertencias')
+                if errores:
+                    partes = [f'{usuarios_creados} usuario(s) creado(s)']
+                    if notas_cargadas:
+                        partes.append(f'{notas_cargadas} nota(s) cargada(s)')
+                    messages.warning(request, ', '.join(partes) + ', con algunas advertencias.')
                     return render(request, 'registration/warning_carga_masiva.html', {
                         'usuarios_creados': usuarios_creados,
                         'usuarios_duplicados': usuarios_duplicados,
+                        'notas_cargadas': notas_cargadas,
                         'errores': errores[:20]  # Mostrar máximo 20 errores
                     })
-                elif usuarios_duplicados > 0 and not errores:
-                    messages.warning(request, f'{usuarios_duplicados} usuarios ya existían en el sistema')
+                elif usuarios_creados > 0 or notas_cargadas > 0:
+                    partes = []
+                    if usuarios_creados:
+                        partes.append(f'{usuarios_creados} usuario(s) creado(s)')
+                    if notas_cargadas:
+                        partes.append(f'{notas_cargadas} nota(s) cargada(s)')
+                    messages.success(request, ', '.join(partes) + ' correctamente.')
+                    return render(request, 'registration/exito_carga_masiva.html', {
+                        'usuarios_creados': usuarios_creados,
+                        'usuarios_duplicados': usuarios_duplicados,
+                        'notas_cargadas': notas_cargadas,
+                    })
+                elif usuarios_duplicados > 0:
+                    messages.warning(request, f'{usuarios_duplicados} usuario(s) ya existían en el sistema; no había notas para cargarles.')
                     return render(request, 'registration/warning_carga_masiva.html', {
                         'usuarios_creados': 0,
                         'usuarios_duplicados': usuarios_duplicados,
+                        'notas_cargadas': 0,
                         'errores': []
                     })
                 else:
-                    messages.error(request, 'No se pudieron crear usuarios')
+                    messages.error(request, 'No se pudo procesar ninguna fila del archivo.')
                     return render(request, 'registration/cargar_usuarios.html', {
                         'formulario': formulario,
                         'errores': errores[:20]
@@ -946,21 +1256,152 @@ def cargar_usuarios(request):
     
     return render(request, 'registration/cargar_usuarios.html', {'formulario': formulario})
 
+@capacidad_requerida('gestionar_materias')
 def alta_masiva_materia(request):
-    if request.method == 'POST' and request.Files['archivo_csv']:
-        archivo_csv = request.FILES['archivo_csv']
-        decoded_file = archivo_csv.read().decode('utf-8').splitlines() 
-        archivo_csv= csv.DictReader(decoded_file) 
+    if request.method == 'POST':
+        form = ArchivoForm(request.POST, request.FILES)
 
-        for fila in archivo_csv:
-            nombre = fila['nombre']
-            profesor = fila['profesor']
-            carrera = fila ['carrera']
-        return HttpResponse ('Materias importadas correctamente')
+        if 'csv_file' not in request.FILES:
+            messages.error(request, 'Por favor seleccione un archivo CSV.')
+            return render(request, 'materias/alta_masiva_materia.html', {'form': ArchivoForm()})
+
+        if not form.is_valid():
+            return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+        archivo_csv = request.FILES['csv_file']
+
+        try:
+            contenido = None
+            for encoding in ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']:
+                try:
+                    archivo_csv.seek(0)
+                    contenido = archivo_csv.read().decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+            if contenido is None:
+                messages.error(request, 'No se pudo leer el archivo. Verifique la codificación.')
+                return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+            reader = csv.DictReader(contenido.splitlines(), delimiter=',')
+
+            campos_requeridos = ['Nombre materia', 'Carrera']
+            if not reader.fieldnames or not all(campo in reader.fieldnames for campo in campos_requeridos):
+                messages.error(request, f'El archivo debe contener las columnas: {", ".join(campos_requeridos)}')
+                return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+            anios_validos = [str(v) for v, _ in Materia.ANIO_CHOICES]
+            dias_validos = [v for v, _ in Materia.DIA_CHOICES]
+            horarios_validos = [v for v, _ in Materia.HORARIO_CHOICES]
+
+            materias_creadas = 0
+            materias_duplicadas = 0
+            errores = []
+
+            for numero_fila, fila in enumerate(reader, start=2):
+                try:
+                    nombre_materia = fila.get('Nombre materia', '').strip()
+                    nombre_carrera = fila.get('Carrera', '').strip()
+
+                    if not nombre_materia or not nombre_carrera:
+                        errores.append(f'Fila {numero_fila}: Campos obligatorios faltantes (Nombre materia, Carrera)')
+                        continue
+
+                    try:
+                        carrera_obj = Carrera.objects.get(nombre_carrera__iexact=nombre_carrera)
+                    except Carrera.DoesNotExist:
+                        errores.append(f'Fila {numero_fila}: Carrera no encontrada ({nombre_carrera})')
+                        continue
+
+                    if Materia.objects.filter(nombre_materia__iexact=nombre_materia, carrera=carrera_obj).exists():
+                        materias_duplicadas += 1
+                        continue
+
+                    profesor_obj = None
+                    dni_profesor = fila.get('Profesor DNI', '').strip()
+                    if dni_profesor:
+                        try:
+                            profesor_obj = Usuario.objects.get(dni=int(dni_profesor), rol='Profesor')
+                        except (ValueError, Usuario.DoesNotExist):
+                            errores.append(f'Fila {numero_fila}: Profesor no encontrado (DNI {dni_profesor})')
+                            continue
+
+                    anio = fila.get('Año', '').strip() or '1'
+                    if anio not in anios_validos:
+                        errores.append(f'Fila {numero_fila}: Año inválido. Opciones: {", ".join(anios_validos)}')
+                        continue
+
+                    dia = fila.get('Día', '').strip() or 'Lunes'
+                    if dia not in dias_validos:
+                        errores.append(f'Fila {numero_fila}: Día inválido. Opciones: {", ".join(dias_validos)}')
+                        continue
+
+                    horario = fila.get('Horario', '').strip() or '12:00'
+                    if horario not in horarios_validos:
+                        errores.append(f'Fila {numero_fila}: Horario inválido. Opciones: {", ".join(horarios_validos)}')
+                        continue
+
+                    inscripcion_str = fila.get('Inscripcion abierta', '').strip().lower()
+                    inscripcion_abierta = inscripcion_str in ['si', 'sí', 'true', '1']
+
+                    Materia.objects.create(
+                        nombre_materia=nombre_materia,
+                        carrera=carrera_obj,
+                        profesor=profesor_obj,
+                        anio=int(anio),
+                        dia=dia,
+                        Horario=horario,
+                        inscripcionAbierta=inscripcion_abierta,
+                    )
+                    materias_creadas += 1
+
+                except IntegrityError as e:
+                    errores.append(f'Fila {numero_fila}: Error de integridad - {str(e)}')
+                except Exception as e:
+                    errores.append(f'Fila {numero_fila}: Error inesperado - {str(e)}')
+
+            if materias_creadas > 0 and not errores:
+                messages.success(request, f'Se crearon {materias_creadas} materias exitosamente')
+                return render(request, 'materias/exito_carga_masiva.html', {
+                    'materias_creadas': materias_creadas,
+                    'materias_duplicadas': materias_duplicadas,
+                })
+            elif materias_creadas > 0:
+                messages.warning(request, f'Se crearon {materias_creadas} materias con algunas advertencias')
+                return render(request, 'materias/warning_carga_masiva.html', {
+                    'materias_creadas': materias_creadas,
+                    'materias_duplicadas': materias_duplicadas,
+                    'errores': errores[:20],
+                })
+            elif materias_duplicadas > 0 and not errores:
+                messages.warning(request, f'{materias_duplicadas} materias ya existían en el sistema')
+                return render(request, 'materias/warning_carga_masiva.html', {
+                    'materias_creadas': 0,
+                    'materias_duplicadas': materias_duplicadas,
+                    'errores': [],
+                })
+            else:
+                messages.error(request, 'No se pudieron crear materias')
+                return render(request, 'materias/alta_masiva_materia.html', {
+                    'form': form,
+                    'errores': errores[:20],
+                })
+
+        except Exception as e:
+            messages.error(request, f'Error procesando archivo: {str(e)}')
+            return render(request, 'materias/alta_masiva_materia.html', {'form': form})
+
+    else:
+        form = ArchivoForm()
+
+    return render(request, 'materias/alta_masiva_materia.html', {'form': form})
     return render(request, 'alta_masiva_materia.html') 
     
+@capacidad_requerida('gestionar_materias')
 def editar_materia(request, id):
     materia = get_object_or_404(Materia, id=id)
+    
     if request.method == 'POST':
         form = MateriaForm(request.POST, instance=materia)
         if form.is_valid():
@@ -968,10 +1409,13 @@ def editar_materia(request, id):
             return redirect('exito_cambios_materia')
     else:
         form = MateriaForm(instance=materia)
-        return render(request, 'materias/editar_materia.html', {'form': form})
-
+        
+    # Este return ahora ataja tanto el método GET inicial 
+    # como los POST que hayan fallado en la validación
+    return render(request, 'materias/editar_materia.html', {'form': form})
 
     
+@capacidad_requerida('gestionar_materias')
 def eliminar_materia(request, id):
     materia = get_object_or_404(Materia, pk=id)
     if request.method == 'POST':
@@ -987,102 +1431,73 @@ def eliminar_mesa(request, id):
     return render(request, 'mesas/eliminar_mesa.html', {'mesa': mesa})
 
 def eliminar_inscripcion_final(request, id):
+    """Solo el personal que gestiona mesas puede dar de baja una inscripción a
+    final. El estudiante no puede: una vez inscripto en una mesa, la baja
+    queda a criterio de la institución."""
     final = get_object_or_404(InscripcionFinal, pk=id)
-    if request.user.id==final.usuario_id and not request.user.is_staff and not request.user.is_superuser:
-        if request.method == 'POST':
-            final.delete()
-            return redirect('exito_final_eliminado_est')
-        return render(request, 'finales/eliminar_final_est.html', {'final': final})
-    elif request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            final.delete()
-            return redirect('exito_final_eliminado_adm')
-        return render(request, 'finales/eliminar_final_est.html', {'final': final})        
-    else:
-        return render(request,'403_forbidden.html')
+    if not request.user.tiene_capacidad('gestionar_mesas'):
+        return render(request, '403_forbidden.html', status=403)
+    if request.method == 'POST':
+        final.delete()
+        return redirect('exito_final_eliminado_adm')
+    return render(request, 'finales/eliminar_final_est.html', {'final': final})
 
+@capacidad_requerida('gestionar_materias')
 def eliminar_materias_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            materia_ids = request.POST.getlist('materia_ids')
-            cantidad_eliminadas = len(materia_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                Materia.objects.filter(id__in=materia_ids).delete()
-            materias = Materia.objects.all()
-            return render(request, 'materias/lista_materias_admin.html', {'materias': materias, 'cantidad_eliminadas': cantidad_eliminadas})
-        return redirect("lista_materias_admin")
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
-def abrir_materias_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            materia_ids = request.POST.getlist('materia_ids')
-            cantidad_eliminadas = len(materia_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=True)
-            return redirect(reverse_lazy('lista_materias_admin'))
-        else:
-            return redirect(reverse_lazy('lista_materias_admin'))
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
+    if request.method == 'POST':
+        materia_ids = request.POST.getlist('materia_ids')
+        cantidad_eliminadas = len(materia_ids)
+        if cantidad_eliminadas > 0:
+            Materia.objects.filter(id__in=materia_ids).delete()
+        materias = Materia.objects.all()
+        return render(request, 'materias/lista_materias_admin.html',
+                      {'materias': materias, 'cantidad_eliminadas': cantidad_eliminadas})
+    return redirect("lista_materias_admin")
 
+
+@capacidad_requerida('abrir_inscripciones')
+def abrir_materias_seleccionadas(request):
+    if request.method == 'POST':
+        materia_ids = request.POST.getlist('materia_ids')
+        if len(materia_ids) > 0:
+            Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=True)
+    return redirect(reverse_lazy('lista_materias_admin'))
+
+
+@capacidad_requerida('abrir_inscripciones')
 def cerrar_materias_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            materia_ids = request.POST.getlist('materia_ids')
-            cantidad_eliminadas = len(materia_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=False)
-            return redirect(reverse_lazy('lista_materias_admin'))
-        else:
-            return redirect(reverse_lazy('lista_materias_admin'))
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
+    if request.method == 'POST':
+        materia_ids = request.POST.getlist('materia_ids')
+        if len(materia_ids) > 0:
+            Materia.objects.filter(id__in=materia_ids).update(inscripcionAbierta=False)
+    return redirect(reverse_lazy('lista_materias_admin'))
+
+
+@capacidad_requerida('gestionar_mesas')
 def eliminar_mesas_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            mesa_ids = request.POST.getlist('mesa_ids')
-            cantidad_eliminadas = len(mesa_ids)
-            if cantidad_eliminadas > 0:
-                MesaFinal.objects.filter(id__in=mesa_ids).delete()
-            mesas = MesaFinal.objects.all()
-            return redirect('/mesas_lista')
-        return redirect('/mesas_lista')
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
+    if request.method == 'POST':
+        mesa_ids = request.POST.getlist('mesa_ids')
+        if len(mesa_ids) > 0:
+            MesaFinal.objects.filter(id__in=mesa_ids).delete()
+    return redirect('/mesas_lista')
+
+
+@capacidad_requerida('gestionar_mesas')
 def abrir_mesas_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            mesa_ids = request.POST.getlist('mesa_ids')
-            cantidad_eliminadas = len(mesa_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=True)
-            mesas = MesaFinal.objects.all()
-            return redirect('/mesas_lista')
-        return redirect('/mesas_lista')
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
-    
+    if request.method == 'POST':
+        mesa_ids = request.POST.getlist('mesa_ids')
+        if len(mesa_ids) > 0:
+            MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=True)
+    return redirect('/mesas_lista')
+
+
+@capacidad_requerida('gestionar_mesas')
 def cerrar_mesas_seleccionadas(request):
-    if request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            mesa_ids = request.POST.getlist('mesa_ids')
-            cantidad_eliminadas = len(mesa_ids)
-            print(request.POST)
-            if cantidad_eliminadas > 0:
-                MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=False)
-            mesas = MesaFinal.objects.all()
-            return redirect('/mesas_lista')
-        return redirect('/mesas_lista')
-    elif not request.user.is_staff or not request.user.is_superuser:
-        return render(request,'403_forbidden.html')
+    if request.method == 'POST':
+        mesa_ids = request.POST.getlist('mesa_ids')
+        if len(mesa_ids) > 0:
+            MesaFinal.objects.filter(id__in=mesa_ids).update(inscripcionAbierta=False)
+    return redirect('/mesas_lista')
 
 #def eliminar_inscripcion_materia(request, id):
 #    materia = get_object_or_404(usuarios_materia, pk=id)
@@ -1100,34 +1515,27 @@ def cerrar_mesas_seleccionadas(request):
 #        return render(request,'403_forbidden.html')
     
 def eliminar_inscripcion_materia(request, id):
+    """
+    Dar de baja una inscripción a materia es una acción administrativa: el
+    alumno no puede autogestionarla, solo Preceptor, Directivo, Secretario o
+    superuser (ver Usuario.puede_administrar). No se borra el registro: se
+    marca estado=ABANDONO para que el historial académico quede intacto.
+    """
     materia = get_object_or_404(usuarios_materia, pk=id)
-    
-    if request.user.id == materia.usuario_id and not request.user.is_staff and not request.user.is_superuser:
-        if request.method == 'POST':
-            # Eliminar inscripciones a finales relacionadas
-            InscripcionFinal.objects.filter(
-                Q(usuario=request.user) & Q(llamado__materia=materia.materia)
-            ).delete()
-            
-            # Eliminar la inscripción a la materia
-            materia.delete()
-            return redirect('exito_materia_eliminada_est')
-        return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
-    
-    elif request.user.is_staff or request.user.is_superuser:
-        if request.method == 'POST':
-            # Eliminar inscripciones a finales relacionadas
-            InscripcionFinal.objects.filter(
-                Q(usuario=materia.usuario) & Q(llamado__materia=materia.materia)
-            ).delete()
-            
-            # Eliminar la inscripción a la materia
-            materia.delete()
-            return redirect('exito_materia_eliminada_adm')
-        return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
-    
-    else:
-        return render(request, '403_forbidden.html')
+    if not request.user.puede_administrar():
+        return render(request, '403_forbidden.html', status=403)
+    if request.method == 'POST':
+        InscripcionFinal.objects.filter(
+            Q(usuario=materia.usuario) & Q(llamado__materia=materia.materia)
+        ).delete()
+        materia.estado = EstadoCursada.ABANDONO
+        materia.save()
+        registrar_auditoria(
+            request, f'Dio de baja (abandono) a {materia.usuario.nombre_completo} de {materia.materia}',
+            'usuarios_materia', materia.pk
+        )
+        return redirect('exito_materia_eliminada_adm')
+    return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
 
 def exito_materia_eliminada(request):
     return render(request, 'materias/exito_materia_eliminada.html')
@@ -1144,6 +1552,7 @@ def exito_final_eliminado_est(request):
 def exito_final_eliminado_adm(request):
     return render(request, 'finales/exito_final_eliminado_adm.html')
 
+@capacidad_requerida('ver_materias')
 def ver_materias(request, id):
     materia = get_object_or_404(Materia, pk=id)
     return render(request, 'materias/ver_materia.html', {'materia': materia})
@@ -1174,11 +1583,7 @@ def alta_estudiante(request):
             form = EstudianteForm()
             return render(request, 'alta_estudiante.html', {'form': form})
         
-class MesasFinalesListView(ListView):
-    model = MesaFinal
-    template_name = 'finales/mesas_finales_list.html'
-    context_object_name = 'mesas_finales'
-
+@capacidad_requerida('abrir_inscripciones')
 def inscribir_mesa_final(request):
     if request.method == 'POST':
         filtro_form = FiltroInscripcionForm(request.POST)
@@ -1196,114 +1601,145 @@ def inscribir_mesa_final(request):
     context = {'mesas_finales': mesas_finales, 'filtro_form': filtro_form}
     return render(request, 'finales/inscribir_mesa_final.html', context)
 
+@capacidad_requerida('gestionar_mesas')
+def tribunal_mesa(request, mesa_id):
+    """Ver y asignar el tribunal (Presidente/Vocales) de una mesa de final."""
+    mesa = get_object_or_404(MesaFinal, id=mesa_id)
+    tribunal_activo = mesa.tribunal.filter(activo=True).select_related('docente')
+    presidente = tribunal_activo.filter(rol=TribunalMesa.PRESIDENTE).first()
+    vocales = list(tribunal_activo.filter(rol=TribunalMesa.VOCAL))
+
+    if request.method == 'POST':
+        docente = get_object_or_404(Usuario, id=request.POST.get('docente'), rol='Profesor')
+        rol = request.POST.get('rol')
+
+        if rol == TribunalMesa.PRESIDENTE and presidente:
+            messages.error(request, 'Esta mesa ya tiene un presidente asignado; reemplazalo en vez de agregar otro.')
+        elif rol == TribunalMesa.VOCAL and len(vocales) >= TribunalMesa.MAX_VOCALES_POR_MESA:
+            messages.error(request, f'Esta mesa ya tiene {TribunalMesa.MAX_VOCALES_POR_MESA} vocales asignados; reemplazá uno en vez de agregar otro.')
+        elif rol not in (TribunalMesa.PRESIDENTE, TribunalMesa.VOCAL):
+            messages.error(request, 'Rol inválido.')
+        else:
+            TribunalMesa.objects.create(mesa=mesa, docente=docente, rol=rol)
+            registrar_auditoria(
+                request, f'Asignó a {docente.nombre_completo} como {rol} del tribunal de {mesa.materia} ({mesa.llamado:%d/%m/%Y})',
+                'TribunalMesa', mesa.pk
+            )
+            messages.success(request, f'{docente.nombre_completo} fue asignado como {rol}.')
+        return redirect('tribunal_mesa', mesa_id=mesa.id)
+
+    context = {
+        'mesa': mesa,
+        'presidente': presidente,
+        'vocales': vocales,
+        'profesores': Usuario.obtener_profesores(),
+        'max_vocales': TribunalMesa.MAX_VOCALES_POR_MESA,
+    }
+    return render(request, 'finales/tribunal_mesa.html', context)
+
+
+@capacidad_requerida('gestionar_mesas')
+def reemplazar_tribunal(request, tribunal_id):
+    """Reemplazo urgente de un integrante del tribunal: no toca el acta, solo cambia quién figura activo."""
+    actual = get_object_or_404(TribunalMesa, id=tribunal_id, activo=True)
+    if request.method == 'POST':
+        nuevo_docente = get_object_or_404(Usuario, id=request.POST.get('docente'), rol='Profesor')
+        actual.activo = False
+        actual.save()
+        nuevo = TribunalMesa.objects.create(
+            mesa=actual.mesa, docente=nuevo_docente, rol=actual.rol, reemplaza_a=actual
+        )
+        registrar_auditoria(
+            request,
+            f'Reemplazó a {actual.docente.nombre_completo} por {nuevo_docente.nombre_completo} como {actual.rol} '
+            f'en el tribunal de {actual.mesa.materia} ({actual.mesa.llamado:%d/%m/%Y})',
+            'TribunalMesa', nuevo.pk
+        )
+        messages.success(request, f'{actual.docente.nombre_completo} fue reemplazado por {nuevo_docente.nombre_completo}.')
+    return redirect('tribunal_mesa', mesa_id=actual.mesa_id)
+
+
+@capacidad_requerida('gestionar_mesas')
+def quitar_tribunal(request, tribunal_id):
+    """Saca a alguien del tribunal sin reemplazo (deja el puesto vacante)."""
+    actual = get_object_or_404(TribunalMesa, id=tribunal_id, activo=True)
+    if request.method == 'POST':
+        actual.activo = False
+        actual.save()
+        registrar_auditoria(
+            request,
+            f'Quitó a {actual.docente.nombre_completo} del tribunal de {actual.mesa.materia} ({actual.mesa.llamado:%d/%m/%Y}) sin reemplazo',
+            'TribunalMesa', actual.pk
+        )
+        messages.success(request, f'{actual.docente.nombre_completo} fue quitado del tribunal.')
+    return redirect('tribunal_mesa', mesa_id=actual.mesa_id)
+
+
+def acta_volante(request, final_id):
+    """Genera el acta volante (planilla de examen) de una mesa de final, paginada de a 25 alumnos.
+
+    La puede ver quien gestiona mesas (Directivo/Secretario/Preceptor) o el
+    profesor de la materia de esta mesa en particular."""
+    final = get_object_or_404(MesaFinal, id=final_id)
+    if not request.user.is_authenticated or not request.user.puede_ver_acta_de(final):
+        return render(request, '403_forbidden.html', status=403)
+    pages = []
+    finales_inscriptos = InscripcionFinal.objects.filter(llamado=final_id).order_by('usuario__nombre_completo')
+    tribunal_activo = final.tribunal.filter(activo=True).select_related('docente')
+    presidente = tribunal_activo.filter(rol=TribunalMesa.PRESIDENTE).first()
+    vocales = list(tribunal_activo.filter(rol=TribunalMesa.VOCAL))
+    if finales_inscriptos.count() <= 25:
+        context = {
+            'finales_inscriptos': finales_inscriptos,
+            'final': final,
+            'cant_inscriptos': finales_inscriptos.count(),
+            'piso': 0,
+            'presidente': presidente,
+            'vocales': vocales,
+        }
+        return render(request, 'finales/acta_volante.html', context)
+    else:
+        for i in range(1, ceil(finales_inscriptos.count() / 25) + 1):
+            inscriptos = []
+            for inscripto in range(25 * (i - 1), 25 * (i - 1) + 25):
+                try:
+                    inscriptos.append(finales_inscriptos[inscripto])
+                except IndexError:
+                    pass
+            context = {
+                'finales_inscriptos': inscriptos,
+                'final': final,
+                'cant_inscriptos': finales_inscriptos.count(),
+                'piso': 25 * (i - 1),
+                'presidente': presidente,
+                'vocales': vocales,
+            }
+            html = render(request, 'finales/acta_volante.html', context).content.decode('utf-8')
+            pages.append({
+                'id': f'page_{i}',
+                'title': f'Acta volante {i}: {final.materia}',
+                'content': html
+            })
+        pages_json = dumps(pages)
+        return render(request, 'finales/lista_acta_volante.html', {'pages_json': pages_json})
+
+@capacidad_requerida('ver_materias')
 def listar_usuarios_materia(request):
     usuarios_materia_data = usuarios_materia.objects.all()  # Recupera todos los registros de usuarios_materia
     context = {'usuarios_materia_data': usuarios_materia_data}
     return render(request, 'registration/ver_usuarios_materia.html', context)
 
 
-def validar_inscripcion_final(usuario_id, materia_id):
-    # Verificamos si el usuario está inscrito a la materia y su nota de cursada
-    try:
-        usuario_materia_instance = usuarios_materia.objects.get(
-            usuario_id=usuario_id,  # Ajusta si el campo es diferente
-            materia_id=materia_id   # Ajusta si el campo es diferente
-        )
-        nota_cursada = usuario_materia_instance.nota_cursada
-        nota_final = usuario_materia_instance.nota_final
-        
-        if nota_cursada is None or nota_cursada < 7:
-            return False
-            #JsonResponse({
-            #    'puede_inscribirse': False,
-            #    'mensaje': 'No tienes la nota de cursada mínima (7) para inscribirte al final.'
-            #})
-        
-        if nota_final is not None:
-            return False
-            #JsonResponse({
-            #    'puede_inscribirse': False,
-            #    'mensaje': 'Ya tienes una nota de final registrada para esta materia. No puedes inscribirte nuevamente.'
-            #})
-    except usuarios_materia.DoesNotExist:
-        return False 
-        #JsonResponse({
-        #    'puede_inscribirse': False,
-        #    'mensaje': 'No estás inscrito a esta materia.'
-        #})
-
-    # Obtenemos todas las materias correlativas de la materia a la que se quiere inscribir
-    correlativas = MateriaCorrelativa.objects.filter(materia_id=materia_id)
-    
-    # Si no hay correlativas, el usuario puede inscribirse directamente
-    if not correlativas.exists():
-        return True
-        #JsonResponse({
-        #    'puede_inscribirse': True,
-        #    'mensaje': 'Puedes inscribirte a la mesa final. Esta materia no tiene correlativas.'
-        #})
-
-    # Si hay correlativas, verificamos si el usuario ya aprobó todas
-    for correlativa in correlativas:
-        try:
-            correlativa_instance = usuarios_materia.objects.get(
-                usuario_id=usuario_id,  # Ajusta si el campo es diferente
-                materia_id=correlativa.materia_correlativa_id  # Ajusta si el campo es diferente
-            )
-            print(correlativa_instance.nota_final)
-            
-            nota_final = correlativa_instance.nota_final
-            if nota_final is None or nota_final < 4:
-                return False
-                #return JsonResponse({
-                #    'puede_inscribirse': False,
-                #    'mensaje': f'No has aprobado la materia correlativa {correlativa.materia_correlativa.nombre_materia} con nota 4 o superior.'
-                #})
-        except usuarios_materia.DoesNotExist:
-            print("Nodeberiaperounonuncasabe")
-            return False
-        #JsonResponse({
-        #        'puede_inscribirse': False,
-        #        'mensaje': f'No has cursado la materia correlativa {correlativa.materia_correlativa.nombre_materia}.'
-        #    })
-    
-    # Si llegamos aquí, el usuario puede inscribirse
-    return True
-#JsonResponse({
-#        'puede_inscribirse': True,
-#        'mensaje': 'Puedes inscribirte a la mesa final.'
-#    })
+# NOTA: la validación de inscripción a finales vive más abajo, en
+# validar_inscripcion_final(). Acá había una segunda definición con el mismo
+# nombre que Python descartaba (gana la última), y que además se comportaba
+# distinto: ignoraba la modalidad Libre y bloqueaba a quien tuviera cualquier
+# nota de final, incluso desaprobada. Se eliminó para que no se edite por error.
 
 def validar_inscripcion_materias(usuario_id, materia_id):
-    try:
-        # Verificamos si el usuario está inscrito a la materia
-        usuarios_materia.objects.get(
-            usuario_id=usuario_id,
-            materia_id=materia_id
-        )
-        return False  # Ya estás inscrito a la materia
-    except usuarios_materia.DoesNotExist:
-        # El usuario no está inscrito, continuamos con la validación
-        pass
-
-    # Obtenemos todas las materias correlativas de la materia a la que se quiere inscribir
-    correlativas = MateriaCorrelativa.objects.filter(materia_id=materia_id)
-
-    if not correlativas.exists():
-        return True #Se puede inscribir, no hay correlativas
-    for correlativa in correlativas:
-        try:
-            correlativa_instance = usuarios_materia.objects.get(
-                usuario_id=usuario_id,
-                materia_id=correlativa.materia_correlativa_id  
-            )
-            
-            nota_final = correlativa_instance.nota_final
-            if nota_final is None or nota_final < 4:
-                return False #No se aprobó final de la correlativa
-        except usuarios_materia.DoesNotExist:
-            return False #No se curso correlativa
-    return True #Se puede inscribir
+    """Para cursar: cursada aprobada de cada correlativa (ver inscripcionFinales/correlativas.py)."""
+    puede, _motivo = correlativas.puede_cursar(usuario_id, materia_id)
+    return puede
 
 
 
@@ -1322,9 +1758,13 @@ def inscribir_usuario(usuario, materia):
         inscripcion.Fecha_Inscripcion = timezone.now()
         inscripcion.save()
 
+@capacidad_requerida('cargar_notas')
 def cargar_nota_final(request, inscripcion_id):
     inscripcion = get_object_or_404(InscripcionFinal, id=inscripcion_id)
     usuario_materia = get_object_or_404(usuarios_materia, usuario=inscripcion.usuario, materia=inscripcion.llamado.materia)
+
+    if not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
+        return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
        form = NotaFinalForm(request.POST)
@@ -1336,9 +1776,10 @@ def cargar_nota_final(request, inscripcion_id):
             inscripcion.aprobada = nota_final >= 4
             inscripcion.save()
 
-            print(f"Nota final: {nota_final}")
-            print(f"Aprobada: {inscripcion.aprobada}")
-
+            registrar_auditoria(
+                request, f'Cargó nota final {nota_final} a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}',
+                'usuarios_materia', usuario_materia.pk
+            )
             messages.success(request, f'Nota final cargada correctamente: {nota_final}')
             return redirect('/listaFinalesAdm')  # Ajusta esto a tu URL de redirección
     else:
@@ -1351,8 +1792,12 @@ def cargar_nota_final(request, inscripcion_id):
     }
     return render(request, 'finales/cargar_nota.html', context)
 
-def cargar_nota_cursada(request,id):
+@capacidad_requerida('cargar_notas')
+def cargar_nota_cursada(request, id):
     usuario_materia = get_object_or_404(usuarios_materia, id=id)
+
+    if not request.user.puede_cargar_notas_de(usuario_materia.materia):
+        return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
         form = NotaCursadaForm(request.POST)
@@ -1361,6 +1806,10 @@ def cargar_nota_cursada(request,id):
             usuario_materia.nota_cursada = nota_cursada
             usuario_materia.save()
 
+            registrar_auditoria(
+                request, f'Cargó nota de cursada {nota_cursada} a {usuario_materia.usuario.nombre_completo} en {usuario_materia.materia}',
+                'usuarios_materia', usuario_materia.pk
+            )
             messages.success(request, f'Nota de cursada cargada correctamente: {nota_cursada}')
             return redirect('/listaMateriasAdm')  # Ajusta esto a tu URL de redirección
     else:
@@ -1372,13 +1821,21 @@ def cargar_nota_cursada(request,id):
     }
     return render(request, 'materias/cargar_nota.html', context)
 
+@capacidad_requerida('cargar_notas')
 def editar_notas(request, id):
     usuario_materia = get_object_or_404(usuarios_materia, id=id)
+
+    if not request.user.puede_cargar_notas_de(usuario_materia.materia):
+        return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
         form = NotaCursadaForm(request.POST, instance=usuario_materia)
         if form.is_valid():
             form.save()
+            registrar_auditoria(
+                request, f'Editó las notas de {usuario_materia.usuario.nombre_completo} en {usuario_materia.materia}',
+                'usuarios_materia', usuario_materia.pk
+            )
             messages.success(request, 'Las notas han sido actualizadas correctamente.')
             return redirect('/listaMateriasAdm/')
         else:
@@ -1401,26 +1858,19 @@ def editar_notas(request, id):
 
 
 
+@capacidad_requerida('abrir_inscripciones')
+def abrir_inscripcion_materia(request, carrera, anio):
+    Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=True)
+    return redirect('lista_materias_admin')
 
-def abrir_inscripcion_materia(request,carrera,anio):
-    if request.user.is_staff or request.user.is_superuser:
-        Materia.objects.filter(carrera_id=carrera,anio=anio).update(inscripcionAbierta=True)
-        return redirect('lista_materias_admin')
-    else:
-        return render(request,"403_forbidden.html")
 
-def cerrar_inscripcion_materia(request,carrera,anio):
-    if request.user.is_staff or request.user.is_superuser:
-        Materia.objects.filter(carrera_id=carrera,anio=anio).update(InscripcionAbierta=False)
-        return redirect('lista_materias_admin')
-    else:
-        return render(request,"403_forbidden.html")
+@capacidad_requerida('abrir_inscripciones')
+def cerrar_inscripcion_materia(request, carrera, anio):
+    Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=False)
+    return redirect('lista_materias_admin')
     
+@capacidad_requerida('gestionar_usuarios')
 def eliminar_usuarios(request):
-    # Restricciones de acceso
-    if not (request.user.is_staff or request.user.is_superuser):
-        return render(request, '403_forbidden.html', {'error_message': "No tienes permiso para realizar esta acción."})
-    
     if request.method == 'POST':
         # Eliminar múltiples usuarios seleccionados
         usuarios_ids = request.POST.getlist('usuarios_ids')
@@ -1434,6 +1884,8 @@ def eliminar_usuarios(request):
         if len(usuarios_ids) > 0:
             try:
                 # Eliminar los usuarios seleccionados
+                emails = list(Usuario.objects.filter(id__in=usuarios_ids).values_list('email', flat=True))
+                registrar_auditoria(request, f'Eliminó usuarios: {", ".join(emails)}', 'Usuario', ",".join(usuarios_ids))
                 usuarios_eliminados = Usuario.objects.filter(id__in=usuarios_ids)
                 cantidad_eliminadas = usuarios_eliminados.count()
                 usuarios_eliminados.delete()
@@ -1443,354 +1895,60 @@ def eliminar_usuarios(request):
                 messages.error(request, f'Error al eliminar usuarios: {str(e)}')
         else:
             messages.warning(request, 'No se seleccionaron usuarios para eliminar.')
-    
+
     return redirect('list_user')
-    
-class CustomPasswordResetView(PasswordResetView):
-    template_name = 'password_reset_form.html'
-    email_template_name = 'password_reset_email.html'
-    success_url = reverse_lazy('recover_pass.html')
 
-class CustomPasswordResetDoneView(PasswordResetDoneView):
-    template_name = 'registration/password_reset_done.html'
-
-class CustomPasswordResetConfirmView(PasswordResetConfirmView):
-    template_name = 'password_reset_confirm.html'
-    success_url = reverse_lazy('password_reset_complete')
-
-class CustomPasswordResetCompleteView(PasswordResetCompleteView):
-    template_name = 'password_reset_complete.html'
-    
-
-def acta_volante(request, final_id):
-
-    pages = []
-    finales_inscriptos = InscripcionFinal.objects.filter(llamado=final_id).order_by('usuario__nombre_completo')
-    final = get_object_or_404(MesaFinal, id=final_id)
-    if finales_inscriptos.count()<=25:
-        context = {
-            'finales_inscriptos': finales_inscriptos,
-            'final': final,
-            'cant_inscriptos': finales_inscriptos.count(),
-            'piso':0
-        }
-        return render(request, 'finales/acta_volante.html', context)
-    else:
-        for i in range(1,ceil(finales_inscriptos.count()/25)+1):
-            inscriptos = []
-            for inscripto in range(25*(i-1),25*(i-1)+25):
-                print(inscripto)
-                try:
-                    inscriptos.append(finales_inscriptos[inscripto])
-                except:
-                    pass
-            context = {
-                'finales_inscriptos': inscriptos,
-                'final': final,
-                'cant_inscriptos': finales_inscriptos.count(),
-                'piso':25*(i-1),
-            }
-            print(f"fin {i} pagina")
-            html = render(request, 'finales/acta_volante.html', context).content.decode('utf-8')
-            pages.append({
-                'id':f'page_{i}',
-                'title':f'Acta volante {i}: {final.materia}',
-                'content':html
-            })
-        pages_json = dumps(pages)
-        return render(request, 'finales/lista_acta_volante.html', {'pages_json': pages_json})
-
-def reporte_usuario_materias(request, usuario_id):
-
-    try:
-        usuario = Usuario.objects.get(id=usuario_id)
-        print(usuario.id)
-    except Usuario.DoesNotExist:    
-        return HttpResponse("Usuario no encontrado", status=404)
-    
-    carrera = usuario.carrera 
-    # materias_de_carrera = usuarios_materia.objects.filter(carrera = usuario.carrera) #hace falta el total de materias de la carrera, no sólo las inscripciones
-    if not carrera:
-        return HttpResponse("El usuario no tiene carreras registradas", status=404)
-
-    # Aquí asumimos que solo tomamos la primera carrera, en caso que esté inscripto en más de una carrera
-    #carrera = carreras.first()
-    # Acceder al número de resolución de la carrera
-    #num_resolucion = carrera.num_resolucion if carrera else None
-
-    materias_data = usuarios_materia.objects.filter(usuario=usuario, aprobada=True).values(
-        'materia__nombre_materia', 'nota_cursada', 'nota_final', 'materia__anio'
-    )
-    #total_materias = usuarios_materia.objects.filter(carrera=carrera).count()
-    materias_aprobadas = len(materias_data)
-    #porcentaje_aprobado = (materias_aprobadas / total_materias) * 100 if total_materias > 0 else 0
-   
-    materias_por_anio = {}
-    for materia in materias_data:
-        anio = materia['materia__anio']
-        if anio not in materias_por_anio:
-            materias_por_anio[anio] = []
-        materias_por_anio[anio].append(materia)
-
-     # Obtener la fecha actual para el pie del informe
-    fecha_actual = datetime.now()
-    dia = fecha_actual.day
-    mes = fecha_actual.strftime("%B")  # Nombre del mes
-    año = fecha_actual.year
-
-    context = {
-        'usuario': usuario,
-        'materias_por_anio': materias_por_anio,
-       # 'porcentaje_aprobado': porcentaje_aprobado,
-       # 'resolucion': usuarios_carreras.num_resolucion,
-        'fecha_dia': dia,
-        'mes': mes,
-        'año': año,
-    }
-    template = loader.get_template('materias/reporte_usuario_materias.html/')
-    html = template.render(context)
-
-    # Convertir HTML a PDF utilizando WeasyPrint con estilos CSS
-    css = CSS(string='@page { size: A4; margin: 2cm }')  # Define el tamaño del papel y márgenes
-    pdf = HTML(string=html, base_url=request.build_absolute_uri()).write_pdf(stylesheets=[css])
-
-#    Generar la respuesta HTTP
-    response = HttpResponse(pdf, content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename=reporte_usuario_{usuario.nombre_completo}.pdf'
-    return response
-
-
-
-
-
-# También necesitas agregar esta función auxiliar si no existe:
-def numero_a_texto(numero):
-    """Convierte un número a texto en español"""
-    if numero == "-" or numero is None:
-        return "-"
-    
-    try:
-        num = float(numero)
-        numeros = {
-            0: "cero", 1: "uno", 2: "dos", 3: "tres", 4: "cuatro",
-            5: "cinco", 6: "seis", 7: "siete", 8: "ocho", 9: "nueve", 10: "diez"
-        }
-        return numeros.get(int(num), str(num))
-    except:
-        return str(numero)
-    
-
-def reporte_estudiante_html(request, usuario_id):
-    # Obtener el usuario
+@rol_requerido('Directivo', 'Secretario')
+def blanquear_password(request, usuario_id):
+    """Restablece la contraseña de un usuario a la predeterminada. Solo Directivo, Secretario o super admin."""
     usuario = get_object_or_404(Usuario, id=usuario_id)
-    hoy = timezone.now().date()
-    
-    # Obtener la carrera del usuario (primera carrera si tiene múltiples)
-    carrera = usuario.carrera.first()
-    if not carrera:
-        carrera = Carrera.objects.first()
-        if not carrera:
-            return HttpResponse("No hay carreras registradas en el sistema", status=404)
-    
-    # Contar materias aprobadas del usuario
-    materias_aprobadas = usuarios_materia.objects.filter(
-        usuario_id=usuario_id, 
-        aprobada=True
-    ).count()
-    
-    # Obtener todas las materias de la carrera del usuario
-    materias_de_carrera = Materia.objects.filter(carrera=carrera)
-    
-    # Prefetch para optimizar las consultas
-    usuarios_materia_prefetch = Prefetch(
-        'usuarios_materia_set',
-        queryset=usuarios_materia.objects.filter(usuario_id=usuario_id),
-        to_attr='usuario_materia'
-    )
-    
-    # Obtener materias por año
-    materias_primero = materias_de_carrera.filter(anio=1).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    materias_segundo = materias_de_carrera.filter(anio=2).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    materias_tercero = materias_de_carrera.filter(anio=3).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    materias_cuarto = materias_de_carrera.filter(anio=4).prefetch_related(usuarios_materia_prefetch).order_by('nombre_materia')
-    
-    # Contar total de materias
-    cant_materias = materias_de_carrera.count()
-    
-    # Función para procesar materias y sus notas
-    def procesar_materias(materias):
-        return [
-            {
-                'materia': materia,
-                'nota_final': next((um.nota_final for um in materia.usuario_materia if um.usuario_id == usuario_id), "-"),
-                'nota_texto': numero_a_texto(next((um.nota_final for um in materia.usuario_materia if um.usuario_id == usuario_id), "-"))
-            }
-            for materia in materias
-        ]
-    
-    # Procesar materias por año
-    materias_primero_con_notas = procesar_materias(materias_primero)
-    materias_segundo_con_notas = procesar_materias(materias_segundo)
-    materias_tercero_con_notas = procesar_materias(materias_tercero)
-    materias_cuarto_con_notas = procesar_materias(materias_cuarto)
-    
-    # Calcular porcentaje de avance
-    if cant_materias > 0:
-        porcentaje = round((materias_aprobadas / cant_materias) * 100, 2)
-    else:
-        porcentaje = 0
-    
-    # Obtener datos del instituto si existe
-    instituto = carrera.instituto if carrera.instituto else None
-    
-    context = {
-        'usuario': usuario,
-        'carrera': carrera,
-        'instituto': instituto,
-        'porcentaje_aprobado': porcentaje,
-        'materias_aprobadas': materias_aprobadas,
-        'total_materias': cant_materias,
-        'materias_primero': materias_primero_con_notas,
-        'materias_segundo': materias_segundo_con_notas,
-        'materias_tercero': materias_tercero_con_notas,
-        'materias_cuarto': materias_cuarto_con_notas,
-        'fecha': hoy
-    }
-    
-    return render(request, 'registration/reporte_estudiante_html.html', context)
+    if request.method == 'POST':
+        usuario.set_password(PASSWORD_PREDETERMINADA)
+        usuario.first_login = True
+        usuario.save()
+        registrar_auditoria(request, f'Blanqueó la contraseña de {usuario.email}', 'Usuario', usuario.pk)
+        messages.success(request, f'Se blanqueó la contraseña de {usuario.nombre_completo or usuario.email}. Ahora es "{PASSWORD_PREDETERMINADA}" y deberá cambiarla en su próximo inicio de sesión.')
+        return redirect('list_user')
+    return render(request, 'registration/blanquear_password.html', {'usuario': usuario})
 
-def numero_a_texto(numero):
-    """Convierte un número a texto en español para uso académico"""
-    if numero == "-" or numero is None:
-        return "-"
-    
-    try:
-        num = float(numero)
-        if num == int(num):  # Si es un entero
-            num = int(num)
-        
-        numeros = {
-            0: "cero", 1: "uno", 2: "dos", 3: "tres", 4: "cuatro",
-            5: "cinco", 6: "seis", 7: "siete", 8: "ocho", 9: "nueve", 10: "diez"
-        }
-        
-        if num in numeros:
-            return numeros[num]
-        else:
-            return str(numero)
-    except:
-        return str(numero)
-    
-
-
-def obtener_finales_estudiante(request):
-    """Vista AJAX para obtener finales disponibles para un estudiante específico"""
-    if request.method == 'GET':
-        estudiante_id = request.GET.get('estudiante_id')
-        
-        if not estudiante_id:
-            return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
-        
-        try:
-            estudiante = get_object_or_404(Usuario, id=estudiante_id)
-            
-            # Verificar que sea estudiante
-            if estudiante.rol != 'Estudiante':
-                return JsonResponse({'status': 'error', 'message': 'El usuario no es un estudiante'})
-            
-            finales_disponibles = []
-            
-            # Obtener todas las materias en las que está inscripto el estudiante
-            materias_estudiante = usuarios_materia.objects.filter(
-                usuario=estudiante,
-                aprobada=False  # No ha aprobado aún
-            ).select_related('materia')
-            
-            for inscripcion_materia in materias_estudiante:
-                # Verificar requisitos:
-                # 1. Nota de cursada >= 7 O modalidad libre
-                cumple_nota = (
-                    inscripcion_materia.modalidad == 'Libre' or 
-                    (inscripcion_materia.nota_cursada is not None and inscripcion_materia.nota_cursada >= 7)
-                )
-                
-                # 2. No tener nota final aprobada
-                sin_final_aprobado = (
-                    inscripcion_materia.nota_final is None or 
-                    inscripcion_materia.nota_final < 4
-                )
-                
-                # 3. Validar correlativas
-                cumple_correlativas = validar_inscripcion_final(estudiante_id, inscripcion_materia.materia.id)
-                
-                # 4. No estar ya inscripto en una mesa final de esta materia
-                ya_inscripto = InscripcionFinal.objects.filter(
-                    usuario=estudiante,
-                    llamado__materia=inscripcion_materia.materia
-                ).exists()
-                
-                if cumple_nota and sin_final_aprobado and cumple_correlativas and not ya_inscripto:
-                    # Buscar mesas finales abiertas para esta materia
-                    mesas_disponibles = MesaFinal.objects.filter(
-                        materia=inscripcion_materia.materia,
-                        inscripcionAbierta=True,
-                        vigente=True,
-                        llamado__gt=timezone.now()  # Fecha futura
-                    ).order_by('llamado')
-                    
-                    for mesa in mesas_disponibles:
-                        finales_disponibles.append({
-                            'id': mesa.id,
-                            'materia': mesa.materia.nombre_materia,
-                            'fecha_llamado': mesa.llamado.strftime('%d/%m/%Y %H:%M'),
-                            'nota_cursada': inscripcion_materia.nota_cursada or 'Libre',
-                            'modalidad': inscripcion_materia.modalidad or 'Regular'
-                        })
-            
-            return JsonResponse({
-                'status': 'success',
-                'finales': finales_disponibles
-            })
-            
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'Error al obtener finales: {str(e)}'
-            })
-    
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'})
-
-
-@csrf_exempt  # TEMPORAL - solo para debugging
+@capacidad_requerida('gestionar_mesas')
 def inscribir_final(request):
     """Vista AJAX para realizar la inscripción al final"""
     usuario_id = request.POST.get('usuario')
     llamado_id = request.POST.get('llamado')
-    
+    excepcional = request.POST.get('excepcional') == 'true'
+
     if not usuario_id or not llamado_id:
         return JsonResponse({
             'status': 'error',
             'message': 'Datos incompletos'
         })
-    
+
     try:
         usuario = get_object_or_404(Usuario, id=usuario_id)
         mesa_final = get_object_or_404(MesaFinal, id=llamado_id)
-        
+
         # Verificar que el usuario sea estudiante
         if usuario.rol != 'Estudiante':
             return JsonResponse({
                 'status': 'error',
                 'message': 'Solo los estudiantes pueden inscribirse'
             })
-        
-        # Verificar que la mesa tenga inscripción abierta
-        if not mesa_final.inscripcionAbierta:
+
+        # Ventana normal de inscripción, o excepcional si está pedida y todavía
+        # faltan los días mínimos para el examen (ver MesaFinal.LIMITE_DIAS_EXCEPCION).
+        if excepcional:
+            if not mesa_final.inscripcion_excepcional_vigente():
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'La inscripción excepcional ya no está disponible: faltan menos de {MesaFinal.LIMITE_DIAS_EXCEPCION} días para el examen'
+                })
+        elif not mesa_final.inscripcion_vigente():
             return JsonResponse({
                 'status': 'error',
                 'message': 'La inscripción para esta mesa está cerrada'
             })
-        
+
         # Verificar que no esté ya inscripto
         if InscripcionFinal.objects.filter(
             usuario=usuario,
@@ -1836,11 +1994,16 @@ def inscribir_final(request):
             })
         
         # Crear la inscripción
-        InscripcionFinal.objects.create(
+        inscripcion = InscripcionFinal.objects.create(
             usuario=usuario,
             llamado=mesa_final
         )
-        
+        prefijo = 'Inscripción EXCEPCIONAL: inscribió' if excepcional else 'Inscribió'
+        registrar_auditoria(
+            request, f'{prefijo} a {usuario.nombre_completo} a la mesa de {mesa_final.materia} del {mesa_final.llamado:%d/%m/%Y}',
+            'InscripcionFinal', inscripcion.pk
+        )
+
         return JsonResponse({
             'status': 'success',
             'message': f'{usuario.nombre_completo} se inscribió correctamente al final de {mesa_final.materia.nombre_materia}'
@@ -1856,55 +2019,28 @@ def inscribir_final(request):
 
 def validar_inscripcion_final(usuario_id, materia_id):
     """
-    Valida si un usuario puede inscribirse al final de una materia
-    Retorna True si puede inscribirse, False si no
+    Valida si un usuario puede inscribirse al final de una materia.
+    Retorna True si puede inscribirse, False si no.
     """
     try:
-        # Verificar si el usuario está inscrito a la materia
         usuario_materia_instance = usuarios_materia.objects.get(
             usuario_id=usuario_id,
             materia_id=materia_id
         )
-        
-        # Verificar nota de cursada (debe ser >= 7 o estar en modalidad libre)
-        if usuario_materia_instance.modalidad != 'Libre':
-            if (usuario_materia_instance.nota_cursada is None or 
-                usuario_materia_instance.nota_cursada < 7):
-                return False
-        
-        # Verificar que no tenga nota final aprobada
-        if (usuario_materia_instance.nota_final is not None and 
-            usuario_materia_instance.nota_final >= 4):
-            return False
-            
     except usuarios_materia.DoesNotExist:
         return False
 
-    # Obtener todas las materias correlativas de la materia
-    correlativas = MateriaCorrelativa.objects.filter(materia_id=materia_id)
-    
-    # Si no hay correlativas, puede inscribirse
-    if not correlativas.exists():
-        return True
-
-    # Verificar que haya aprobado todas las correlativas
-    for correlativa in correlativas:
-        try:
-            correlativa_instance = usuarios_materia.objects.get(
-                usuario_id=usuario_id,
-                materia_id=correlativa.materia_correlativa_id
-            )
-            
-            # La correlativa debe estar aprobada (nota final >= 4)
-            if (correlativa_instance.nota_final is None or 
-                correlativa_instance.nota_final < 4):
-                return False
-                
-        except usuarios_materia.DoesNotExist:
-            # No cursó la correlativa
+    # Nota mínima de cursada propia de la materia para rendir (regla del
+    # instituto, no es parte de correlativas): >= 7 o modalidad Libre.
+    if usuario_materia_instance.modalidad != 'Libre':
+        if (usuario_materia_instance.nota_cursada is None or
+                usuario_materia_instance.nota_cursada < 7):
             return False
-    
-    return True
+
+    # Correlativas: cursada aprobada de esta materia + final aprobado de cada
+    # correlativa (ver inscripcionFinales/correlativas.py).
+    puede, _motivo = correlativas.puede_rendir(usuario_id, materia_id)
+    return puede
 
 class FirstLoginPasswordChangeView(FormView):
     form_class = SetPasswordForm
@@ -1935,6 +2071,7 @@ class FirstLoginPasswordChangeView(FormView):
 def first_login_password_change_done(request):
     return render(request, 'registration/first_login_success.html')
 
+@capacidad_requerida('ver_reportes')
 def imprimir_mesas_finales_pdf(request):
     """
     Genera un PDF con el listado de mesas de finales vigentes
@@ -1963,7 +2100,7 @@ def imprimir_mesas_finales_pdf(request):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=22,
-            textColor=colors.HexColor('#2c3e50'),
+            textColor=colors.HexColor('#0D2033'),
             spaceAfter=20,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -1974,7 +2111,7 @@ def imprimir_mesas_finales_pdf(request):
             'Subtitle',
             parent=styles['Normal'],
             fontSize=12,
-            textColor=colors.HexColor('#7f8c8d'),
+            textColor=colors.HexColor('#64748b'),
             spaceAfter=30,
             alignment=TA_CENTER,
             fontName='Helvetica'
@@ -1982,6 +2119,12 @@ def imprimir_mesas_finales_pdf(request):
         
         # Título principal
         elements.append(Paragraph("MESAS DE EXÁMENES FINALES", title_style))
+        inst_style = ParagraphStyle(
+            'Inst', parent=styles['Normal'], fontSize=12,
+            textColor=colors.HexColor('#3E9BD6'), spaceAfter=2,
+            alignment=TA_CENTER, fontName='Helvetica-Bold'
+        )
+        elements.append(Paragraph("ISFDyT N°210 · La Plata", inst_style))
         
         # Fecha de generación
         fecha_actual = now().strftime('%d/%m/%Y %H:%M')
@@ -2009,6 +2152,11 @@ def imprimir_mesas_finales_pdf(request):
         else:
             # Crear encabezados de la tabla
             data = [['Materia', 'Carrera', 'Fecha', 'Horario', 'Profesor', 'Inscripción']]
+
+            cell_style = ParagraphStyle(
+                'CeldaCartel', parent=styles['Normal'], fontSize=9, leading=11,
+                textColor=colors.black, alignment=TA_CENTER, fontName='Helvetica'
+            )
             
             # Agregar datos de cada mesa
             for mesa in mesas:
@@ -2022,28 +2170,28 @@ def imprimir_mesas_finales_pdf(request):
                 carrera = mesa.materia.carrera.nombre_carrera if mesa.materia.carrera else '-'
                 
                 data.append([
-                    mesa.materia.nombre_materia,
-                    carrera,
-                    mesa.llamado.strftime('%d/%m/%Y'),
-                    mesa.llamado.strftime('%H:%M'),
-                    profesor,
-                    inscripcion
+                    Paragraph(mesa.materia.nombre_materia, cell_style),
+                    Paragraph(carrera, cell_style),
+                    Paragraph(mesa.llamado.strftime('%d/%m/%Y'), cell_style),
+                    Paragraph(mesa.llamado.strftime('%H:%M'), cell_style),
+                    Paragraph(profesor, cell_style),
+                    Paragraph(inscripcion, cell_style),
                 ])
             
             # Crear tabla con anchos de columna personalizados
             table = Table(data, colWidths=[
-                2.2*inch,  # Materia
-                1.8*inch,  # Carrera
-                0.9*inch,  # Fecha
-                0.7*inch,  # Horario
-                1.5*inch,  # Profesor
-                0.9*inch   # Inscripción
+                1.7*inch,   # Materia
+                1.85*inch,  # Carrera
+                0.85*inch,  # Fecha
+                0.7*inch,   # Horario
+                1.35*inch,  # Profesor
+                0.85*inch   # Inscripción
             ])
             
             # Aplicar estilos a la tabla
             table.setStyle(TableStyle([
                 # Estilo del encabezado
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0D2033')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -2057,11 +2205,11 @@ def imprimir_mesas_finales_pdf(request):
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#3498db')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#3E9BD6')),
                 
                 # Alternancia de colores en filas
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecf0f1')]),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#EEF3F8')]),
                 
                 # Padding
                 ('TOPPADDING', (0, 1), (-1, -1), 8),
@@ -2079,7 +2227,7 @@ def imprimir_mesas_finales_pdf(request):
                 'Footer',
                 parent=styles['Normal'],
                 fontSize=9,
-                textColor=colors.HexColor('#95a5a6'),
+                textColor=colors.HexColor('#94a3b8'),
                 alignment=TA_CENTER
             )
             
@@ -2183,6 +2331,8 @@ def reporte_estudiante_descarga(request, usuario_id):
     usando una API externa
     """
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not request.user.is_authenticated or not request.user.puede_ver_reporte_de(usuario):
+        return render(request, '403_forbidden.html', status=403)
     
     if not usuario.es_estudiante():
         return HttpResponse("Este reporte solo está disponible para estudiantes", status=403)
@@ -2218,118 +2368,68 @@ def reporte_estudiante_descarga(request, usuario_id):
     return HttpResponse("Error al generar el PDF", status=500)
 
 
+NUMEROS_EN_LETRAS_NOTA = {
+    10: "Diez", 9: "Nueve", 8: "Ocho", 7: "Siete", 6: "Seis",
+    5: "Cinco", 4: "Cuatro", 3: "Tres", 2: "Dos", 1: "Uno",
+}
+
+
 def obtener_contexto_reporte(usuario):
     """
-    Función auxiliar para obtener el contexto del reporte
+    Contexto de la constancia/reporte de un estudiante: sus materias reales
+    (de las carreras en las que está inscripto), notas y porcentaje de
+    avance. Antes esto usaba una lista de materias y un nombre de carrera
+    hardcodeados (de una tecnicatura en particular), así que cualquier
+    estudiante de otra carrera recibía una constancia con materias que no
+    eran las suyas.
     """
-    materias_hardcoded = {
-        1: [
-            "Ciencia, Tecnología y Sociedad",
-            "Inglés I",
-            "Álgebra",
-            "Algoritmo y Estructura de Datos I",
-            "Sistemas y Organizaciones",
-            "Arquitectura de Computadoras",
-        ],
-        2: [
-            "Inglés II",
-            "Probabilidad y Estadística II",
-            "Estadística",
-            "Algoritmo y Estructura de Datos II",
-            "Sistemas Operativos",
-            "Base de Datos",
-            "Prácticas Profesionalizantes II",
-        ],
-        3: [
-            "Inglés III",
-            "Aspectos Legales de la Profesión",
-            "Seminario de Actualización",
-            "Redes y Comunicaciones",
-            "Ingeniería de Software",
-            "Algoritmo y Estructura de Datos III",
-            "Prácticas Profesionalizantes III",
-        ]
+    carreras = list(usuario.carrera.all())
+    materias = Materia.objects.filter(carrera__in=carreras).order_by('anio', 'nombre_materia')
+    inscripciones = {
+        um.materia_id: um
+        for um in usuarios_materia.objects.filter(usuario=usuario, materia__in=materias)
     }
-    
+
     materias_por_anio = {}
     total_materias = 0
     materias_aprobadas = 0
-    
-    for anio, lista_materias in materias_hardcoded.items():
-        materias_por_anio[anio] = []
-        
-        for nombre_materia in lista_materias:
-            total_materias += 1
-            
-            nota_cursada = "-"
-            nota_final = "-"
-            calif_cursada = "-"
-            calif_final = "-"
-            fecha_cursada = "-"
-            aprobada = False
-            
-            try:
-                materia = Materia.objects.filter(nombre_materia__iexact=nombre_materia).first()
-                if materia:
-                    try:
-                        inscripcion = usuarios_materia.objects.get(usuario=usuario, materia=materia)
-                        
-                        if inscripcion.nota_cursada not in [None, '', 'None', 'none']:
-                            try:
-                                nota_cursada = int(float(inscripcion.nota_cursada))
-                                numeros_letras = {
-                                    10: "Diez", 9: "Nueve", 8: "Ocho", 7: "Siete",
-                                    6: "Seis", 5: "Cinco", 4: "Cuatro", 3: "Tres",
-                                    2: "Dos", 1: "Uno"
-                                }
-                                calif_cursada = numeros_letras.get(nota_cursada, "-")
-                            except (ValueError, TypeError):
-                                nota_cursada = "-"
-                                calif_cursada = "-"
-                        
-                        if inscripcion.nota_final not in [None, '', 'None', 'none']:
-                            try:
-                                nota_final = int(float(inscripcion.nota_final))
-                                numeros_letras = {
-                                    10: "Diez", 9: "Nueve", 8: "Ocho", 7: "Siete",
-                                    6: "Seis", 5: "Cinco", 4: "Cuatro", 3: "Tres",
-                                    2: "Dos", 1: "Uno"
-                                }
-                                calif_final = numeros_letras.get(nota_final, "-")
-                                
-                                if nota_final >= 4:
-                                    aprobada = True
-                                    materias_aprobadas += 1
-                            except (ValueError, TypeError):
-                                nota_final = "-"
-                                calif_final = "-"
-                        
-                        if inscripcion.ciclo_lectivo not in [None, '', 'None', 'none']:
-                            fecha_cursada = str(inscripcion.ciclo_lectivo)
-                        
-                        if inscripcion.aprobada and not aprobada:
-                            aprobada = True
-                            materias_aprobadas += 1
-                            
-                    except usuarios_materia.DoesNotExist:
-                        pass
-            except Exception:
-                pass
-            
-            materias_por_anio[anio].append({
-                'nombre': nombre_materia,
-                'nota_cursada': nota_cursada,
-                'nota_final': nota_final,
-                'calif_cursada': calif_cursada,
-                'calif_final': calif_final,
-                'fecha': fecha_cursada
-            })
-    
+
+    for materia in materias:
+        total_materias += 1
+        inscripcion = inscripciones.get(materia.id)
+
+        nota_cursada = calif_cursada = nota_final = calif_final = "-"
+        fecha_cursada = "-"
+
+        if inscripcion:
+            if inscripcion.nota_cursada is not None:
+                nota_cursada = int(float(inscripcion.nota_cursada))
+                calif_cursada = NUMEROS_EN_LETRAS_NOTA.get(nota_cursada, "-")
+            if inscripcion.nota_final is not None:
+                nota_final = int(float(inscripcion.nota_final))
+                calif_final = NUMEROS_EN_LETRAS_NOTA.get(nota_final, "-")
+            if inscripcion.ciclo_lectivo:
+                fecha_cursada = str(inscripcion.ciclo_lectivo)
+
+        if correlativas.tiene_final_aprobado(inscripcion):
+            materias_aprobadas += 1
+
+        materias_por_anio.setdefault(materia.anio, []).append({
+            'nombre': materia.nombre_materia,
+            'nota_cursada': nota_cursada,
+            'nota_final': nota_final,
+            'calif_cursada': calif_cursada,
+            'calif_final': calif_final,
+            'fecha': fecha_cursada,
+        })
+
     porcentaje_aprobadas = round((materias_aprobadas / total_materias * 100), 2) if total_materias > 0 else 0
     porcentaje_en_letras = numero_a_letras(porcentaje_aprobadas)
-    
+
     return {
         'usuario': usuario,
+        'nombre_carrera': ' y '.join(c.nombre_carrera for c in carreras) if carreras else None,
+        'resolucion_carrera': ', '.join(c.num_resolucion for c in carreras if c.num_resolucion),
         'materias_por_anio': materias_por_anio,
         'fecha_actual': now().strftime('%d/%m/%Y'),
         'total_materias': total_materias,
@@ -2339,12 +2439,31 @@ def obtener_contexto_reporte(usuario):
     }
 
 
+
+# ========== RECUPERACIÓN DE CONTRASEÑA ==========
+class CustomPasswordResetView(PasswordResetView):
+    template_name = 'registration/password_reset_form.html'
+    email_template_name = 'registration/password_reset_email.html'
+    success_url = reverse_lazy('password_reset_done')
+
+class CustomPasswordResetDoneView(PasswordResetDoneView):
+    template_name = 'registration/password_reset_done.html'
+
+class CustomPasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = 'registration/password_reset_confirm.html'
+    success_url = reverse_lazy('password_reset_complete')
+
+class CustomPasswordResetCompleteView(PasswordResetCompleteView):
+    template_name = 'registration/password_reset_complete.html'
+
 @login_required
 def reporte_estudiante_html(request, usuario_id):
     """
     Vista HTML del reporte para previsualización
     """
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not request.user.is_authenticated or not request.user.puede_ver_reporte_de(usuario):
+        return render(request, '403_forbidden.html', status=403)
     
     if not usuario.es_estudiante():
         return HttpResponse("Este reporte solo está disponible para estudiantes", status=403)
@@ -2352,3 +2471,49 @@ def reporte_estudiante_html(request, usuario_id):
     context = obtener_contexto_reporte(usuario)
     
     return render(request, 'reportes/constancia_estudiante.html', context)
+@capacidad_requerida('gestionar_mesas')
+def obtener_finales_estudiante(request):
+    """
+    Vista AJAX para la inscripción manual: finales a los que un estudiante
+    puede inscribirse, más los que solo le faltan por la ventana de
+    inscripción cerrada (marcados 'excepcional', ver MesaFinal.inscripcion_excepcional_vigente).
+    """
+    if request.method != 'GET':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'})
+
+    estudiante_id = request.GET.get('estudiante_id')
+    if not estudiante_id:
+        return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
+
+    estudiante = get_object_or_404(Usuario, id=estudiante_id)
+    if estudiante.rol != 'Estudiante':
+        return JsonResponse({'status': 'error', 'message': 'El usuario no es un estudiante'})
+
+    inscripciones_por_materia = {
+        um.materia_id: um for um in usuarios_materia.objects.filter(usuario=estudiante)
+    }
+
+    finales_disponibles = []
+    for item in correlativas.finales_con_requisitos(estudiante):
+        mesa = item['mesa']
+        if item['disponible']:
+            excepcional = False
+        elif item['motivo'] == correlativas.MOTIVO_INSCRIPCION_CERRADA and mesa.inscripcion_excepcional_vigente():
+            excepcional = True
+        else:
+            continue
+
+        inscripcion_materia = inscripciones_por_materia.get(mesa.materia_id)
+        finales_disponibles.append({
+            'id': mesa.id,
+            'materia': mesa.materia.nombre_materia,
+            'fecha_llamado': mesa.llamado.strftime('%d/%m/%Y %H:%M'),
+            'nota_cursada': (inscripcion_materia.nota_cursada if inscripcion_materia else None) or 'Libre',
+            'modalidad': (inscripcion_materia.modalidad if inscripcion_materia else None) or 'Regular',
+            'excepcional': excepcional,
+        })
+
+    return JsonResponse({'status': 'success', 'finales': finales_disponibles})
+    
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'})
+

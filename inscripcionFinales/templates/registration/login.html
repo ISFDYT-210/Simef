@@ -1,101 +1,332 @@
 {% extends 'base/base.html' %}
-{% include 'base/header.html' %}
 
 {% block title %}Inicio de sesion{% endblock %}
 
-{% block content %}
-
-<!-- Mensajes -->
-{% if form.errors %}
-  <div id="login-error">
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      <p class="fs-5">El email o la contraseña son incorrecto. Intentelo nuevamente por favor.</p>
-    </div>
-  </div>
-{% endif %}
-<!-- Fin mensajes -->
-
-<div class="container-fluid login-screen align-center">
-  <div class="card login-card bg-trans no-border">
-    <div class="row g-0 bg-trans">
-      <div class="card-l border-rad40-l white-bg">
-        <div class="card-body card-body-login">
-          <h5 class="card-title">Inicio de sesión</h5>
-          <form method="post" class="login-form">   
-            {% csrf_token %}
-            <div class="form-fields">
-              <p class="fs-5"> 
-                <label for="id_username" class="fs-4">Email:</label>
-                {{ form.username }}
-              </p>
-              <p class="fs-5">
-                <label for="id_password" class="fs-4">Password:</label>
-                {{ form.password }}
-              </p>
-            </div>
-            <div class="recordarme">  
-              <input type="checkbox" id="recordarme" name="recordarme" value="recordarme" style="width:20px;height:20px;">
-              <label for="recordarme" class="fs-4" style="margin-left: -5px">Recordarme</label>
-            </div>
-            <div> 
-              <input type="checkbox" onclick="myFunction()" style="width:20px;height:20px; margin-left: 19px"><span style="font-size: 23px; margin-left: 12px">Mostrar Contraseña</span>
-            </div>
-            <div class="center-content">
-              <div>
-                <button type="submit" class="btn btn-blue">Ingresar</button>
-              </div>
-              <a href="/recuperar_pass/" class="fs-4" style="text-decoration: none">Olvidaste tu contraseña?</a>
-            </div>
-          </form>
-
-        </div>
-      </div>
-      
-      <div class="card-r border-rad40-r purple-bg">
-        <h3 class="text-center sime-titulo"></h3>
-        <img src="/static/imagenes/SIMEF.png" class="logo-login" style="height: 80%; width: 60%;">
-      </div>
-
-    </div>
-  </div>
-</div>
-
+{% block extra_head %}
 <style>
-  @media (max-width: 768px) {
-    #id_password {
-        font-size: fs-5; /* Tamaño de fuente más grande en pantallas más pequeñas */
-    }
-    .main-bar {
-      height: 70px;
-      font-size: 5px;
-    }
-    .titulo {
-      font-size: 18px;
-    }
+.login-screen {
+  width: 100%;
+  margin: 0 auto;
 }
-@media (max-width: 768px) {
-  .card login-card bg-trans no-border {
-      width: 80px;
-      height 100px;
-  }
+
+.login-logo {
+  height: 60px;
+  width: auto;
+  margin: 0 auto 12px;
+  display: block;
+  object-fit: contain;
+}
+
+.login-title {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: #14304d;
+  margin: 0 0 4px;
+}
+
+.login-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0 0 1.5rem;
+}
+
+.login-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #fca5a5;
+  background-color: #fef2f2;
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+
+.login-error svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.login-field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background-color: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-input::placeholder {
+  color: #94a3b8;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: #3e9bd6;
+  box-shadow: 0 0 0 3px rgba(62, 155, 214, 0.2);
+}
+
+.login-password-wrapper {
+    position: relative;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    background-color: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-password-wrapper:focus-within {
+    outline: none;
+    border-color: #3e9bd6;
+    box-shadow: 0 0 0 3px rgba(62, 155, 214, 0.2);
+}
+
+.login-password-wrapper.login-input-error {
+    border-color: #fca5a5;
+}
+
+.login-password-wrapper.login-input-error:focus-within {
+    border-color: #fca5a5;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.login-password-wrapper .login-input {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    padding-right: 3rem;
+    border: none;
+    outline: none;
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+}
+
+.login-password-wrapper .login-input::placeholder {
+    color: #94a3b8;
+}
+
+.login-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 100%;
+    border: none;
+    border-top-right-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.login-toggle:hover {
+    color: #64748b;
+}
+
+.login-toggle:focus-within {
+    color: #3e9bd6;
+    outline: none;
+}
+
+.login-input-error {
+    border-color: #fca5a5;
+}
+
+.login-input-error:focus {
+    border-color: #fca5a5;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.login-error-msg {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: #dc2626;
+}
+
+.login-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 1rem;
+}
+
+.login-checkbox {
+  height: 1rem;
+  width: 1rem;
+  accent-color: #3e9bd6;
+  cursor: pointer;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 0.65rem 1.25rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #3e9bd6 0%, #2c82b8 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(62, 155, 214, 0.3);
+  transition: box-shadow 0.2s, filter 0.2s;
+}
+
+.login-submit:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 12px -2px rgba(62, 155, 214, 0.4);
+}
+
+.login-submit:active {
+  filter: brightness(0.95);
+}
+
+.login-footer {
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.login-footer a {
+  color: #3e9bd6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .login-title { font-size: 1.375rem; }
 }
 </style>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous">
-</script>
-
-<script>
-  function myFunction() {
-    var x = document.getElementById("id_password");
-    if (x.type === "password") {
-      x.type = "text";
-    } else {
-      x.type = "password";
-    }
-  }
-
-</script>
-
 {% endblock %}
-{% include 'base/footer.html' %}
+
+{% block content %}
+<div class="login-screen">
+  <div class="mb-6 flex flex-col items-center text-center">
+    <img src="/static/imagenes/SIMEF.png" alt="SIMEF" class="login-logo">
+    <h1 class="login-title">Bienvenido a SIMEF</h1>
+    <p class="login-subtitle">Ingresá con tu cuenta institucional</p>
+  </div>
+
+  {% if form.errors %}
+  <div class="login-error">
+    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill="#dc2626"/>
+      <path d="M15 9l-6 6m0-6l6 6" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+    </svg>
+    <span>El email o la contraseña son incorrectos. Intentá nuevamente.</span>
+  </div>
+  {% endif %}
+
+  <form method="post" class="space-y-4" novalidate
+        x-data="{
+          mostrar: false,
+          errorPass: false,
+          errorEmail: false,
+          emailErrorMsg: '',
+          validarEmail() {
+            let v = this.$el.elements.username.value.trim();
+            if (v === '') {
+              this.errorEmail = true;
+              this.emailErrorMsg = 'Ingresá tu email para continuar.';
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+              this.errorEmail = true;
+              this.emailErrorMsg = 'Ingresá un email válido.';
+            } else {
+              this.errorEmail = false;
+              this.emailErrorMsg = '';
+            }
+          },
+          submitForm(event) {
+            this.validarEmail();
+            if (!this.$el.elements.password.value.trim()) {
+              this.errorPass = true;
+            } else {
+              this.errorPass = false;
+            }
+            if (this.errorEmail || this.errorPass) {
+              event.preventDefault();
+              if (this.errorEmail) {
+                this.$el.elements.username.focus();
+              } else {
+                this.$el.elements.password.focus();
+              }
+            }
+          }
+        }"
+        @submit="submitForm($event)">
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+    <div class="login-field">
+      <label for="id_username">Email</label>
+      <input type="text" name="username" id="id_username" autofocus
+             class="login-input"
+             :class="{ 'login-input-error': errorEmail }"
+             @input="validarEmail()">
+      <span class="login-error-msg" x-show="errorEmail" x-cloak x-text="emailErrorMsg"></span>
+    </div>
+
+    <div class="login-field">
+      <label for="id_password">Contraseña</label>
+      <div class="login-password-wrapper" :class="{ 'login-input-error': errorPass }">
+        <input :type="mostrar ? 'text' : 'password'" name="password" id="id_password"
+               class="login-input"
+               autocomplete="current-password"
+               @input="errorPass = false">
+        <button type="button"
+                @click="mostrar = !mostrar"
+                :aria-label="mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                class="login-toggle">
+          <svg x-show="!mostrar" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg x-show="mostrar" x-cloak class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.4 5.7A9.3 9.3 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.8 15.8 0 0 1-3.4 4M6.3 7.8A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5c1 0 1.9-.1 2.7-.4"/>
+          </svg>
+        </button>
+      </div>
+      <span class="login-error-msg" x-show="errorPass" x-cloak>Ingresá tu contraseña para continuar.</span>
+    </div>
+
+    <div class="login-row">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" id="recordarme" name="recordarme" value="recordarme" class="login-checkbox">
+        <span>Recordarme</span>
+      </label>
+    </div>
+
+    <button type="submit" class="login-submit">Ingresar</button>
+
+    <div class="login-footer">
+      <a href="/recuperar_pass/">¿Olvidaste tu contraseña?</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
