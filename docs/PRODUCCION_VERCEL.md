@@ -59,11 +59,30 @@ sube.
 | Variable | Production | Comentario |
 |---|---|---|
 | `DEBUG` | `False` | Obligatoria. Con `True` se muestran errores con código y datos. |
-| `SECRET_KEY` | Clave larga y aleatoria, propia de producción | Generarla con `python -c "import secrets; print(secrets.token_urlsafe(50))"`. |
+| `SECRET_KEY` | Clave larga y aleatoria, propia de producción | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella. Generarla con `python -c "import secrets; print(secrets.token_urlsafe(50))"`. |
 | `ALLOWED_HOSTS` | `www.pulqui-simef210.com.ar,pulqui-simef210.com.ar` | Sin espacios. Para que también abran las vistas previas, agregar `.vercel.app` solo en *Preview*. |
 | `CSRF_TRUSTED_ORIGINS` | `https://www.pulqui-simef210.com.ar,https://pulqui-simef210.com.ar` | Con esquema. |
 | `DATABASE_URL` | Cadena de conexión de Neon con `?sslmode=require` | Ver [DESPLIEGUE.md §3.1](DESPLIEGUE.md) para obtenerla. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` y el resto de `EMAIL_*` | Cuenta de correo del instituto | Para recuperar la contraseña y avisos. |
+
+### HTTPS
+
+Con `DEBUG=False`, `settings.py` activa solo lo que pide el checklist de
+despliegue de Django: redirección de http a https, cookies de sesión y CSRF
+marcadas `Secure`, y HSTS por una hora (`SECURE_HSTS_SECONDS=3600`). En
+desarrollo, con `DEBUG=True`, todo eso queda apagado. Cada ajuste se puede pisar
+desde el entorno, sin tocar el código:
+
+| Variable | Por defecto con `DEBUG=False` | Cuándo cambiarla |
+|---|---|---|
+| `SECURE_HSTS_SECONDS` | `3600` (una hora) | Cuando producción lleve unos días andando bien por HTTPS, subirla a `31536000` (un año). El navegador recuerda el valor y no se puede acortar antes de que venza. |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `False` | Solo después de verificar que **todos** los subdominios del dominio se sirven por HTTPS. |
+| `SECURE_HSTS_PRELOAD` | `False` | No activarla sin una decisión explícita: inscribe el dominio en la lista que traen los navegadores, y en la práctica no se puede deshacer. |
+| `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` | `True` | Solo para diagnosticar. Por ejemplo, si apareciera un bucle de redirecciones, `SECURE_SSL_REDIRECT=False` lo corta sin un deploy de código. |
+
+Django sabe que el pedido llegó por HTTPS por la cabecera `X-Forwarded-Proto`,
+que pone Vercel (`SECURE_PROXY_SSL_HEADER`). Fuera de un proxy que pise esa
+cabecera, ese ajuste no es seguro.
 
 **Las vistas previas no tienen que usar la base de producción.** Una vista
 previa corre el código de un PR que todavía no se revisó del todo. Si su

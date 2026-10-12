@@ -20,5 +20,9 @@ DATABASES = {
     }
 }
 
+# El cliente de pruebas pide por http: si se corren los tests con DEBUG=False,
+# la redirección a HTTPS convertiría cada respuesta en un 301.
+SECURE_SSL_REDIRECT = False
+
 # El hasher por defecto es lento a propósito; en los tests no aporta nada.
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
