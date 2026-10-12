@@ -1,5 +1,9 @@
 # Despliegue de SIMEF en producción (Debian)
 
+> **Alternativa, no es la producción actual.** Desde el 12 de octubre de 2026,
+> producción corre en Vercel: ver [PRODUCCION_VERCEL.md](PRODUCCION_VERCEL.md).
+> Esta guía queda para el día en que el instituto tenga un servidor propio.
+
 Stack: **Apache → Gunicorn → Django (Python) + Tailwind → Postgres en Neon**
 
 Este documento describe cómo se sirve SIMEF en un servidor Debian y cómo
