@@ -70,6 +70,9 @@ jobs:
       SECRET_KEY: django-insecure-ci-only-key-not-for-production
       DEBUG: 'False'
       ALLOWED_HOSTS: localhost,127.0.0.1
+      # El cliente de pruebas pide por http: con la redireccion a HTTPS que trae
+      # DEBUG=False, cada respuesta seria un 301.
+      SECURE_SSL_REDIRECT: 'False'
       DATABASE_URL: postgres://simef:simef@localhost:5432/simef
       EMAIL_HOST_USER: ci@example.com
       EMAIL_HOST_PASSWORD: ''
@@ -133,10 +136,10 @@ jobs:
     name: Django deployment checklist
     runs-on: ubuntu-latest
     needs: lint
-    # Falla solo ante ERRORES de configuracion; las WARNINGS (HSTS, SSL redirect,
-    # cookies seguras) quedan visibles en el log como deuda pendiente.
+    # Falla ante cualquier aviso de seguridad (--fail-level WARNING), para que no
+    # vuelva a acumularse deuda: con DEBUG=False la configuracion tiene que pasar
+    # el checklist de despliegue de Django completo.
     env:
-      SECRET_KEY: django-insecure-ci-only-key-not-for-production
       DEBUG: 'False'
       ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
@@ -153,8 +156,13 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
+      # Clave aleatoria en cada corrida: una fija en el repo dispararia el aviso
+      # security.W009 (clave debil o con prefijo django-insecure-).
+      - name: Generar una SECRET_KEY de prueba
+        run: echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')" >> "$GITHUB_ENV"
+
       - name: manage.py check --deploy
-        run: python manage.py check --deploy
+        run: python manage.py check --deploy --fail-level WARNING
 
   docker-build:
     name: Build imagen Docker

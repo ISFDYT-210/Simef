@@ -17,9 +17,10 @@ credenciales reales: cada persona/entorno tiene el suyo.
 
 | Variable | Para qué sirve |
 |---|---|
-| `SECRET_KEY` | Clave secreta de Django. Para uso local cualquier valor sirve; en producción tiene que ser una clave real y secreta. |
+| `SECRET_KEY` | Clave secreta de Django. En desarrollo, si no la definís, se usa una de respaldo. Con `DEBUG=False` es obligatoria (la app no arranca sin ella) y tiene que ser una clave real y secreta. |
 | `DEBUG` | `True` en desarrollo, `False` en producción. |
 | `ALLOWED_HOSTS` | Hosts/dominios permitidos, separados por coma. |
+| `SECURE_HSTS_SECONDS` y otras `SECURE_*` | Ajustes de HTTPS. No hace falta definirlas: con `DEBUG=True` quedan apagadas y con `DEBUG=False` toman valores seguros. Ver [PRODUCCION_VERCEL.md](PRODUCCION_VERCEL.md). |
 | `CSRF_TRUSTED_ORIGINS` | Orígenes HTTPS desde los que se aceptan formularios, separados por coma (con esquema, por ejemplo `https://*.app.github.dev`). Vacío por defecto. En un Codespace hace falta, junto con `.app.github.dev` en `ALLOWED_HOSTS`, para abrir la app desde la URL reenviada; sin eso Django responde 400 al entrar y 403 al iniciar sesión. |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Credenciales de la base Postgres que levanta Docker. |
 | `DATABASE_URL` | URL de conexión a la base. Si no la definís, Django usa un SQLite local. La usan `manage.py runserver` y los tests sin `--settings`; **los contenedores de Docker la ignoran**, porque `docker-compose.override.yml` la pisa apuntando a la base local del compose (ver [DOCKER.md](DOCKER.md)). En producción apunta a Neon (ver [DESPLIEGUE.md](DESPLIEGUE.md)). |
