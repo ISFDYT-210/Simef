@@ -37,7 +37,12 @@ def _env_bool(nombre, por_defecto):
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# Apagado salvo que se pida explicitamente con DEBUG=True (exacto): si falta la
+# variable, como puede pasar en un entorno de produccion recien armado, la app
+# no muestra errores con codigo y configuracion. Desarrollo lo prende en su
+# .env (ver .env.example) y docker-compose.override.yml. Lo controla
+# inscripcionFinales/tests/test_settings.py.
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # La clave de respaldo es publica (esta en el repo): solo sirve para desarrollo.
@@ -48,7 +53,8 @@ if not SECRET_KEY:
     if not DEBUG:
         raise ImproperlyConfigured(
             'Falta la variable de entorno SECRET_KEY. Con DEBUG=False es '
-            'obligatoria: ver docs/PRODUCCION_VERCEL.md.'
+            'obligatoria: ver docs/PRODUCCION_VERCEL.md. Para desarrollar, '
+            'crear el .env a partir de .env.example, que trae DEBUG=True.'
         )
     SECRET_KEY = 'django-insecure-utp902oup=*=ltlzswjy)s5l-ko5c)ju@c2sx(5n6#&(d0(2)@'
 
