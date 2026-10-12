@@ -172,9 +172,11 @@ py -m pip install -r requirements.txt
 
 ### 6. Configurar el archivo de settings
 
-**No hay nada que copiar.** El `settings.py` versionado ya sirve para
-desarrollo: `DEBUG` viene en `True` y, si no definís `DATABASE_URL`, usa un
-SQLite local sin que tengas que instalar Postgres.
+**No hay que tocar `settings.py`, pero sí crear el `.env`** a partir de
+`.env.example` (ver [docs/ENV.md](docs/ENV.md)). La plantilla trae
+`DEBUG=True`, que pone la app en modo desarrollo: si falta, `DEBUG` queda
+apagado como en producción. Si no definís `DATABASE_URL`, usa un SQLite local
+sin que tengas que instalar Postgres.
 
 Si querés apuntar a una base Postgres, definí las variables en un `.env`
 (ver [docs/ENV.md](docs/ENV.md)). **No copies ningún archivo sobre

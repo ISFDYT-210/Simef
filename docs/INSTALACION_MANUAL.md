@@ -58,11 +58,13 @@ pip3 install -r requirements.txt
 python manage.py migrate
 ```
 
-> **No hace falta tocar `settings.py`.** El `settings.py` versionado ya sirve
-> para desarrollo: `DEBUG` viene en `True` por defecto y, si no definís la
-> variable `DATABASE_URL`, usa un SQLite local (`db.sqlite3`) sin que tengas
-> que instalar Postgres. Si querés apuntar a una base Postgres, definí
-> `DATABASE_URL` en un `.env` (ver [ENV.md](ENV.md)).
+> **No hace falta tocar `settings.py`, pero sí crear el `.env`.** Copialo de
+> la plantilla con `cat .env.example > .env` (ver [ENV.md](ENV.md)): trae
+> `DEBUG=True`, que es lo que pone la app en modo desarrollo. Sin esa variable,
+> `DEBUG` queda apagado como en producción, y la app no arranca si además falta
+> `SECRET_KEY`. Si no definís `DATABASE_URL`, usa un SQLite local
+> (`db.sqlite3`) sin que tengas que instalar Postgres; para apuntar a una base
+> Postgres, definí `DATABASE_URL` en el `.env`.
 >
 > El repo incluye además `settings_TEST.py`, que se usa para correr los tests
 > (ver más abajo). **No lo copies sobre `settings.py`**: pisarías un archivo

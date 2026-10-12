@@ -18,7 +18,7 @@ credenciales reales: cada persona/entorno tiene el suyo.
 | Variable | Para qué sirve |
 |---|---|
 | `SECRET_KEY` | Clave secreta de Django. En desarrollo, si no la definís, se usa una de respaldo. Con `DEBUG=False` es obligatoria (la app no arranca sin ella) y tiene que ser una clave real y secreta. |
-| `DEBUG` | `True` en desarrollo, `False` en producción. |
+| `DEBUG` | `True` en desarrollo, `False` en producción. **Si no está definida, vale `False`**: solo `True` exacto prende el modo debug. Con Docker, el override la prende si el `.env` no dice otra cosa. |
 | `ALLOWED_HOSTS` | Hosts/dominios permitidos, separados por coma. |
 | `SECURE_HSTS_SECONDS` y otras `SECURE_*` | Ajustes de HTTPS. No hace falta definirlas: con `DEBUG=True` quedan apagadas y con `DEBUG=False` toman valores seguros. Ver [PRODUCCION_VERCEL.md](PRODUCCION_VERCEL.md). |
 | `CSRF_TRUSTED_ORIGINS` | Orígenes HTTPS desde los que se aceptan formularios, separados por coma (con esquema, por ejemplo `https://*.app.github.dev`). Vacío por defecto. En un Codespace hace falta, junto con `.app.github.dev` en `ALLOWED_HOSTS`, para abrir la app desde la URL reenviada; sin eso Django responde 400 al entrar y 403 al iniciar sesión. |

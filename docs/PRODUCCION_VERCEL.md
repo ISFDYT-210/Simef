@@ -58,7 +58,7 @@ sube.
 
 | Variable | Production | Comentario |
 |---|---|---|
-| `DEBUG` | `False` | Obligatoria. Con `True` se muestran errores con código y datos. |
+| `DEBUG` | `False` | Si falta, ya vale `False`; conviene cargarla igual para que se vea. Con `True` se muestran errores con código y datos. |
 | `SECRET_KEY` | Clave larga y aleatoria, propia de producción | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella. Generarla con `python -c "import secrets; print(secrets.token_urlsafe(50))"`. |
 | `ALLOWED_HOSTS` | `www.pulqui-simef210.com.ar,pulqui-simef210.com.ar` | Sin espacios. Para que también abran las vistas previas, agregar `.vercel.app` solo en *Preview*. |
 | `CSRF_TRUSTED_ORIGINS` | `https://www.pulqui-simef210.com.ar,https://pulqui-simef210.com.ar` | Con esquema. |
