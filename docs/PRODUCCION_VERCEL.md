@@ -60,9 +60,9 @@ sube.
 |---|---|---|
 | `DEBUG` | `False` | Si falta, ya vale `False`; conviene cargarla igual para que se vea. Con `True` se muestran errores con código y datos. |
 | `SECRET_KEY` | Clave larga y aleatoria, propia de producción | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella. Generarla con `python -c "import secrets; print(secrets.token_urlsafe(50))"`. |
-| `ALLOWED_HOSTS` | `www.pulqui-simef210.com.ar,pulqui-simef210.com.ar` | Sin espacios. Para que también abran las vistas previas, agregar `.vercel.app` solo en *Preview*. |
+| `ALLOWED_HOSTS` | `www.pulqui-simef210.com.ar,pulqui-simef210.com.ar` | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella. Sin espacios. Para que también abran las vistas previas, agregar `.vercel.app` solo en *Preview*. |
 | `CSRF_TRUSTED_ORIGINS` | `https://www.pulqui-simef210.com.ar,https://pulqui-simef210.com.ar` | Con esquema. |
-| `DATABASE_URL` | Cadena de conexión de Neon con `?sslmode=require` | Ver [DESPLIEGUE.md §3.1](DESPLIEGUE.md) para obtenerla. |
+| `DATABASE_URL` | Cadena de conexión de Neon con `?sslmode=require` | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella, en vez de caer a un SQLite vacío. Ver [DESPLIEGUE.md §3.1](DESPLIEGUE.md) para obtenerla. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` y el resto de `EMAIL_*` | Cuenta de correo del instituto | Para recuperar la contraseña y avisos. |
 
 ### HTTPS

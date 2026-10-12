@@ -186,11 +186,12 @@ Comprobaciones que vale la pena hacer una sola vez, con calma:
   que queremos; pero escribir `DEBUG=true` en minúscula también apaga el modo
   debug, no lo enciende. Si alguna vez necesitás encenderlo, va `True` exacto.
 - `ALLOWED_HOSTS` se parte por comas y **sin espacios** alrededor de cada host.
-  Si queda vacío y `DEBUG=False`, Django rechaza todas las peticiones con
+  Si queda vacío y `DEBUG=False`, la app no arranca y el error dice que falta.
+  Si un host está mal escrito, Django rechaza esas peticiones con
   `DisallowedHost`.
-- Si `DATABASE_URL` falta, la app **no falla**: cae silenciosamente a un SQLite
-  local vacío y parece que se perdieron todos los datos. Ante un "desapareció
-  todo" después de un deploy, esto es lo primero a revisar.
+- Si `DATABASE_URL` falta y `DEBUG=False`, la app no arranca y el error dice
+  que falta. (Antes caía en silencio a un SQLite local vacío, y parecía que se
+  habían perdido todos los datos.)
 
 El archivo tiene la contraseña de la base, así que no queda legible para todo
 el mundo:
