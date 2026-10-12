@@ -449,6 +449,8 @@ class InscripcionFinal(models.Model):
     usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, blank=False, null=False)  # 'Usuario' con mayúscula
     llamado = models.ForeignKey('MesaFinal', on_delete=models.CASCADE, blank=False, null=False)
     aprobada= models.BooleanField(null=True) 
+    # El alumno se inscribio pero no se presento a rendir.
+    ausente = models.BooleanField(default=False)
     inscripcionAbierta=models.BooleanField(default=False)
 
 class Estudiante(Usuario):

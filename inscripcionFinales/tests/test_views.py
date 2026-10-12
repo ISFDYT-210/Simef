@@ -395,6 +395,18 @@ class InscripcionFinalEstudianteTest(TestCase):
         self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
         self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
 
+    def test_la_inscripcion_nueva_queda_como_presente(self):
+        """
+        La columna ausente es NOT NULL y sin default en la base (#119): si el
+        modelo deja de mandarla en el INSERT, la inscripción vuelve a fallar
+        con IntegrityError.
+        """
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        self.client.force_login(self.alumno)
+        self.client.get(self.url)
+        inscripcion = InscripcionFinal.objects.get(usuario=self.alumno, llamado=self.mesa)
+        self.assertFalse(inscripcion.ausente)
+
     def test_alumno_que_no_cumple_los_requisitos_no_queda_inscripto(self):
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
         self.client.force_login(self.alumno)
