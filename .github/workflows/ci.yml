@@ -167,6 +167,55 @@ jobs:
       - name: manage.py check --deploy
         run: python manage.py check --deploy --fail-level WARNING
 
+  dependency-audit:
+    name: Dependencias vulnerables (pip-audit)
+    runs-on: ubuntu-latest
+    env:
+      # INFORMATIVO por ahora: las dependencias actuales tienen vulnerabilidades
+      # conocidas (Django 4.2.7, Pillow, sqlparse, requests; SEC-03 y SEC-06), y
+      # se resuelven al actualizarlas. Mientras tanto el job las informa en su
+      # resumen y con un aviso en el PR, sin fallar.
+      # Cuando pip-audit quede en cero: pasar esto a 'true', para que una
+      # dependencia vulnerable frene el PR, y sumar el job a los checks
+      # obligatorios del ruleset de main.
+      PIP_AUDIT_BLOQUEANTE: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar pip-audit
+        run: pip install pip-audit==2.9.0
+
+      # pip-audit sale con error tanto si encuentra vulnerabilidades como si no
+      # pudo correr. Para no tapar lo segundo, el resultado se lee del JSON:
+      # sin JSON valido, el job falla aunque sea informativo.
+      - name: pip-audit -r requirements.txt
+        run: |
+          pip-audit -r requirements.txt --progress-spinner off --format json --output pip-audit.json || true
+          set +e
+          resumen=$(python .github/scripts/pip_audit_resumen.py pip-audit.json 2>&1 >> "$GITHUB_STEP_SUMMARY")
+          estado=$?
+          set -e
+          echo "$resumen"
+          case "$estado" in
+            0) ;;
+            1)
+              echo "::warning title=Dependencias vulnerables::$resumen Ver el resumen del job."
+              if [ "$PIP_AUDIT_BLOQUEANTE" = "true" ]; then exit 1; fi
+              ;;
+            *)
+              echo "::error title=pip-audit no pudo correr::$resumen"
+              exit 1
+              ;;
+          esac
+
   docker-build:
     name: Build imagen Docker
     runs-on: ubuntu-latest

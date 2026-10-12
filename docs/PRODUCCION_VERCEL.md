@@ -129,6 +129,8 @@ Si un deploy a producción sale mal:
 ## 5. Antes de cada salida a producción
 
 - [ ] CI en verde en el PR a `main`.
+- [ ] Job *Dependencias vulnerables (pip-audit)* sin vulnerabilidades. Hoy es
+      informativo: aunque pase en verde, hay que mirar su resumen.
 - [ ] Migraciones nuevas: rama de Neon creada, `migrate --plan` revisado y
       migraciones aplicadas.
 - [ ] Estáticos nuevos: `collectstatic` corrido y `staticfiles/` commiteado.
