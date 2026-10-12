@@ -11,7 +11,14 @@ Uso:
 
     python manage.py test inscripcionFinales --settings=gestionInstituto.settings_TEST
 """
-from .settings import *  # noqa: F401,F403
+import os
+
+# Los tests no necesitan las variables obligatorias de producción (SECRET_KEY,
+# ALLOWED_HOSTS, DATABASE_URL): sin un .env, settings.py arranca en modo
+# desarrollo. El test runner de Django apaga DEBUG igual al correr.
+os.environ.setdefault('DEBUG', 'True')
+
+from .settings import *  # noqa: F401,F403,E402
 
 DATABASES = {
     'default': {

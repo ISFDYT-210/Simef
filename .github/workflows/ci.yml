@@ -142,6 +142,9 @@ jobs:
     env:
       DEBUG: 'False'
       ALLOWED_HOSTS: localhost,127.0.0.1
+      # Obligatoria con DEBUG=False. check --deploy no se conecta a la base, asi
+      # que alcanza con una URL de prueba.
+      DATABASE_URL: postgres://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout
         uses: actions/checkout@v7

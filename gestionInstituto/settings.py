@@ -29,6 +29,14 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
+def _falta_en_produccion(nombre):
+    raise ImproperlyConfigured(
+        f'Falta la variable de entorno {nombre}. Con DEBUG=False es '
+        'obligatoria: ver docs/PRODUCCION_VERCEL.md. Para desarrollar, '
+        'crear el .env a partir de .env.example, que trae DEBUG=True.'
+    )
+
+
 def _env_bool(nombre, por_defecto):
     valor = os.environ.get(nombre)
     if valor is None:
@@ -51,14 +59,14 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
     if not DEBUG:
-        raise ImproperlyConfigured(
-            'Falta la variable de entorno SECRET_KEY. Con DEBUG=False es '
-            'obligatoria: ver docs/PRODUCCION_VERCEL.md. Para desarrollar, '
-            'crear el .env a partir de .env.example, que trae DEBUG=True.'
-        )
+        _falta_en_produccion('SECRET_KEY')
     SECRET_KEY = 'django-insecure-utp902oup=*=ltlzswjy)s5l-ko5c)ju@c2sx(5n6#&(d0(2)@'
 
 ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h]
+# Con DEBUG apagado y la lista vacia, Django rechaza todas las visitas con un
+# 400 que no explica nada. Mejor que el deploy falle diciendo que falta.
+if not DEBUG and not ALLOWED_HOSTS:
+    _falta_en_produccion('ALLOWED_HOSTS')
 
 # Origenes HTTPS desde los que se aceptan formularios POST, separados por coma.
 # Hace falta cuando la app se abre detras de un proxy con otro esquema, como la
@@ -152,6 +160,11 @@ WSGI_APPLICATION = 'gestionInstituto.wsgi.application'
 
 
 _database_url = os.environ.get('DATABASE_URL')
+
+# El SQLite de respaldo es solo para desarrollo. En produccion, caer ahi en
+# silencio significa una base vacia (y en Vercel, ademas, de solo lectura).
+if not _database_url and not DEBUG:
+    _falta_en_produccion('DATABASE_URL')
 
 if _database_url:
     _parsed = urlparse(_database_url)
