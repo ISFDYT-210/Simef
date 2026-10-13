@@ -327,27 +327,6 @@ class edit_profile_form(forms.ModelForm):
 
     )
 
-class EstudianteForm(forms.ModelForm):
-    class Meta:
-        model = Estudiante
-        fields = '__all__'
-
-class ProfesorForm(forms.ModelForm):
-    class Meta: 
-        model = Profesor
-        fields = '__all__' 
-
-class PreceptorForm(forms.ModelForm):
-    class Meta:
-        model = Preceptor
-        fields = '__all__'
-        
-class DirectivoForm(forms.ModelForm):
-    class Meta:
-        model = Directivo 
-        fields = '__all__'
-
-
 ############################################################
 class MateriaForm(forms.ModelForm):
 
