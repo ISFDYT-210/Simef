@@ -85,3 +85,48 @@ class VariablesObligatoriasEnProduccionTest(SimpleTestCase):
         proceso = cargar_settings(DEBUG='True')
         self.assertEqual(proceso.returncode, 0, proceso.stderr)
         self.assertEqual(resultado(proceso)['ENGINE'], 'django.db.backends.sqlite3')
+
+
+RESOLVER_ADMIN = textwrap.dedent("""
+    import os
+    import dotenv
+    dotenv.load_dotenv = lambda *args, **kwargs: False  # no leer el .env local
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'gestionInstituto.settings'
+    import django
+    django.setup()
+    from django.urls import Resolver404, resolve
+    try:
+        resolve('/admin/')
+        print('admin: disponible')
+    except Resolver404:
+        print('admin: 404')
+""")
+
+
+def resolver_admin(**variables):
+    entorno = {'PATH': os.environ.get('PATH', '')}
+    entorno.update({k: v for k, v in variables.items() if v is not None})
+    return subprocess.run(
+        [sys.executable, '-c', RESOLVER_ADMIN],
+        cwd=settings.BASE_DIR, env=entorno, capture_output=True, text=True, timeout=60,
+    )
+
+
+class AdminSoloEnDesarrolloTest(SimpleTestCase):
+    """/admin/ no existe en producción salvo que se habilite a propósito (#140)."""
+
+    def test_en_produccion_el_admin_responde_404(self):
+        proceso = resolver_admin(**PRODUCCION)
+        self.assertEqual(proceso.returncode, 0, proceso.stderr)
+        self.assertEqual(proceso.stdout.strip(), 'admin: 404')
+
+    def test_se_puede_habilitar_a_proposito_en_produccion(self):
+        proceso = resolver_admin(ADMIN_HABILITADO='True', **PRODUCCION)
+        self.assertEqual(proceso.returncode, 0, proceso.stderr)
+        self.assertEqual(proceso.stdout.strip(), 'admin: disponible')
+
+    def test_en_desarrollo_sigue_disponible(self):
+        proceso = resolver_admin(DEBUG='True')
+        self.assertEqual(proceso.returncode, 0, proceso.stderr)
+        self.assertEqual(proceso.stdout.strip(), 'admin: disponible')
+
