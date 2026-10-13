@@ -9,11 +9,12 @@ Correr con:
 """
 from datetime import timedelta
 
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from inscripcionFinales.models import (
-    Carrera, Materia, MesaFinal, Usuario, usuarios_materia,
+    BLOQUEO_LOGIN_MINUTOS_BASE, BLOQUEO_LOGIN_MINUTOS_TOPE, Carrera, Materia, MesaFinal,
+    Usuario, duracion_bloqueo_login, usuarios_materia,
 )
 
 
@@ -176,3 +177,55 @@ class InscripcionExcepcionalVigenteTest(TestCase):
 
     def test_ya_paso_no_permite_excepcion(self):
         self.assertFalse(self.mesa(dias=-1).inscripcion_excepcional_vigente())
+
+
+class DuracionBloqueoLoginTest(TestCase):
+    """
+    duracion_bloqueo_login (AXES_COOLOFF_TIME): 10 minutos el primer
+    bloqueo, +10 cada vez que la MISMA cuenta se vuelve a bloquear, hasta
+    un tope. Se resetea con un login exitoso (ver CustomLoginView).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = Usuario.objects.create(
+            email='bloqueo@test.com', username='bloqueo', nombre_completo='Bloqueo Test',
+            rol='Estudiante', dni=80,
+        )
+
+    def _request(self):
+        return RequestFactory().post('/accounts/login/', {'username': 'bloqueo@test.com', 'password': 'x'})
+
+    def test_primer_bloqueo_dura_el_minimo_base(self):
+        duracion = duracion_bloqueo_login(self._request())
+        self.assertEqual(duracion, timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_BASE))
+        self.usuario.refresh_from_db()
+        self.assertEqual(self.usuario.nivel_bloqueo_login, 1)
+
+    def test_segundo_bloqueo_de_la_misma_cuenta_duplica_la_espera(self):
+        duracion_bloqueo_login(self._request())  # primer bloqueo: nivel 1
+        # Simula que el primer bloqueo ya venció (episodio cerrado).
+        self.usuario.refresh_from_db()
+        self.usuario.bloqueado_login_hasta = timezone.now() - timedelta(seconds=1)
+        self.usuario.save()
+
+        duracion = duracion_bloqueo_login(self._request())  # segundo bloqueo: nivel 2
+        self.assertEqual(duracion, timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_BASE * 2))
+
+    def test_mismo_episodio_no_escala_de_nuevo(self):
+        """Mientras el bloqueo sigue vigente, reintentos no deberían subir el nivel."""
+        primera = duracion_bloqueo_login(self._request())
+        segunda = duracion_bloqueo_login(self._request())
+        self.usuario.refresh_from_db()
+        self.assertEqual(self.usuario.nivel_bloqueo_login, 1)
+        self.assertLessEqual(segunda, primera)
+
+    def test_no_supera_el_tope(self):
+        self.usuario.nivel_bloqueo_login = 999
+        self.usuario.save()
+        duracion = duracion_bloqueo_login(self._request())
+        self.assertEqual(duracion, timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_TOPE))
+
+    def test_cuenta_inexistente_usa_el_minimo_base(self):
+        request = RequestFactory().post('/accounts/login/', {'username': 'no-existe@test.com', 'password': 'x'})
+        self.assertEqual(duracion_bloqueo_login(request), timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_BASE))
