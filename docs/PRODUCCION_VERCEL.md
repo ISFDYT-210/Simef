@@ -63,7 +63,7 @@ sube.
 | `ALLOWED_HOSTS` | `www.pulqui-simef210.com.ar,pulqui-simef210.com.ar` | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella. Sin espacios. Para que también abran las vistas previas, agregar `.vercel.app` solo en *Preview*. |
 | `CSRF_TRUSTED_ORIGINS` | `https://www.pulqui-simef210.com.ar,https://pulqui-simef210.com.ar` | Con esquema. |
 | `DATABASE_URL` | Cadena de conexión de Neon con `?sslmode=require` | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella, en vez de caer a un SQLite vacío. Ver [DESPLIEGUE.md §3.1](DESPLIEGUE.md) para obtenerla. |
-| `ADMIN_HABILITADO` | **No definirla** | Sin la variable, con `DEBUG=False` el panel `/admin/` de Django responde 404. Solo para una corrección puntual: `True`, redeploy, y después quitarla y redeployar de nuevo. |
+| `ADMIN_HABILITADO` | **No definirla** | Sin la variable, con `DEBUG=False` el panel `/admin/` de Django no existe: la ruta redirige al inicio. Solo para una corrección puntual: `True`, redeploy, y después quitarla y redeployar de nuevo. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` y el resto de `EMAIL_*` | Cuenta de correo del instituto | Para recuperar la contraseña y avisos. |
 
 ### HTTPS

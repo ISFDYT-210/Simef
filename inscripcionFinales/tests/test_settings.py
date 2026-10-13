@@ -94,12 +94,11 @@ RESOLVER_ADMIN = textwrap.dedent("""
     os.environ['DJANGO_SETTINGS_MODULE'] = 'gestionInstituto.settings'
     import django
     django.setup()
-    from django.urls import Resolver404, resolve
-    try:
-        resolve('/admin/')
-        print('admin: disponible')
-    except Resolver404:
-        print('admin: 404')
+    from django.urls import resolve
+    from django.views.generic import RedirectView
+    vista = resolve('/admin/').func
+    redirige = getattr(vista, 'view_class', None) is RedirectView
+    print('admin: redirige al inicio' if redirige else 'admin: disponible')
 """)
 
 
@@ -113,12 +112,12 @@ def resolver_admin(**variables):
 
 
 class AdminSoloEnDesarrolloTest(SimpleTestCase):
-    """/admin/ no existe en producción salvo que se habilite a propósito (#140)."""
+    """En producción /admin/ redirige al inicio, salvo que se habilite a propósito (#140, #143)."""
 
-    def test_en_produccion_el_admin_responde_404(self):
+    def test_en_produccion_el_admin_redirige_al_inicio(self):
         proceso = resolver_admin(**PRODUCCION)
         self.assertEqual(proceso.returncode, 0, proceso.stderr)
-        self.assertEqual(proceso.stdout.strip(), 'admin: 404')
+        self.assertEqual(proceso.stdout.strip(), 'admin: redirige al inicio')
 
     def test_se_puede_habilitar_a_proposito_en_produccion(self):
         proceso = resolver_admin(ADMIN_HABILITADO='True', **PRODUCCION)
