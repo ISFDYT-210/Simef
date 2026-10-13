@@ -682,40 +682,44 @@ def inscripcionFinal(request):
     return render(request, 'finales/inscripcion_final_adm.html', context)
 
 
+def _motivo_rechazo_final(usuario, mesa):
+    """El mismo motivo que muestra la lista de finales para esta mesa, si lo hay."""
+    for item in correlativas.finales_con_requisitos(usuario):
+        if item['mesa'].id == mesa.id and not item['disponible']:
+            return item['motivo']
+    return None
+
+
+# El botón "Inscribirse" es un link (GET). Cualquier otro método responde 405 en
+# vez de llegar a una plantilla que no existe (#103).
+@require_http_methods(['GET'])
 @capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
     final = get_object_or_404(MesaFinal, id=final_id)
-    
-    if request.method == 'GET':
-        inscripcion_usuario = request.user
-        
-        # Verificar si ya existe la inscripción
-        if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
-            messages.warning(request, 'Ya estás inscrito en este final.')
-            return redirect('/inscripcionFinalEst/')
+    inscripcion_usuario = request.user
 
-        # Verificar que la mesa esté dentro de su período de inscripción
-        if not final.inscripcion_vigente():
-            messages.error(request, 'La inscripción para esta mesa de final está cerrada.')
-            return redirect('/inscripcionFinalEst/')
+    # Verificar si ya existe la inscripción
+    if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
+        messages.warning(request, 'Ya estás inscrito en este final.')
+        return redirect('/inscripcionFinalEst/')
 
-        # Validar la inscripción
-        if validar_inscripcion_final(inscripcion_usuario.id, final.materia_id):
-            # Crear el objeto InscripcionFinal
-            nueva_inscripcion = InscripcionFinal(
-                usuario=inscripcion_usuario,
-                llamado=final,
-            )
-            nueva_inscripcion.save()
-            
-            messages.success(request, 'Te has inscrito exitosamente en el final.')
-            return redirect('/inscripcionFinalEst/')
-        else:
-            messages.error(request, 'No cumples con los requisitos para inscribirte en este final.')
-            return redirect('/inscripcionFinalEst/')
-    
-    # Si es GET, mostrar el formulario de confirmación
-    return render(request, 'finals/inscripcion_final_adm.html', {'final': final})
+    # Verificar que la mesa esté dentro de su período de inscripción
+    if not final.inscripcion_vigente():
+        messages.error(request, 'La inscripción para esta mesa de final está cerrada.')
+        return redirect('/inscripcionFinalEst/')
+
+    # Validar la inscripción
+    if validar_inscripcion_final(inscripcion_usuario.id, final.materia_id):
+        InscripcionFinal.objects.create(usuario=inscripcion_usuario, llamado=final)
+        messages.success(request, 'Te has inscrito exitosamente en el final.')
+        return redirect('/inscripcionFinalEst/')
+
+    motivo = _motivo_rechazo_final(inscripcion_usuario, final)
+    if motivo:
+        messages.error(request, f'No puedes inscribirte en este final: {motivo}.')
+    else:
+        messages.error(request, 'No cumples con los requisitos para inscribirte en este final.')
+    return redirect('/inscripcionFinalEst/')
 
 @capacidad_requerida('abrir_inscripciones')
 def obtener_materias_estudiante(request):

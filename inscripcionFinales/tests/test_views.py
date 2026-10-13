@@ -407,6 +407,21 @@ class InscripcionFinalEstudianteTest(TestCase):
         inscripcion = InscripcionFinal.objects.get(usuario=self.alumno, llamado=self.mesa)
         self.assertFalse(inscripcion.ausente)
 
+    def test_el_rechazo_dice_el_motivo_concreto(self):
+        """El mismo motivo que muestra la lista de finales (#134, #103)."""
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url, follow=True)
+        mensajes = [str(m) for m in respuesta.context['messages']]
+        self.assertIn('No puedes inscribirte en este final: Necesitás nota de cursada ≥ 7 (o modalidad libre).',
+                      mensajes)
+
+    def test_un_post_responde_405_y_no_inscribe(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        self.client.force_login(self.alumno)
+        self.assertEqual(self.client.post(self.url).status_code, 405)
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
     def test_alumno_que_no_cumple_los_requisitos_no_queda_inscripto(self):
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
         self.client.force_login(self.alumno)
