@@ -1,5 +1,6 @@
 import secrets
 import string
+from datetime import timedelta
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
@@ -82,6 +83,12 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     carrera = models.ManyToManyField('Carrera', blank=True)
     first_login = models.BooleanField(default=True, help_text="True si es el primer login del usuario")
+
+    # Bloqueo progresivo de login (ver duracion_bloqueo_login más abajo): cada
+    # vez que esta cuenta se bloquea de nuevo por intentos fallidos, el
+    # bloqueo siguiente dura más. Se resetea al iniciar sesión con éxito.
+    nivel_bloqueo_login = models.PositiveIntegerField(default=0)
+    bloqueado_login_hasta = models.DateTimeField(null=True, blank=True)
 
     # === Roles ===============================================================
     DIRECTIVO = 'Directivo'
@@ -213,6 +220,51 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     @classmethod
     def obtener_por_rol(cls, rol):
         return cls.objects.filter(rol=rol).order_by('nombre_completo')
+
+
+# Minutos que dura el primer bloqueo de login y cuánto suma cada bloqueo
+# siguiente de la misma cuenta (ver duracion_bloqueo_login).
+BLOQUEO_LOGIN_MINUTOS_BASE = 10
+BLOQUEO_LOGIN_MINUTOS_TOPE = 120
+
+
+def duracion_bloqueo_login(request):
+    """
+    AXES_COOLOFF_TIME como función: 10 minutos la primera vez que una cuenta
+    se bloquea por intentos fallidos; cada bloqueo siguiente de la MISMA
+    cuenta suma otros 10 (10, 20, 30, ...) hasta un tope, en vez de siempre
+    la misma duración fija. Se resetea con un login exitoso (ver
+    CustomLoginView.form_valid).
+
+    django-axes llama a esta función en dos momentos distintos por cada
+    intento fallido: para decidir hasta cuándo bloquear (antes de saber si
+    ESTE intento en particular cruza el límite) y para mostrar el tiempo
+    restante en la pantalla de bloqueo. Por eso no se puede "incrementar el
+    nivel" acá sin más: si la cuenta ya tiene un bloqueo vigente
+    (bloqueado_login_hasta en el futuro), es el MISMO episodio y se devuelve
+    la duración ya fijada; recién cuando no hay uno vigente se arranca un
+    episodio nuevo y ahí sí sube de nivel.
+    """
+    email = (request.POST.get('username') or '').strip() if request else ''
+    duracion_default = timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_BASE)
+    if not email:
+        return duracion_default
+
+    usuario = Usuario.objects.filter(email__iexact=email).first()
+    if not usuario:
+        return duracion_default
+
+    ahora = timezone.now()
+    if usuario.bloqueado_login_hasta and usuario.bloqueado_login_hasta > ahora:
+        return usuario.bloqueado_login_hasta - ahora
+
+    nivel = usuario.nivel_bloqueo_login + 1
+    minutos = min(BLOQUEO_LOGIN_MINUTOS_BASE * nivel, BLOQUEO_LOGIN_MINUTOS_TOPE)
+    duracion = timedelta(minutes=minutos)
+    usuario.nivel_bloqueo_login = nivel
+    usuario.bloqueado_login_hasta = ahora + duracion
+    usuario.save(update_fields=['nivel_bloqueo_login', 'bloqueado_login_hasta'])
+    return duracion
 
 
 class Carrera(models.Model):

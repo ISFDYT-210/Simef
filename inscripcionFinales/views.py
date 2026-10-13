@@ -95,6 +95,16 @@ class CustomLoginView(LoginView):
             self.request.session.set_expiry(1209600)
         else:
             self.request.session.set_expiry(0)
+
+        # Un login exitoso reinicia el bloqueo progresivo (ver
+        # duracion_bloqueo_login en models.py): el próximo bloqueo, si lo
+        # hay, vuelve a arrancar en 10 minutos en vez de seguir escalando.
+        usuario = form.get_user()
+        if usuario.nivel_bloqueo_login or usuario.bloqueado_login_hasta:
+            usuario.nivel_bloqueo_login = 0
+            usuario.bloqueado_login_hasta = None
+            usuario.save(update_fields=['nivel_bloqueo_login', 'bloqueado_login_hasta'])
+
         return super().form_valid(form)
 
        
