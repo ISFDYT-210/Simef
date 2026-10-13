@@ -429,6 +429,9 @@ class InscripcionFinalEstudianteTest(TestCase):
     La vista le pasaba a validar_inscripcion_final() la Materia entera en vez de
     su id, y la consulta usuarios_materia.objects.get(materia_id=...) explotaba
     con TypeError: ningún alumno podía inscribirse a un final por su cuenta.
+
+    Requiere POST (SEC-09): un GET que mutara acá se podía disparar con un
+    simple link o <img> de un sitio externo sin que el alumno lo pidiera.
     """
 
     @classmethod
@@ -447,7 +450,7 @@ class InscripcionFinalEstudianteTest(TestCase):
     def test_alumno_que_cumple_los_requisitos_queda_inscripto(self):
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
         self.client.force_login(self.alumno)
-        respuesta = self.client.get(self.url)
+        respuesta = self.client.post(self.url)
         self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
         self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
 
@@ -459,7 +462,7 @@ class InscripcionFinalEstudianteTest(TestCase):
         """
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
         self.client.force_login(self.alumno)
-        self.client.get(self.url)
+        self.client.post(self.url)
         inscripcion = InscripcionFinal.objects.get(usuario=self.alumno, llamado=self.mesa)
         self.assertFalse(inscripcion.ausente)
 
@@ -467,21 +470,21 @@ class InscripcionFinalEstudianteTest(TestCase):
         """El mismo motivo que muestra la lista de finales (#134, #103)."""
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)
         self.client.force_login(self.alumno)
-        respuesta = self.client.get(self.url, follow=True)
+        respuesta = self.client.post(self.url, follow=True)
         mensajes = [str(m) for m in respuesta.context['messages']]
         self.assertIn('No puedes inscribirte en este final: Necesitás nota de cursada ≥ 7 (o modalidad libre).',
                       mensajes)
 
-    def test_un_post_responde_405_y_no_inscribe(self):
+    def test_un_get_responde_405_y_no_inscribe(self):
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
         self.client.force_login(self.alumno)
-        self.assertEqual(self.client.post(self.url).status_code, 405)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
 
     def test_alumno_que_no_cumple_los_requisitos_no_queda_inscripto(self):
         usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
         self.client.force_login(self.alumno)
-        respuesta = self.client.get(self.url)
+        respuesta = self.client.post(self.url)
         self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
 
@@ -1011,6 +1014,27 @@ class ConstanciaPdfTest(TestCase):
             respuesta = self.client.get(self.url)
         self.assertEqual(respuesta.status_code, 500)
         self.assertIn('No se pudo generar la constancia', logs.output[0])
+
+
+class FirstLoginPasswordChangeViewTest(TestCase):
+    """
+    /change_password_first/ no pedía login (SEC-10): un anónimo que la
+    visitaba podía llegar a get_form_kwargs() con request.user = AnonymousUser,
+    que no tiene los métodos que SetPasswordForm necesita.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = crear_usuario('primerlogin@test.com', 'Estudiante', 'Alumno', 90)
+
+    def test_anonimo_no_accede(self):
+        respuesta = self.client.get('/change_password_first/')
+        self.assertNotEqual(respuesta.status_code, 200)
+
+    def test_usuario_logueado_si_accede(self):
+        self.client.force_login(self.usuario)
+        respuesta = self.client.get('/change_password_first/')
+        self.assertEqual(respuesta.status_code, 200)
 
 
 class LoginThrottlingTest(TestCase):

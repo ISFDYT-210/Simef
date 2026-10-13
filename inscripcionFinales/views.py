@@ -54,6 +54,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.timezone import now
 from io import BytesIO
 from .models import Usuario, usuarios_materia, Materia, Carrera
@@ -710,9 +711,9 @@ def _motivo_rechazo_final(usuario, mesa):
     return None
 
 
-# El botón "Inscribirse" es un link (GET). Cualquier otro método responde 405 en
-# vez de llegar a una plantilla que no existe (#103).
-@require_http_methods(['GET'])
+# Requiere POST (con CSRF): un GET que mutara acá se podía disparar con un
+# simple link o <img> de un sitio externo sin que el alumno lo pidiera (SEC-09).
+@require_http_methods(['POST'])
 @capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
     final = get_object_or_404(MesaFinal, id=final_id)
@@ -810,12 +811,6 @@ def inscripcionMateriaEst(request, materia_id, modalidad):
 def exito_inscripcion_mesa(request):
     return render(request, 'finales/exito_inscripcion_mesa.html')
 
-def error_alta_mesa(request):
-    return render(request, 'finales/error_alta_mesa.html')
-
-def exito_alta_mesa(request):
-    return render(request, 'finales/exito_alta_mesa.html')
-
 def error_inscripcion_adm(request):
     return render(request, 'finales/error_inscripcion_adm.html')
 
@@ -831,49 +826,6 @@ def error_inscripcion_est5(request):#No aprobaste la correlativa
     return render(request, 'finales/error_inscripcion_est5.html')
 def error_inscripcion_est6(request):#No cursaste la correlativa
     return render(request, 'finales/error_inscripcion_est6.html')
-    
-################################################################
-
-#Nico y Cami were here
-
-def crear_estudiante(request):
-    if request.method == 'POST':
-        form = EstudianteForm(request.POST)
-        if form.is_valid():
-            form.save()
-    else:
-        form = EstudianteForm()
-    return render(request, 'crear_estudiante.html', {'form':form})
-
-def crear_profesor(request):
-    if request.method =='POST':
-        form = ProfesorForm(request.POST)
-        if form.is_valid():
-            form.save()
-    else:
-        form = ProfesorForm()
-        return render(request, 'crear_profesor.html', {'form':form})
-    
-
-def crear_preceptor(request):
-    if request.method =='POST':
-        form = PreceptorForm(request.Post)
-        if form.is_valid():
-            form.save()
-    else:
-        form = PreceptorForm()
-        return render(request, 'crear_preceptor.html',{'form':form})
-    
-
-def crear_Directivo(request):
-    if request.method =='POST':
-        form = DirectivoForm(request.Post)
-        if form.is_valid():
-            form.save()
-    else:
-        form = DirectivoForm()
-        return render(request, 'crear_directivo.html',{'form':form})
-    
     
 def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
     """
@@ -2081,7 +2033,7 @@ def validar_inscripcion_final(usuario_id, materia_id):
     puede, _motivo = correlativas.puede_rendir(usuario_id, materia_id)
     return puede
 
-class FirstLoginPasswordChangeView(FormView):
+class FirstLoginPasswordChangeView(LoginRequiredMixin, FormView):
     form_class = SetPasswordForm
     template_name = 'registration/first_login_password_change.html'
     
