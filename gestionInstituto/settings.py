@@ -71,7 +71,7 @@ if not DEBUG and not ALLOWED_HOSTS:
 # Panel de administracion de Django (/admin/). Ninguna pantalla de SIMEF lo usa,
 # y en produccion es una puerta de entrada a todos los datos para cualquier cuenta
 # con permisos de staff. Por defecto queda solo en desarrollo: con DEBUG apagado,
-# /admin/ responde 404. Para una correccion puntual en produccion, definir
+# /admin/ redirige al inicio. Para una correccion puntual en produccion, definir
 # ADMIN_HABILITADO=True en Vercel, redeployar y despues quitarla.
 ADMIN_HABILITADO = _env_bool('ADMIN_HABILITADO', DEBUG)
 
