@@ -1,3 +1,4 @@
+import logging
 import re
 import unicodedata
 from collections import defaultdict
@@ -6,6 +7,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from .models import *
 from .forms import *
 from . import correlativas
+from .constancia_pdf import generar_constancia_pdf
 from django.views.generic import CreateView,TemplateView,ListView,UpdateView,DeleteView,FormView
 from django.core.mail import send_mail
 from django.contrib.auth import *
@@ -64,10 +66,13 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas
+
 import io
 from django.utils.timezone import now
 from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
 from .audit import registrar_auditoria
+
+logger = logging.getLogger(__name__)
 
 # ... aquí van tus otros imports existentes
 
@@ -2327,45 +2332,29 @@ def numero_a_letras(numero):
 @login_required
 def reporte_estudiante_descarga(request, usuario_id):
     """
-    Genera un PDF con las materias y notas del estudiante para descarga
-    usando una API externa
+    Descarga la constancia académica del estudiante en PDF.
+
+    El PDF se arma dentro del sistema (inscripcionFinales/constancia_pdf.py):
+    los datos del estudiante no salen hacia ningún servicio externo (SEC-08).
     """
     usuario = get_object_or_404(Usuario, id=usuario_id)
     if not request.user.is_authenticated or not request.user.puede_ver_reporte_de(usuario):
         return render(request, '403_forbidden.html', status=403)
-    
+
     if not usuario.es_estudiante():
         return HttpResponse("Este reporte solo está disponible para estudiantes", status=403)
-    
-    # Obtener el contexto (mismo código que antes)
-    context = obtener_contexto_reporte(usuario)
-    
-    # Renderizar HTML
-    html_string = render_to_string('reportes/constancia_estudiante.html', context)
-    
-    # Usar API de conversión HTML a PDF (ejemplo con api.html2pdf.app)
+
     try:
-        api_response = requests.post(
-            'https://api.html2pdf.app/v1/generate',
-            json={
-                'html': html_string,
-                'options': {
-                    'format': 'A4',
-                    'margin': {'top': '1.5cm', 'right': '1.5cm', 'bottom': '1.5cm', 'left': '1.5cm'}
-                }
-            },
-            timeout=30
-        )
-        
-        if api_response.status_code == 200:
-            response = HttpResponse(api_response.content, content_type='application/pdf')
-            nombre_archivo = f"constancia_{usuario.nombre_completo or usuario.email}.pdf".replace(" ", "_")
-            response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
-            return response
-    except Exception as e:
-        pass
-    
-    return HttpResponse("Error al generar el PDF", status=500)
+        pdf = generar_constancia_pdf(obtener_contexto_reporte(usuario))
+    except Exception:
+        logger.exception('No se pudo generar la constancia del usuario %s', usuario.id)
+        return HttpResponse("Error al generar el PDF", status=500)
+
+    # Solo ASCII en el nombre del archivo: el encabezado HTTP no admite tildes ni comillas.
+    nombre = re.sub(r'[^A-Za-z0-9_-]+', '_', _sin_acentos(usuario.nombre_completo or f'estudiante_{usuario.id}'))
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="constancia_{nombre.strip("_")}.pdf"'
+    return response
 
 
 NUMEROS_EN_LETRAS_NOTA = {
