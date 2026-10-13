@@ -366,6 +366,70 @@ class InscripcionExcepcionalMesaTest(TestCase):
         self.assertEqual(respuesta['status'], 'error')
 
 
+class InscripcionFinalEstudianteTest(TestCase):
+    """
+    inscripcionFinalEst: el alumno se inscribe solo desde /inscribirse_final/<id>.
+
+    La vista le pasaba a validar_inscripcion_final() la Materia entera en vez de
+    su id, y la consulta usuarios_materia.objects.get(materia_id=...) explotaba
+    con TypeError: ningún alumno podía inscribirse a un final por su cuenta.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        # anio=2 por el mismo motivo que en InscripcionExcepcionalMesaTest.
+        cls.materia = Materia.objects.create(nombre_materia='Psicología', carrera=carrera, anio=2)
+        cls.alumno = crear_usuario('alu_est@test.com', 'Estudiante', 'Alumno', 50)
+        cls.alumno.carrera.add(carrera)
+        cls.mesa = MesaFinal.objects.create(
+            materia=cls.materia, llamado=timezone.now() + timedelta(days=5),
+            inscripcionAbierta=True,
+        )
+        cls.url = f'/inscribirse_final/{cls.mesa.id}'
+
+    def test_alumno_que_cumple_los_requisitos_queda_inscripto(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url)
+        self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+    def test_la_inscripcion_nueva_queda_como_presente(self):
+        """
+        La columna ausente es NOT NULL y sin default en la base (#119): si el
+        modelo deja de mandarla en el INSERT, la inscripción vuelve a fallar
+        con IntegrityError.
+        """
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        self.client.force_login(self.alumno)
+        self.client.get(self.url)
+        inscripcion = InscripcionFinal.objects.get(usuario=self.alumno, llamado=self.mesa)
+        self.assertFalse(inscripcion.ausente)
+
+    def test_el_rechazo_dice_el_motivo_concreto(self):
+        """El mismo motivo que muestra la lista de finales (#134, #103)."""
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url, follow=True)
+        mensajes = [str(m) for m in respuesta.context['messages']]
+        self.assertIn('No puedes inscribirte en este final: Necesitás nota de cursada ≥ 7 (o modalidad libre).',
+                      mensajes)
+
+    def test_un_post_responde_405_y_no_inscribe(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        self.client.force_login(self.alumno)
+        self.assertEqual(self.client.post(self.url).status_code, 405)
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+    def test_alumno_que_no_cumple_los_requisitos_no_queda_inscripto(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url)
+        self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+
 class TribunalMesaTest(TestCase):
     """
     Asignación de tribunal: Preceptor asigna Presidente/Vocales, puede
@@ -688,3 +752,72 @@ class CargarUsuariosConNotaTest(TestCase):
         self.assertTrue(Usuario.objects.filter(dni=999).exists())
         self.assertIn('Materia no encontrada', response.content.decode())
 
+
+class ConstanciaPdfTest(TestCase):
+    """
+    La constancia se genera dentro del sistema (#130, SEC-08). Antes se mandaba
+    el HTML con nombre, DNI y notas a un servicio externo; como views.py nunca
+    importó requests, además la descarga respondía siempre 500.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura en Enfermería', num_resolucion='RES-1/2024')
+        Materia.objects.create(nombre_materia='Anatomía & Fisiología <I>', carrera=carrera, anio=1)
+        Materia.objects.create(nombre_materia='Farmacología', carrera=carrera, anio=2)
+        # Caracteres que el PDF interpreta como marcado: tienen que llegar escapados.
+        cls.alumno = crear_usuario('pdf@test.com', 'Estudiante', 'José <Pérez> & Cía', 70)
+        cls.alumno.carrera.add(carrera)
+        cls.otro = crear_usuario('pdf2@test.com', 'Estudiante', 'Otro Alumno', 71)
+        cls.url = f'/reporte/{cls.alumno.id}'
+
+    def test_el_alumno_descarga_su_constancia_en_pdf(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta['Content-Type'], 'application/pdf')
+        self.assertTrue(respuesta.content.startswith(b'%PDF-'))
+        self.assertEqual(respuesta['Content-Disposition'], 'attachment; filename="constancia_jose_perez_cia.pdf"')
+
+    def test_no_hace_pedidos_a_servicios_externos(self):
+        from unittest import mock
+        import socket
+        self.client.force_login(self.alumno)
+        with mock.patch.object(socket.socket, 'connect', side_effect=AssertionError('conexión de red')):
+            respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_otro_estudiante_no_puede_descargarla(self):
+        self.client.force_login(self.otro)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_si_falla_la_generacion_queda_en_el_log(self):
+        from unittest import mock
+        self.client.force_login(self.alumno)
+        with mock.patch('inscripcionFinales.views.generar_constancia_pdf', side_effect=ValueError('roto')), \
+                self.assertLogs('inscripcionFinales.views', level='ERROR') as logs:
+            respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 500)
+        self.assertIn('No se pudo generar la constancia', logs.output[0])
+
+
+class LogoutTest(TestCase):
+    """Desde Django 5.0, LogoutView solo acepta POST (#128)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = crear_usuario('logout@test.com', 'Estudiante', 'Alumno Logout', 60)
+
+    def test_post_cierra_la_sesion_y_avisa(self):
+        self.client.force_login(self.usuario)
+        respuesta = self.client.post('/accounts/logout/', follow=True)
+        self.assertRedirects(respuesta, '/', fetch_redirect_response=False)
+        self.assertNotIn('_auth_user_id', self.client.session)
+        mensajes = [str(m) for m in respuesta.context['messages']] if respuesta.context else []
+        self.assertIn('Su sesión se ha cerrado correctamente. Hasta la próxima!', mensajes)
+
+    def test_get_no_cierra_la_sesion(self):
+        self.client.force_login(self.usuario)
+        respuesta = self.client.get('/accounts/logout/')
+        self.assertEqual(respuesta.status_code, 405)
+        self.assertIn('_auth_user_id', self.client.session)

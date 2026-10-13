@@ -18,10 +18,13 @@ permissions:
 env:
   PYTHON_VERSION: '3.11' # misma version que el Dockerfile
 
+# Runners fijos en ubuntu-24.04: desde el 19/10/2026 `ubuntu-latest` pasa a
+# Ubuntu 26, y ese cambio no tiene que llegar sin aviso. Para actualizar: un PR
+# aparte que cambie las etiquetas y pase el CI completo.
 jobs:
   lint:
     name: Lint (flake8)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -46,7 +49,7 @@ jobs:
 
   test:
     name: Tests (Django + PostgreSQL)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
 
     # Misma base de datos que docker-compose.yml para no testear sobre sqlite
@@ -70,6 +73,9 @@ jobs:
       SECRET_KEY: django-insecure-ci-only-key-not-for-production
       DEBUG: 'False'
       ALLOWED_HOSTS: localhost,127.0.0.1
+      # El cliente de pruebas pide por http: con la redireccion a HTTPS que trae
+      # DEBUG=False, cada respuesta seria un 301.
+      SECURE_SSL_REDIRECT: 'False'
       DATABASE_URL: postgres://simef:simef@localhost:5432/simef
       EMAIL_HOST_USER: ci@example.com
       EMAIL_HOST_PASSWORD: ''
@@ -126,19 +132,26 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Collectstatic (whitenoise / manifest)
-        run: python manage.py collectstatic --noinput
+      # En Vercel no corre collectstatic: se sirve staticfiles/ tal como esta en
+      # el repo. Este paso la regenera en una carpeta temporal y falla si no
+      # coincide, o si una ruta /static/ escrita a mano apunta a un archivo que no
+      # existe. Arreglo: collectstatic --noinput --clear y commitear staticfiles/.
+      - name: staticfiles/ al dia con collectstatic
+        run: python .github/scripts/verificar_staticfiles.py
 
   security-check:
     name: Django deployment checklist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
-    # Falla solo ante ERRORES de configuracion; las WARNINGS (HSTS, SSL redirect,
-    # cookies seguras) quedan visibles en el log como deuda pendiente.
+    # Falla ante cualquier aviso de seguridad (--fail-level WARNING), para que no
+    # vuelva a acumularse deuda: con DEBUG=False la configuracion tiene que pasar
+    # el checklist de despliegue de Django completo.
     env:
-      SECRET_KEY: django-insecure-ci-only-key-not-for-production
       DEBUG: 'False'
       ALLOWED_HOSTS: localhost,127.0.0.1
+      # Obligatoria con DEBUG=False. check --deploy no se conecta a la base, asi
+      # que alcanza con una URL de prueba.
+      DATABASE_URL: postgres://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -153,12 +166,65 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
+      # Clave aleatoria en cada corrida: una fija en el repo dispararia el aviso
+      # security.W009 (clave debil o con prefijo django-insecure-).
+      - name: Generar una SECRET_KEY de prueba
+        run: echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')" >> "$GITHUB_ENV"
+
       - name: manage.py check --deploy
-        run: python manage.py check --deploy
+        run: python manage.py check --deploy --fail-level WARNING
+
+  dependency-audit:
+    name: Dependencias vulnerables (pip-audit)
+    runs-on: ubuntu-24.04
+    env:
+      # BLOQUEANTE: desde Django 5.2.17 y las dependencias actualizadas (#128),
+      # pip-audit da cero, asi que cualquier dependencia vulnerable frena el PR.
+      # Para que ademas frene el merge a main hay que sumar este job a los checks
+      # obligatorios del ruleset de main.
+      # 'false' lo vuelve informativo: solo para una emergencia, con una tarjeta
+      # que diga que vulnerabilidad se acepta y hasta cuando.
+      PIP_AUDIT_BLOQUEANTE: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar pip-audit
+        run: pip install pip-audit==2.9.0
+
+      # pip-audit sale con error tanto si encuentra vulnerabilidades como si no
+      # pudo correr. Para no tapar lo segundo, el resultado se lee del JSON:
+      # sin JSON valido, el job falla aunque sea informativo.
+      - name: pip-audit -r requirements.txt
+        run: |
+          pip-audit -r requirements.txt --progress-spinner off --format json --output pip-audit.json || true
+          set +e
+          resumen=$(python .github/scripts/pip_audit_resumen.py pip-audit.json 2>&1 >> "$GITHUB_STEP_SUMMARY")
+          estado=$?
+          set -e
+          echo "$resumen"
+          case "$estado" in
+            0) ;;
+            1)
+              echo "::warning title=Dependencias vulnerables::$resumen Ver el resumen del job."
+              if [ "$PIP_AUDIT_BLOQUEANTE" = "true" ]; then exit 1; fi
+              ;;
+            *)
+              echo "::error title=pip-audit no pudo correr::$resumen"
+              exit 1
+              ;;
+          esac
 
   docker-build:
     name: Build imagen Docker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: test
     steps:
       - name: Checkout

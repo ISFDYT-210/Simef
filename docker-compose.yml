@@ -1,6 +1,10 @@
 services:
   db:
     image: postgres:16-alpine
+    # Que Docker vuelva a levantar el servicio si el proceso se cae o si se
+    # reinicia el daemon (por ejemplo, cuando el Codespace se suspende y se
+    # reanuda). `docker compose stop` / `down` lo detienen igual.
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -17,6 +21,7 @@ services:
 
   web:
     build: .
+    restart: unless-stopped
     env_file: .env
     depends_on:
       db:

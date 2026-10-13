@@ -1,3 +1,4 @@
+import logging
 import re
 import unicodedata
 from collections import defaultdict
@@ -6,6 +7,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from .models import *
 from .forms import *
 from . import correlativas
+from .constancia_pdf import generar_constancia_pdf
 from django.views.generic import CreateView,TemplateView,ListView,UpdateView,DeleteView,FormView
 from django.core.mail import send_mail
 from django.contrib.auth import *
@@ -64,10 +66,13 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas
+
 import io
 from django.utils.timezone import now
 from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
 from .audit import registrar_auditoria
+
+logger = logging.getLogger(__name__)
 
 # ... aquí van tus otros imports existentes
 
@@ -94,8 +99,9 @@ class CustomLoginView(LoginView):
 
        
 class CustomLogoutView(LogoutView):
-
-    def get(self,request):
+    # Desde Django 5.0, LogoutView solo acepta POST: un link GET para cerrar
+    # sesion responde 405. Todos los botones de "Cerrar sesion" son formularios.
+    def post(self, request, *args, **kwargs):
         logout(request)
         messages.success(request, 'Su sesión se ha cerrado correctamente. Hasta la próxima!')
         return redirect("/")
@@ -676,40 +682,44 @@ def inscripcionFinal(request):
     return render(request, 'finales/inscripcion_final_adm.html', context)
 
 
+def _motivo_rechazo_final(usuario, mesa):
+    """El mismo motivo que muestra la lista de finales para esta mesa, si lo hay."""
+    for item in correlativas.finales_con_requisitos(usuario):
+        if item['mesa'].id == mesa.id and not item['disponible']:
+            return item['motivo']
+    return None
+
+
+# El botón "Inscribirse" es un link (GET). Cualquier otro método responde 405 en
+# vez de llegar a una plantilla que no existe (#103).
+@require_http_methods(['GET'])
 @capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
     final = get_object_or_404(MesaFinal, id=final_id)
-    
-    if request.method == 'GET':
-        inscripcion_usuario = request.user
-        
-        # Verificar si ya existe la inscripción
-        if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
-            messages.warning(request, 'Ya estás inscrito en este final.')
-            return redirect('/inscripcionFinalEst/')
+    inscripcion_usuario = request.user
 
-        # Verificar que la mesa esté dentro de su período de inscripción
-        if not final.inscripcion_vigente():
-            messages.error(request, 'La inscripción para esta mesa de final está cerrada.')
-            return redirect('/inscripcionFinalEst/')
+    # Verificar si ya existe la inscripción
+    if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
+        messages.warning(request, 'Ya estás inscrito en este final.')
+        return redirect('/inscripcionFinalEst/')
 
-        # Validar la inscripción
-        if validar_inscripcion_final(inscripcion_usuario.id, final.materia):
-            # Crear el objeto InscripcionFinal
-            nueva_inscripcion = InscripcionFinal(
-                usuario=inscripcion_usuario,
-                llamado=final,
-            )
-            nueva_inscripcion.save()
-            
-            messages.success(request, 'Te has inscrito exitosamente en el final.')
-            return redirect('/inscripcionFinalEst/')
-        else:
-            messages.error(request, 'No cumples con los requisitos para inscribirte en este final.')
-            return redirect('/inscripcionFinalEst/')
-    
-    # Si es GET, mostrar el formulario de confirmación
-    return render(request, 'finals/inscripcion_final_adm.html', {'final': final})
+    # Verificar que la mesa esté dentro de su período de inscripción
+    if not final.inscripcion_vigente():
+        messages.error(request, 'La inscripción para esta mesa de final está cerrada.')
+        return redirect('/inscripcionFinalEst/')
+
+    # Validar la inscripción
+    if validar_inscripcion_final(inscripcion_usuario.id, final.materia_id):
+        InscripcionFinal.objects.create(usuario=inscripcion_usuario, llamado=final)
+        messages.success(request, 'Te has inscrito exitosamente en el final.')
+        return redirect('/inscripcionFinalEst/')
+
+    motivo = _motivo_rechazo_final(inscripcion_usuario, final)
+    if motivo:
+        messages.error(request, f'No puedes inscribirte en este final: {motivo}.')
+    else:
+        messages.error(request, 'No cumples con los requisitos para inscribirte en este final.')
+    return redirect('/inscripcionFinalEst/')
 
 @capacidad_requerida('abrir_inscripciones')
 def obtener_materias_estudiante(request):
@@ -2327,45 +2337,29 @@ def numero_a_letras(numero):
 @login_required
 def reporte_estudiante_descarga(request, usuario_id):
     """
-    Genera un PDF con las materias y notas del estudiante para descarga
-    usando una API externa
+    Descarga la constancia académica del estudiante en PDF.
+
+    El PDF se arma dentro del sistema (inscripcionFinales/constancia_pdf.py):
+    los datos del estudiante no salen hacia ningún servicio externo (SEC-08).
     """
     usuario = get_object_or_404(Usuario, id=usuario_id)
     if not request.user.is_authenticated or not request.user.puede_ver_reporte_de(usuario):
         return render(request, '403_forbidden.html', status=403)
-    
+
     if not usuario.es_estudiante():
         return HttpResponse("Este reporte solo está disponible para estudiantes", status=403)
-    
-    # Obtener el contexto (mismo código que antes)
-    context = obtener_contexto_reporte(usuario)
-    
-    # Renderizar HTML
-    html_string = render_to_string('reportes/constancia_estudiante.html', context)
-    
-    # Usar API de conversión HTML a PDF (ejemplo con api.html2pdf.app)
+
     try:
-        api_response = requests.post(
-            'https://api.html2pdf.app/v1/generate',
-            json={
-                'html': html_string,
-                'options': {
-                    'format': 'A4',
-                    'margin': {'top': '1.5cm', 'right': '1.5cm', 'bottom': '1.5cm', 'left': '1.5cm'}
-                }
-            },
-            timeout=30
-        )
-        
-        if api_response.status_code == 200:
-            response = HttpResponse(api_response.content, content_type='application/pdf')
-            nombre_archivo = f"constancia_{usuario.nombre_completo or usuario.email}.pdf".replace(" ", "_")
-            response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
-            return response
-    except Exception as e:
-        pass
-    
-    return HttpResponse("Error al generar el PDF", status=500)
+        pdf = generar_constancia_pdf(obtener_contexto_reporte(usuario))
+    except Exception:
+        logger.exception('No se pudo generar la constancia del usuario %s', usuario.id)
+        return HttpResponse("Error al generar el PDF", status=500)
+
+    # Solo ASCII en el nombre del archivo: el encabezado HTTP no admite tildes ni comillas.
+    nombre = re.sub(r'[^A-Za-z0-9_-]+', '_', _sin_acentos(usuario.nombre_completo or f'estudiante_{usuario.id}'))
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="constancia_{nombre.strip("_")}.pdf"'
+    return response
 
 
 NUMEROS_EN_LETRAS_NOTA = {

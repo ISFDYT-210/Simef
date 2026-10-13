@@ -13,11 +13,20 @@
 
 name: Deploy Docker
 
+# APAGADO: produccion corre en Vercel (decision del 2026-10-12, ver
+# docs/PRODUCCION_VERCEL.md). Este workflow queda como alternativa para cuando
+# el instituto tenga un servidor propio, y solo corre a mano desde la pestaña
+# Actions ("Run workflow").
+#
+# Antes de volver a usarlo hay que arreglar el paso por SSH: etiqueta la imagen
+# como simef:current, pero docker-compose.yml no usa ese nombre (reinicia con la
+# imagen vieja); `docker compose up` carga tambien docker-compose.override.yml
+# (modo desarrollo y base local), y entrypoint.sh migra al arrancar.
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
   workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   tags: ['v*']
 
 concurrency:
   group: deploy-docker-${{ github.ref }}
@@ -30,7 +39,7 @@ env:
 jobs:
   build-and-push:
     name: Build y push a GHCR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -73,7 +82,7 @@ jobs:
 
   deploy-vps:
     name: Deploy por SSH (opcional)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build-and-push
     environment: production
     permissions:

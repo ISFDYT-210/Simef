@@ -17,10 +17,15 @@
 
 name: Deploy Vercel
 
-# DESACTIVADO POR AHORA: no hay proyecto de Vercel ni secrets cargados, asi que
-# el workflow solo corre a mano desde la pestaña Actions ("Run workflow").
-# Para reactivarlo cuando exista el proyecto: cargar los tres secrets de abajo
-# y descomentar los disparadores automaticos.
+# DESACTIVADO A PROPOSITO: produccion ya se publica sola con la integracion de
+# Vercel con GitHub (proyecto isfdyt210s-projects/simef): cada push a main va a
+# produccion y cada PR tiene su vista previa. Activar estos disparadores
+# duplicaria cada deploy. Ver docs/PRODUCCION_VERCEL.md.
+#
+# Queda como alternativa por si algun dia se quiere desplegar desde Actions en
+# lugar de la integracion (por ejemplo, para que el deploy espere al CI): habria
+# que desconectar la integracion, cargar los tres secrets de abajo y descomentar
+# los disparadores.
 on:
   workflow_dispatch:
   # push:
@@ -39,7 +44,7 @@ env:
 jobs:
   deploy:
     name: ${{ github.ref == 'refs/heads/main' && 'Produccion' || 'Preview' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write # para comentar la URL de preview en el PR

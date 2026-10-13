@@ -37,7 +37,8 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 | [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md) | Copiar los datos de Neon a tu base local para probar sin tocar la del instituto. |
 | [docs/GITFLOW.md](docs/GITFLOW.md) | Cómo se organizan las ramas y cómo entra un cambio: todo a `develop` por Pull Request. |
 | [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
-| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Despliegue en producción (Apache + Gunicorn + Django + Postgres en Neon) en Debian. |
+| [docs/PRODUCCION_VERCEL.md](docs/PRODUCCION_VERCEL.md) | Cómo funciona producción en Vercel: cómo se publica, variables, migraciones y cómo volver atrás. |
+| [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Alternativa: despliegue en un servidor Debian propio (Apache + Gunicorn + Postgres en Neon). |
 | [docs/tailwind.md](docs/tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
 | [docs/TARJETAS_GH.md](docs/TARJETAS_GH.md) | Cómo cargar tarjetas de trabajo (issues) al tablero con la CLI `gh`. |
 | [docs/INFORME_MODIFICACIONES.md](docs/INFORME_MODIFICACIONES.md) | Registro de cambios del proyecto. |
@@ -171,9 +172,11 @@ py -m pip install -r requirements.txt
 
 ### 6. Configurar el archivo de settings
 
-**No hay nada que copiar.** El `settings.py` versionado ya sirve para
-desarrollo: `DEBUG` viene en `True` y, si no definís `DATABASE_URL`, usa un
-SQLite local sin que tengas que instalar Postgres.
+**No hay que tocar `settings.py`, pero sí crear el `.env`** a partir de
+`.env.example` (ver [docs/ENV.md](docs/ENV.md)). La plantilla trae
+`DEBUG=True`, que pone la app en modo desarrollo: si falta, `DEBUG` queda
+apagado como en producción. Si no definís `DATABASE_URL`, usa un SQLite local
+sin que tengas que instalar Postgres.
 
 Si querés apuntar a una base Postgres, definí las variables en un `.env`
 (ver [docs/ENV.md](docs/ENV.md)). **No copies ningún archivo sobre

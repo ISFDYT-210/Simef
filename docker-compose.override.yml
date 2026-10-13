@@ -12,6 +12,11 @@ services:
       - .:/app
 
     environment:
+      # Modo desarrollo: settings.py deja DEBUG apagado si la variable falta, asi
+      # que aca se prende salvo que el .env diga otra cosa (por ejemplo
+      # DEBUG=False para probar el comportamiento de produccion).
+      DEBUG: ${DEBUG:-True}
+
       # IMPORTANTE: esto pisa el DATABASE_URL del .env a proposito.
       #
       # entrypoint.sh corre `migrate` en cada arranque del contenedor. Si el
