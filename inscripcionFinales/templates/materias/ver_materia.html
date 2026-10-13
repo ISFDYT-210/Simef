@@ -9,7 +9,7 @@
     </div>
     <dl class="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2">
       <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Carrera</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.carrera.nombre_carrera|default:"—" }}</dd></div>
-      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Profesor</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.profesor.nombres|default:"—" }}</dd></div>
+      <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Profesor</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.profesor.nombre_completo|default:"—" }}</dd></div>
       <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Año</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.anio|default:"—" }}</dd></div>
       <div class="bg-white px-6 py-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Día</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.dia|default:"—" }}</dd></div>
       <div class="bg-white px-6 py-4 sm:col-span-2"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Horario</dt><dd class="mt-1 text-sm text-tinta-900">{{ materia.Horario|default:"—" }}</dd></div>

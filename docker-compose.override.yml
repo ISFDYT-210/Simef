@@ -12,10 +12,15 @@ services:
       - .:/app
 
     environment:
-      # Modo desarrollo: settings.py deja DEBUG apagado si la variable falta, asi
-      # que aca se prende salvo que el .env diga otra cosa (por ejemplo
-      # DEBUG=False para probar el comportamiento de produccion).
-      DEBUG: ${DEBUG:-True}
+      # Fijo en True a proposito, sin leer del .env: este archivo es SOLO para
+      # desarrollo local (ver encabezado), y el .env trae DEBUG=False porque
+      # esta pensado para produccion. `${DEBUG:-True}` no servia como
+      # fallback: docker compose toma el DEBUG=False del .env igual, asi que
+      # el contenedor arrancaba con DEBUG apagado -> settings.py prende
+      # SECURE_SSL_REDIRECT -> Django redirige cada pedido a https, que el
+      # servidor de desarrollo no entiende (="Bad request version" a repeticion
+      # en el log, el navegador reintentando por HTTPS contra un puerto HTTP).
+      DEBUG: "True"
 
       # IMPORTANTE: esto pisa el DATABASE_URL del .env a proposito.
       #
