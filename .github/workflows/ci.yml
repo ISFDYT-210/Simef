@@ -129,8 +129,12 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Collectstatic (whitenoise / manifest)
-        run: python manage.py collectstatic --noinput
+      # En Vercel no corre collectstatic: se sirve staticfiles/ tal como esta en
+      # el repo. Este paso la regenera en una carpeta temporal y falla si no
+      # coincide, o si una ruta /static/ escrita a mano apunta a un archivo que no
+      # existe. Arreglo: collectstatic --noinput --clear y commitear staticfiles/.
+      - name: staticfiles/ al dia con collectstatic
+        run: python .github/scripts/verificar_staticfiles.py
 
   security-check:
     name: Django deployment checklist
