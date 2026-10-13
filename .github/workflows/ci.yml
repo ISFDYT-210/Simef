@@ -171,14 +171,13 @@ jobs:
     name: Dependencias vulnerables (pip-audit)
     runs-on: ubuntu-latest
     env:
-      # INFORMATIVO por ahora: las dependencias actuales tienen vulnerabilidades
-      # conocidas (Django 4.2.7, Pillow, sqlparse, requests; SEC-03 y SEC-06), y
-      # se resuelven al actualizarlas. Mientras tanto el job las informa en su
-      # resumen y con un aviso en el PR, sin fallar.
-      # Cuando pip-audit quede en cero: pasar esto a 'true', para que una
-      # dependencia vulnerable frene el PR, y sumar el job a los checks
+      # BLOQUEANTE: desde Django 5.2.17 y las dependencias actualizadas (#128),
+      # pip-audit da cero, asi que cualquier dependencia vulnerable frena el PR.
+      # Para que ademas frene el merge a main hay que sumar este job a los checks
       # obligatorios del ruleset de main.
-      PIP_AUDIT_BLOQUEANTE: 'false'
+      # 'false' lo vuelve informativo: solo para una emergencia, con una tarjeta
+      # que diga que vulnerabilidad se acepta y hasta cuando.
+      PIP_AUDIT_BLOQUEANTE: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v7

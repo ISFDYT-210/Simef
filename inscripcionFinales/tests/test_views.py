@@ -785,3 +785,24 @@ class ConstanciaPdfTest(TestCase):
         self.assertEqual(respuesta.status_code, 500)
         self.assertIn('No se pudo generar la constancia', logs.output[0])
 
+
+class LogoutTest(TestCase):
+    """Desde Django 5.0, LogoutView solo acepta POST (#128)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = crear_usuario('logout@test.com', 'Estudiante', 'Alumno Logout', 60)
+
+    def test_post_cierra_la_sesion_y_avisa(self):
+        self.client.force_login(self.usuario)
+        respuesta = self.client.post('/accounts/logout/', follow=True)
+        self.assertRedirects(respuesta, '/', fetch_redirect_response=False)
+        self.assertNotIn('_auth_user_id', self.client.session)
+        mensajes = [str(m) for m in respuesta.context['messages']] if respuesta.context else []
+        self.assertIn('Su sesión se ha cerrado correctamente. Hasta la próxima!', mensajes)
+
+    def test_get_no_cierra_la_sesion(self):
+        self.client.force_login(self.usuario)
+        respuesta = self.client.get('/accounts/logout/')
+        self.assertEqual(respuesta.status_code, 405)
+        self.assertIn('_auth_user_id', self.client.session)

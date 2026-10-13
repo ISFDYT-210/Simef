@@ -99,8 +99,9 @@ class CustomLoginView(LoginView):
 
        
 class CustomLogoutView(LogoutView):
-
-    def get(self,request):
+    # Desde Django 5.0, LogoutView solo acepta POST: un link GET para cerrar
+    # sesion responde 405. Todos los botones de "Cerrar sesion" son formularios.
+    def post(self, request, *args, **kwargs):
         logout(request)
         messages.success(request, 'Su sesión se ha cerrado correctamente. Hasta la próxima!')
         return redirect("/")
