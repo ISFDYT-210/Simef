@@ -132,16 +132,17 @@ class registri_user_form(UserCreationForm):
     cargo = forms.CharField(max_length=100, required=False)
     area = forms.CharField(max_length=100, required=False)
 
-    # Contraseña opcional: si se deja vacía, se usa la predeterminada (12345678)
+    # Contraseña opcional: si se deja vacía, se genera una aleatoria distinta
+    # para esta cuenta (ver generar_password_aleatoria en models.py).
     password = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=True, attrs={
             'class': 'form-control',
             'style': 'width:100%; padding:6px; box-sizing:border-box;',
-            'placeholder': 'Dejar vacío para usar la predeterminada (12345678)'
+            'placeholder': 'Dejar vacío para generar una automáticamente'
         }),
         label="Contraseña",
-        help_text="Opcional. Si la dejás vacía, se usa la contraseña predeterminada (12345678)."
+        help_text="Opcional. Si la dejás vacía, se genera una contraseña aleatoria para esta cuenta."
     )
 
     class Meta:
@@ -155,8 +156,8 @@ class registri_user_form(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Contraseña predeterminada antes del primer login (si el admin no elige otra)
-        self.password_generado = PASSWORD_PREDETERMINADA
+        # Contraseña aleatoria antes del primer login, salvo que el admin elija otra
+        self.password_generado = generar_password_aleatoria()
 
         # Estilo del selector de rol (para que se vea la caja)
         if 'rol' in self.fields:
@@ -411,7 +412,7 @@ class MateriaConFiltroSelect(forms.Select):
 class MesaFinalForm(forms.ModelForm):
     class Meta:
         model = MesaFinal
-        fields = ['materia', 'llamado', 'inscripcionAbierta']
+        fields = ['materia', 'llamado', 'aula', 'sede', 'inscripcionAbierta']
         widgets = {
             'llamado': forms.DateTimeInput(
                 attrs={
@@ -420,12 +421,16 @@ class MesaFinalForm(forms.ModelForm):
                 },
                 format='%Y-%m-%dT%H:%M'
             ),
+            'aula': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Aula 3'}),
+            'sede': forms.Select(attrs={'class': 'form-control'}),
             'inscripcionAbierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'materia': MateriaConFiltroSelect(attrs={'class': 'form-control'})
         }
         labels = {
             'materia': 'Materia',
             'llamado': 'Fecha y Hora del Llamado',
+            'aula': 'Aula',
+            'sede': 'Sede',
             'inscripcionAbierta': 'Inscripción Abierta'
         }
 
@@ -560,7 +565,22 @@ class InscripcionMateriaForm(forms.ModelForm):
         return cleaned_data
 
 class NotaFinalForm(forms.Form):
-    nota_final = forms.DecimalField(max_digits=4, decimal_places=2, min_value=0, max_value=10)
+    """Carga del resultado de un llamado a final: lo que el preceptor transcribe
+    del acta en papel. O hay nota, o el alumno estuvo ausente; no ambas cosas."""
+    nota_final = forms.DecimalField(max_digits=4, decimal_places=2, min_value=0, max_value=10, required=False)
+    ausente = forms.BooleanField(required=False)
+    numero_acta = forms.CharField(max_length=50, required=False)
+    folio = forms.CharField(max_length=50, required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        nota_final = cleaned_data.get('nota_final')
+        ausente = cleaned_data.get('ausente')
+        if ausente and nota_final is not None:
+            raise forms.ValidationError('Un alumno ausente no puede tener nota: elegí una de las dos opciones.')
+        if not ausente and nota_final is None:
+            raise forms.ValidationError('Ingresá una nota o marcá al alumno como ausente.')
+        return cleaned_data
 
 class NotaCursadaForm(forms.ModelForm):
     class Meta:

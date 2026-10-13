@@ -29,4 +29,10 @@ services:
       # aislado y Neon solo se toca desde un despliegue deliberado.
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
-    command: ["gunicorn", "gestionInstituto.wsgi:application", "--bind", "0.0.0.0:8000", "--reload"]
+    # runserver en vez de gunicorn --reload: gunicorn avisa "Reloader is on.
+    # Use in development only!" porque bajo Docker, con todo el codigo
+    # montado como volumen, el watcher consume memoria hasta que el worker
+    # se queda sin memoria y gunicorn lo mata con SIGKILL -> Internal Server
+    # Error intermitente, sin relacion con ninguna pagina en particular.
+    # runserver esta hecho para este caso y no tiene ese problema.
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]

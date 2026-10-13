@@ -147,9 +147,38 @@
             margin-top: 3px;
             font-size: 7.5pt;
         }
+
+        .no-print {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+
+        .no-print button {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background-color: #0f172a;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .no-print button:hover {
+            background-color: #1e293b;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="no-print">
+        <button type="button" onclick="window.print()">Imprimir</button>
+    </div>
     <div class="container">
         <!-- Header -->
         <div class="header">

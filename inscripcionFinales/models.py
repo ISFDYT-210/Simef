@@ -1,3 +1,6 @@
+import secrets
+import string
+
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
 from django.db import models
@@ -9,9 +12,21 @@ validador_telefono = RegexValidator(
     'El teléfono debe tener exactamente 10 dígitos (código de área + número, sin espacios ni guiones). Ej: 2211234567'
 )
 
-# Contraseña con la que se crea todo usuario nuevo, antes de su primer login
-# (después se lo obliga a cambiarla vía FirstLoginPasswordChangeView).
-PASSWORD_PREDETERMINADA = '12345678'
+# Alfabeto sin caracteres ambiguos (0/O, 1/l/I) para que una contraseña
+# generada se pueda transcribir a mano sin errores.
+_ALFABETO_PASSWORD = string.ascii_uppercase.replace('O', '').replace('I', '') + \
+    string.ascii_lowercase.replace('l', '') + \
+    string.digits.replace('0', '').replace('1', '')
+
+
+def generar_password_aleatoria(longitud=10):
+    """
+    Contraseña aleatoria para un usuario nuevo o para blanquear una cuenta.
+    Cada cuenta recibe una distinta (antes todas usaban la misma, PASSWORD_PREDETERMINADA
+    = '12345678', un blanco fácil de adivinar). Se muestra una sola vez a quien
+    da de alta/blanquea la cuenta; después queda solo el hash, como cualquier otra.
+    """
+    return ''.join(secrets.choice(_ALFABETO_PASSWORD) for _ in range(longitud))
 
 
 # === Matriz de capacidades por rol ===========================================
@@ -330,6 +345,14 @@ class usuarios_materia(models.Model):
         'Fecha de regularidad', null=True, blank=True,
         help_text='Fecha en que se aprobó la cursada. Reservado para cuando se active el vencimiento de regularidad.'
     )
+    ciclo_actual_desde = models.DateTimeField(
+        'Inicio del ciclo de cursada actual', null=True, blank=True,
+        help_text=(
+            'Se renueva cada vez que el alumno vuelve a cursar después de quedar '
+            'en RECURSA o ABANDONO. Los finales rendidos antes de esta fecha no '
+            'cuentan para el tope de 3 oportunidades (ver correlativas.MAX_OPORTUNIDADES_FINAL).'
+        ),
+    )
 
     TURNO_CHOICES = (
         ('Mañana','Mañana'),
@@ -348,8 +371,30 @@ class usuarios_materia(models.Model):
         return ((self.nota_cursada is not None and self.nota_cursada >= 4) or self.modalidad == 'Libre') and self.aprobada == False
 
     def save(self, *args, **kwargs):
+        self._detectar_nuevo_ciclo()
         self.recalcular_estado()
         super().save(*args, **kwargs)
+
+    def _detectar_nuevo_ciclo(self):
+        """
+        Marca cuándo empezó el ciclo de cursada actual. Primera vez: ahora.
+        Si ya existía y la fila venía de RECURSA/ABANDONO y le están cargando
+        una nota_cursada distinta, es que el alumno volvió a cursar: eso
+        arranca un ciclo nuevo y 'reinicia' el tope de 3 oportunidades de
+        final (los intentos de antes quedan fuera del conteo).
+        """
+        if not self.pk:
+            self.ciclo_actual_desde = timezone.now()
+            return
+        anterior = type(self).objects.filter(pk=self.pk).values('estado', 'nota_cursada').first()
+        if not anterior:
+            return
+        volvio_a_cursar = (
+            anterior['estado'] in (EstadoCursada.RECURSA, EstadoCursada.ABANDONO)
+            and anterior['nota_cursada'] != self.nota_cursada
+        )
+        if volvio_a_cursar:
+            self.ciclo_actual_desde = timezone.now()
 
     def recalcular_estado(self):
         """
@@ -380,10 +425,27 @@ class MesaFinal(models.Model):
     # de días para el examen.
     LIMITE_DIAS_EXCEPCION = 2
 
+    SEDE_CHOICES = (
+        ('SEDE LA PLATA', 'SEDE LA PLATA'),
+        ('SEDE ABASTO', 'SEDE ABASTO'),
+    )
+
     materia = models.ForeignKey('Materia', on_delete=models.CASCADE, blank=False, null=False)
     llamado= models.DateTimeField('Llamado', null=False, blank=False)
     vigente= models.BooleanField(default=True)
     inscripcionAbierta = models.BooleanField(default=False)
+
+    # Dónde se rinde. Aula es texto libre (no hay catálogo de aulas); sede es
+    # una de las dos del instituto.
+    aula = models.CharField('Aula', max_length=50, blank=True, default='')
+    sede = models.CharField('Sede', max_length=20, choices=SEDE_CHOICES, blank=True, default='')
+
+    # Datos de cierre: el preceptor los transcribe del acta en papel que
+    # firmó el tribunal. Quedan vacíos hasta que se carga el primer
+    # resultado de esta mesa.
+    numero_acta = models.CharField('Número de acta', max_length=50, blank=True, default='')
+    folio = models.CharField('Folio', max_length=50, blank=True, default='')
+
     def __str__(self):
         return f"{self.materia} -> {self.llamado}"
 
@@ -448,10 +510,16 @@ class TribunalMesa(models.Model):
 class InscripcionFinal(models.Model):
     usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, blank=False, null=False)  # 'Usuario' con mayúscula
     llamado = models.ForeignKey('MesaFinal', on_delete=models.CASCADE, blank=False, null=False)
-    aprobada= models.BooleanField(null=True) 
+    aprobada= models.BooleanField(null=True)
     # El alumno se inscribio pero no se presento a rendir.
     ausente = models.BooleanField(default=False)
     inscripcionAbierta=models.BooleanField(default=False)
+
+    # Resultado de ESTE llamado en particular. usuarios_materia.nota_final
+    # guarda una sola nota por materia (se pisa en cada nuevo intento); este
+    # campo es la fuente de verdad por intento, para no mostrarle a un
+    # llamado la nota de otro (ver api_finales_inscriptos_adm).
+    nota = models.FloatField('Nota', null=True, blank=True)
 
 class Estudiante(Usuario):
     matricula= models.CharField(max_length=10,unique=True)
