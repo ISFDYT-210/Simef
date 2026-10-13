@@ -18,10 +18,13 @@ permissions:
 env:
   PYTHON_VERSION: '3.11' # misma version que el Dockerfile
 
+# Runners fijos en ubuntu-24.04: desde el 19/10/2026 `ubuntu-latest` pasa a
+# Ubuntu 26, y ese cambio no tiene que llegar sin aviso. Para actualizar: un PR
+# aparte que cambie las etiquetas y pase el CI completo.
 jobs:
   lint:
     name: Lint (flake8)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -46,7 +49,7 @@ jobs:
 
   test:
     name: Tests (Django + PostgreSQL)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
 
     # Misma base de datos que docker-compose.yml para no testear sobre sqlite
@@ -138,7 +141,7 @@ jobs:
 
   security-check:
     name: Django deployment checklist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     # Falla ante cualquier aviso de seguridad (--fail-level WARNING), para que no
     # vuelva a acumularse deuda: con DEBUG=False la configuracion tiene que pasar
@@ -173,7 +176,7 @@ jobs:
 
   dependency-audit:
     name: Dependencias vulnerables (pip-audit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # BLOQUEANTE: desde Django 5.2.17 y las dependencias actualizadas (#128),
       # pip-audit da cero, asi que cualquier dependencia vulnerable frena el PR.
@@ -221,7 +224,7 @@ jobs:
 
   docker-build:
     name: Build imagen Docker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: test
     steps:
       - name: Checkout
