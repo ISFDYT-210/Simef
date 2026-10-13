@@ -133,7 +133,8 @@ Si un deploy a producción sale mal:
       informativo: aunque pase en verde, hay que mirar su resumen.
 - [ ] Migraciones nuevas: rama de Neon creada, `migrate --plan` revisado y
       migraciones aplicadas.
-- [ ] Estáticos nuevos: `collectstatic` corrido y `staticfiles/` commiteado.
+- [ ] Estáticos nuevos o modificados: `python manage.py collectstatic --noinput --clear`
+      y `staticfiles/` commiteado. El CI falla si no coincide.
 - [ ] Variables de *Production* revisadas (sección 2).
 - [ ] Después del deploy: entrar, iniciar sesión, inscribirse a un final y
       generar una constancia.

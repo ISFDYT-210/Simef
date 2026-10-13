@@ -227,6 +227,18 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# Estaticos con nombre con hash y comprimidos (WhiteNoise): el navegador no se
+# queda con versiones viejas despues de un deploy. Con DEBUG apagado, cada
+# {% static %} tiene que estar en staticfiles/staticfiles.json: si falta, la
+# pagina da 500. En Vercel no corre collectstatic (vercel.json usa `builds`), asi
+# que staticfiles/ se sirve tal como esta commiteada. Despues de tocar un
+# estatico: `python manage.py collectstatic --noinput --clear` y commitear
+# staticfiles/. El CI falla si no coincide (.github/scripts/verificar_staticfiles.py).
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
+
 # Archivos de medios (imágenes subidas por usuarios, ej. fotos de perfil)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
