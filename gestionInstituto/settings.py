@@ -68,6 +68,13 @@ ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h]
 if not DEBUG and not ALLOWED_HOSTS:
     _falta_en_produccion('ALLOWED_HOSTS')
 
+# Panel de administracion de Django (/admin/). Ninguna pantalla de SIMEF lo usa,
+# y en produccion es una puerta de entrada a todos los datos para cualquier cuenta
+# con permisos de staff. Por defecto queda solo en desarrollo: con DEBUG apagado,
+# /admin/ responde 404. Para una correccion puntual en produccion, definir
+# ADMIN_HABILITADO=True en Vercel, redeployar y despues quitarla.
+ADMIN_HABILITADO = _env_bool('ADMIN_HABILITADO', DEBUG)
+
 # Origenes HTTPS desde los que se aceptan formularios POST, separados por coma.
 # Hace falta cuando la app se abre detras de un proxy con otro esquema, como la
 # URL reenviada de un Codespace (https://*.app.github.dev): sin esto, Django
