@@ -560,7 +560,22 @@ class InscripcionMateriaForm(forms.ModelForm):
         return cleaned_data
 
 class NotaFinalForm(forms.Form):
-    nota_final = forms.DecimalField(max_digits=4, decimal_places=2, min_value=0, max_value=10)
+    """Carga del resultado de un llamado a final: lo que el preceptor transcribe
+    del acta en papel. O hay nota, o el alumno estuvo ausente; no ambas cosas."""
+    nota_final = forms.DecimalField(max_digits=4, decimal_places=2, min_value=0, max_value=10, required=False)
+    ausente = forms.BooleanField(required=False)
+    numero_acta = forms.CharField(max_length=50, required=False)
+    folio = forms.CharField(max_length=50, required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        nota_final = cleaned_data.get('nota_final')
+        ausente = cleaned_data.get('ausente')
+        if ausente and nota_final is not None:
+            raise forms.ValidationError('Un alumno ausente no puede tener nota: elegí una de las dos opciones.')
+        if not ausente and nota_final is None:
+            raise forms.ValidationError('Ingresá una nota o marcá al alumno como ausente.')
+        return cleaned_data
 
 class NotaCursadaForm(forms.ModelForm):
     class Meta:

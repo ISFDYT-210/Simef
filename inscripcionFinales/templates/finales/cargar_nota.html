@@ -33,7 +33,14 @@
       </div>
       {% endif %}
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          {{ form.ausente }}
+          El estudiante estuvo ausente (no se presentó a rendir)
+        </label>
+      </div>
+
+      <div x-show="!ausente" x-cloak class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label for="id_nota_final" class="mb-1 block text-sm font-medium text-slate-700">Nota final</label>
           {{ form.nota_final }}
@@ -51,6 +58,21 @@
           <div>
             <p class="text-sm font-bold" :class="aprueba ? 'text-emerald-700' : 'text-red-700'" x-text="aprueba ? 'APROBADO' : 'DESAPROBADO'"></p>
             <p class="text-xs text-slate-600" x-text="aprueba ? ('El estudiante aprueba con ' + nota) : 'No alcanza la nota mínima'"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Datos de cierre de esta mesa</p>
+        <p class="mt-1 text-xs text-slate-500">Se transcriben del acta en papel que firmó el tribunal. Quedan guardados en la mesa; no hace falta repetirlos en cada alumno.</p>
+        <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="id_numero_acta" class="mb-1 block text-sm font-medium text-slate-700">Número de acta</label>
+            {{ form.numero_acta }}
+          </div>
+          <div>
+            <label for="id_folio" class="mb-1 block text-sm font-medium text-slate-700">Folio</label>
+            {{ form.folio }}
           </div>
         </div>
       </div>
@@ -75,14 +97,24 @@
 <script>
   function cargarNotaFinal() {
     return {
-      nota: null, valida: false, aprueba: false, error: false,
+      nota: null, valida: false, aprueba: false, error: false, ausente: false,
       init() {
         var inp = document.getElementById('id_nota_final');
-        if (!inp) return;
-        inp.classList.add('w-full','rounded-lg','border','border-slate-300','px-3','py-2','text-sm','focus:border-celeste-500','focus:outline-none','focus:ring-2','focus:ring-celeste-100');
-        inp.setAttribute('min','1'); inp.setAttribute('max','10'); inp.setAttribute('step','0.1'); inp.setAttribute('placeholder','Ej: 7.5');
-        inp.addEventListener('input', () => this.evaluar(inp.value));
-        setTimeout(() => inp.focus(), 300);
+        var ausenteInp = document.getElementById('id_ausente');
+        var textInputs = [document.getElementById('id_numero_acta'), document.getElementById('id_folio')];
+
+        if (inp) {
+          inp.classList.add('w-full','rounded-lg','border','border-slate-300','px-3','py-2','text-sm','focus:border-celeste-500','focus:outline-none','focus:ring-2','focus:ring-celeste-100');
+          inp.setAttribute('min','1'); inp.setAttribute('max','10'); inp.setAttribute('step','0.1'); inp.setAttribute('placeholder','Ej: 7.5');
+          inp.addEventListener('input', () => this.evaluar(inp.value));
+          setTimeout(() => inp.focus(), 300);
+        }
+        textInputs.forEach((t) => t && t.classList.add('w-full','rounded-lg','border','border-slate-300','px-3','py-2','text-sm','focus:border-celeste-500','focus:outline-none','focus:ring-2','focus:ring-celeste-100'));
+        if (ausenteInp) {
+          ausenteInp.classList.add('h-4','w-4','rounded','border-slate-300','text-celeste-600');
+          this.ausente = ausenteInp.checked;
+          ausenteInp.addEventListener('change', () => { this.ausente = ausenteInp.checked; });
+        }
       },
       evaluar(v) {
         var n = parseFloat(v);
@@ -91,6 +123,7 @@
         this.nota = n; this.valida = true; this.aprueba = n >= 4;
       },
       validar(e) {
+        if (this.ausente) return;
         var inp = document.getElementById('id_nota_final');
         var n = parseFloat(inp.value);
         if (isNaN(n) || n < 1 || n > 10) { this.error = true; e.preventDefault(); inp.focus(); }
