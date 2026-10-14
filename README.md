@@ -37,6 +37,7 @@ La app queda en **http://localhost:8000**. Guía completa paso a paso en
 | [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md) | Copiar los datos de Neon a tu base local para probar sin tocar la del instituto. |
 | [docs/GITFLOW.md](docs/GITFLOW.md) | Cómo se organizan las ramas y cómo entra un cambio: todo a `develop` por Pull Request. |
 | [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) | Instalación sin Docker (venv + Python), Linux y Windows. |
+| [docs/MOP.md](docs/MOP.md) | Manual de Operaciones y Procedimientos: publicar, migrar, respaldar, restaurar, volver atrás y atender incidentes, con responsables. |
 | [docs/PRODUCCION_VERCEL.md](docs/PRODUCCION_VERCEL.md) | Cómo funciona producción en Vercel: cómo se publica, variables, migraciones y cómo volver atrás. |
 | [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) | Alternativa: despliegue en un servidor Debian propio (Apache + Gunicorn + Postgres en Neon). |
 | [docs/tailwind.md](docs/tailwind.md) | Kit de build de Tailwind CSS del proyecto. |
