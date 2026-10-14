@@ -410,10 +410,20 @@ class MesaFinal(models.Model):
     # de días para el examen.
     LIMITE_DIAS_EXCEPCION = 2
 
+    SEDE_CHOICES = (
+        ('SEDE LA PLATA', 'SEDE LA PLATA'),
+        ('SEDE ABASTO', 'SEDE ABASTO'),
+    )
+
     materia = models.ForeignKey('Materia', on_delete=models.CASCADE, blank=False, null=False)
     llamado= models.DateTimeField('Llamado', null=False, blank=False)
     vigente= models.BooleanField(default=True)
     inscripcionAbierta = models.BooleanField(default=False)
+
+    # Dónde se rinde. Aula es texto libre (no hay catálogo de aulas); sede es
+    # una de las dos del instituto.
+    aula = models.CharField('Aula', max_length=50, blank=True, default='')
+    sede = models.CharField('Sede', max_length=20, choices=SEDE_CHOICES, blank=True, default='')
 
     # Datos de cierre: el preceptor los transcribe del acta en papel que
     # firmó el tribunal. Quedan vacíos hasta que se carga el primer

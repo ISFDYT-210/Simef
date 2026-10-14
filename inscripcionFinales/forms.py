@@ -411,7 +411,7 @@ class MateriaConFiltroSelect(forms.Select):
 class MesaFinalForm(forms.ModelForm):
     class Meta:
         model = MesaFinal
-        fields = ['materia', 'llamado', 'inscripcionAbierta']
+        fields = ['materia', 'llamado', 'aula', 'sede', 'inscripcionAbierta']
         widgets = {
             'llamado': forms.DateTimeInput(
                 attrs={
@@ -420,12 +420,16 @@ class MesaFinalForm(forms.ModelForm):
                 },
                 format='%Y-%m-%dT%H:%M'
             ),
+            'aula': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Aula 3'}),
+            'sede': forms.Select(attrs={'class': 'form-control'}),
             'inscripcionAbierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'materia': MateriaConFiltroSelect(attrs={'class': 'form-control'})
         }
         labels = {
             'materia': 'Materia',
             'llamado': 'Fecha y Hora del Llamado',
+            'aula': 'Aula',
+            'sede': 'Sede',
             'inscripcionAbierta': 'Inscripción Abierta'
         }
 

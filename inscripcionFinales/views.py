@@ -441,6 +441,8 @@ def api_lista_mesas(request):
         'materia': str(mesa.materia),
         'fecha': mesa.llamado.strftime('%d/%m/%Y'),
         'hora': mesa.llamado.strftime('%H:%M'),
+        'aula': mesa.aula,
+        'sede': mesa.sede,
         # inscripcion_vigente distingue "abierta de verdad" de "quedó abierta pero venció"
         'vigente': mesa.inscripcion_vigente(),
         'abierta': mesa.inscripcionAbierta,

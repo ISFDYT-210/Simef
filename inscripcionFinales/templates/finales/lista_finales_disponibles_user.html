@@ -7,7 +7,7 @@
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400"><th class="px-5 py-3 font-semibold">Materia</th><th class="px-5 py-3 font-semibold">Llamado</th><th class="px-5 py-3 font-semibold">Profesor</th><th class="px-5 py-3 font-semibold text-right">Acciones</th></tr>
+        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400"><th class="px-5 py-3 font-semibold">Materia</th><th class="px-5 py-3 font-semibold">Llamado</th><th class="px-5 py-3 font-semibold">Aula/Sede</th><th class="px-5 py-3 font-semibold">Profesor</th><th class="px-5 py-3 font-semibold text-right">Acciones</th></tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
         {% for item in finales_con_requisitos %}
@@ -15,6 +15,9 @@
         <tr class="hover:bg-slate-50">
           <td class="px-5 py-3 font-medium text-tinta-900">{{ final.materia }}</td>
           <td class="px-5 py-3">{{ final.llamado }}</td>
+          <td class="px-5 py-3 text-slate-600">
+            {% if final.aula or final.sede %}{{ final.sede }}{% if final.sede and final.aula %} · {% endif %}{{ final.aula }}{% else %}—{% endif %}
+          </td>
           <td class="px-5 py-3">{{ final.materia.profesor.nombre_completo|default:"—" }}</td>
           <td class="px-5 py-3 text-right">
             {% if item.disponible %}
@@ -33,7 +36,7 @@
         </tr>
         {% endwith %}
         {% empty %}
-        <tr><td colspan="4" class="px-5 py-10 text-center text-sm text-slate-500">No hay finales disponibles.</td></tr>
+        <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No hay finales disponibles.</td></tr>
         {% endfor %}
       </tbody>
     </table>

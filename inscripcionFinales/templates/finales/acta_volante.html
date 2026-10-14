@@ -23,13 +23,41 @@
             margin-top: 10px;
         }
         p {
-            font-size: 13px; 
+            font-size: 13px;
         }
 
+        .no-print {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+
+        .no-print button {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background-color: #0f172a;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .no-print button:hover {
+            background-color: #1e293b;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
 
     </style>
 </head>
 <body>
+    <div class="no-print">
+        <button type="button" onclick="window.print()">Imprimir</button>
+    </div>
     <div class="header">
         <h3>ACTA VOLANTE DE EXAMENES</h3>
         <h6>I.S.F.D. y T. Nº 210</h6>
@@ -39,6 +67,12 @@
     <p id='mesa'>Exámenes de alumnos:</p>
     <p id='carrera'>Carrera: {{final.materia.carrera}}</p>
     <p id="asignatura">ASIGNATURA: {{final.materia}}</p>
+    {% if final.aula or final.sede %}
+    <p id="aula-sede">
+        {% if final.sede %}SEDE: {{ final.sede }}{% endif %}
+        {% if final.aula %}{% if final.sede %} &nbsp;&nbsp; {% endif %}AULA: {{ final.aula }}{% endif %}
+    </p>
+    {% endif %}
 
     <div style="text-align: right;">
         FECHA

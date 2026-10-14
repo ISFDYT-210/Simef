@@ -41,6 +41,16 @@
         {{ form.llamado }}
         <p x-show="errores.llamado" x-cloak class="mt-1 text-xs text-red-600" x-text="errores.llamado"></p>
       </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label for="{{ form.aula.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Aula</label>
+          {{ form.aula }}
+        </div>
+        <div>
+          <label for="{{ form.sede.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Sede</label>
+          {{ form.sede }}
+        </div>
+      </div>
       {% if form.vigente %}<div class="hidden">{{ form.vigente }}</div>{% endif %}
       {% if form.inscripcionAbierta %}<div class="hidden">{{ form.inscripcionAbierta }}</div>{% endif %}
     </div>
@@ -70,6 +80,10 @@
         var man = new Date(); man.setDate(man.getDate() + 1);
         ll.setAttribute('min', man.toISOString().slice(0, 16)); // desde mañana
       }
+      ['{{ form.aula.id_for_label }}', '{{ form.sede.id_for_label }}'].forEach(function (id) {
+        var inp = document.getElementById(id);
+        if (inp) inp.classList.add.apply(inp.classList, c);
+      });
       this.aplicarFiltros();
     },
     // Filtro de carrera/año (bidireccional) 
