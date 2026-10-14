@@ -2000,10 +2000,14 @@ def inscribir_final(request):
                 'message': 'La inscripción para esta mesa está cerrada'
             })
 
-        # Verificar que no esté ya inscripto
+        # Verificar que no tenga ya una inscripción pendiente (sin resultado
+        # todavía) a otra mesa de esta materia. Una vez cargado el resultado
+        # (nota o ausente) deja de contar acá: si le quedan oportunidades,
+        # puede volver a anotarse (ver validar_inscripcion_final más abajo).
         if InscripcionFinal.objects.filter(
             usuario=usuario,
-            llamado__materia=mesa_final.materia
+            llamado__materia=mesa_final.materia,
+            aprobada__isnull=True,
         ).exists():
             return JsonResponse({
                 'status': 'error',
@@ -2030,11 +2034,13 @@ def inscribir_final(request):
                     'message': f'{usuario.nombre_completo} no tiene la nota mínima de cursada (7)'
                 })
         
-        # Verificar correlativas
-        if not validar_inscripcion_final(usuario_id, mesa_final.materia.id):
+        # Verificar correlativas, cursada aprobada y tope de oportunidades
+        # (nota de cursada >= 7 ya se validó arriba; puede_rendir() cubre el resto).
+        puede, motivo_rendir = correlativas.puede_rendir(usuario_id, mesa_final.materia.id)
+        if not puede:
             return JsonResponse({
                 'status': 'error',
-                'message': f'{usuario.nombre_completo} no cumple con los requisitos de correlativas'
+                'message': motivo_rendir or f'{usuario.nombre_completo} no cumple con los requisitos de correlativas'
             })
         
         # Verificar que no tenga final aprobado

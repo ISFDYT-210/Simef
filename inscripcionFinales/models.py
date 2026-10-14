@@ -330,6 +330,14 @@ class usuarios_materia(models.Model):
         'Fecha de regularidad', null=True, blank=True,
         help_text='Fecha en que se aprobó la cursada. Reservado para cuando se active el vencimiento de regularidad.'
     )
+    ciclo_actual_desde = models.DateTimeField(
+        'Inicio del ciclo de cursada actual', null=True, blank=True,
+        help_text=(
+            'Se renueva cada vez que el alumno vuelve a cursar después de quedar '
+            'en RECURSA o ABANDONO. Los finales rendidos antes de esta fecha no '
+            'cuentan para el tope de 3 oportunidades (ver correlativas.MAX_OPORTUNIDADES_FINAL).'
+        ),
+    )
 
     TURNO_CHOICES = (
         ('Mañana','Mañana'),
@@ -348,8 +356,30 @@ class usuarios_materia(models.Model):
         return ((self.nota_cursada is not None and self.nota_cursada >= 4) or self.modalidad == 'Libre') and self.aprobada == False
 
     def save(self, *args, **kwargs):
+        self._detectar_nuevo_ciclo()
         self.recalcular_estado()
         super().save(*args, **kwargs)
+
+    def _detectar_nuevo_ciclo(self):
+        """
+        Marca cuándo empezó el ciclo de cursada actual. Primera vez: ahora.
+        Si ya existía y la fila venía de RECURSA/ABANDONO y le están cargando
+        una nota_cursada distinta, es que el alumno volvió a cursar: eso
+        arranca un ciclo nuevo y 'reinicia' el tope de 3 oportunidades de
+        final (los intentos de antes quedan fuera del conteo).
+        """
+        if not self.pk:
+            self.ciclo_actual_desde = timezone.now()
+            return
+        anterior = type(self).objects.filter(pk=self.pk).values('estado', 'nota_cursada').first()
+        if not anterior:
+            return
+        volvio_a_cursar = (
+            anterior['estado'] in (EstadoCursada.RECURSA, EstadoCursada.ABANDONO)
+            and anterior['nota_cursada'] != self.nota_cursada
+        )
+        if volvio_a_cursar:
+            self.ciclo_actual_desde = timezone.now()
 
     def recalcular_estado(self):
         """
