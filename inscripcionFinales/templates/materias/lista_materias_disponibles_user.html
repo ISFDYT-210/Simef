@@ -2,8 +2,14 @@
 {% block title %}Lista de materias{% endblock %}
 {% block encabezado %}Materias disponibles{% endblock %}
 {% block content %}
-<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-  <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-sm font-semibold text-tinta-900">Materias disponibles</h2></div>
+<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white" x-data="{ soloDisponibles: false }">
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+    <h2 class="text-sm font-semibold text-tinta-900">Materias disponibles</h2>
+    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+      <input type="checkbox" x-model="soloDisponibles" class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+      Mostrar solo las que puedo cursar
+    </label>
+  </div>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
@@ -18,11 +24,14 @@
       <tbody class="divide-y divide-slate-100">
         {% for item in materias_con_requisitos %}
         {% with materia=item.materia %}
-        <tr class="hover:bg-slate-50" x-data="{ abierto: false }" data-practica="{% if materia.nombre_materia|lower|slice:':5' == 'pract' or materia.nombre_materia|lower|slice:':5' == 'práct' %}1{% else %}0{% endif %}">
+        <tr class="hover:bg-slate-50"
+            x-data="{ abierto: false, disponible: {% if item.disponible %}true{% else %}false{% endif %} }"
+            x-show="!soloDisponibles || disponible"
+            data-practica="{% if materia.nombre_materia|lower|slice:':5' == 'pract' or materia.nombre_materia|lower|slice:':5' == 'práct' %}1{% else %}0{% endif %}">
           <td class="px-5 py-3 font-medium text-tinta-900">{{ materia.nombre_materia }}</td>
           <td class="px-5 py-3">{{ materia.anio }}</td>
           <td class="px-5 py-3">{{ materia.carrera.nombre_carrera }}</td>
-          <td class="px-5 py-3">{{ materia.profesor.nombres|default:"—" }}</td>
+          <td class="px-5 py-3">{{ materia.profesor.nombre_completo|default:"—" }}</td>
           <td class="px-5 py-3">
             {% if item.disponible %}
             <div class="flex items-center justify-end gap-2">
@@ -39,7 +48,7 @@
             </div>
             {% else %}
             <div class="flex items-center justify-end" title="{{ item.motivo }}">
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+              <span class="inline-block rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                 {{ item.motivo }}
               </span>
             </div>
