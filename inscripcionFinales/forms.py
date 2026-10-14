@@ -132,16 +132,17 @@ class registri_user_form(UserCreationForm):
     cargo = forms.CharField(max_length=100, required=False)
     area = forms.CharField(max_length=100, required=False)
 
-    # Contraseña opcional: si se deja vacía, se usa la predeterminada (12345678)
+    # Contraseña opcional: si se deja vacía, se genera una aleatoria distinta
+    # para esta cuenta (ver generar_password_aleatoria en models.py).
     password = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=True, attrs={
             'class': 'form-control',
             'style': 'width:100%; padding:6px; box-sizing:border-box;',
-            'placeholder': 'Dejar vacío para usar la predeterminada (12345678)'
+            'placeholder': 'Dejar vacío para generar una automáticamente'
         }),
         label="Contraseña",
-        help_text="Opcional. Si la dejás vacía, se usa la contraseña predeterminada (12345678)."
+        help_text="Opcional. Si la dejás vacía, se genera una contraseña aleatoria para esta cuenta."
     )
 
     class Meta:
@@ -155,8 +156,8 @@ class registri_user_form(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Contraseña predeterminada antes del primer login (si el admin no elige otra)
-        self.password_generado = PASSWORD_PREDETERMINADA
+        # Contraseña aleatoria antes del primer login, salvo que el admin elija otra
+        self.password_generado = generar_password_aleatoria()
 
         # Estilo del selector de rol (para que se vea la caja)
         if 'rol' in self.fields:
