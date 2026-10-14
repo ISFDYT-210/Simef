@@ -91,6 +91,27 @@ def tiene_inscripcion_activa(usuario_id, materia_id):
     ).exclude(estado__in=ESTADOS_INACTIVOS).exists()
 
 
+def horario_ocupado(usuario_id, materia):
+    """
+    True si el alumno ya está cursando (EN_CURSO, es decir asistiendo a
+    clases ahora mismo) otra materia que cae en el mismo día y horario que
+    `materia`. Una vez que esa otra cursada queda REGULAR/PROMOCIONADO/
+    APROBADO ya no ocupa el horario: el alumno dejó de asistir a esas clases.
+
+    `materia`: instancia de Materia (ya consultada por el caller, evita
+    repetir el SELECT).
+    """
+    conflicto = usuarios_materia.objects.filter(
+        usuario_id=usuario_id,
+        estado=EstadoCursada.EN_CURSO,
+        materia__dia=materia.dia,
+        materia__Horario=materia.Horario,
+    ).exclude(materia_id=materia.id).select_related('materia').first()
+    if conflicto:
+        return True, f"Cursando los {materia.dia} a las {materia.Horario}"
+    return False, None
+
+
 def tiene_cursada_aprobada(inscripcion):
     """`inscripcion`: instancia de usuarios_materia, o None si nunca la cursó."""
     if inscripcion is None:
@@ -124,6 +145,10 @@ def puede_cursar(usuario_id, materia_id):
 
     if materia.anio == 1 and es_ingresante(usuario_id, materia.carrera_id):
         return True, None
+
+    ocupado, motivo_horario = horario_ocupado(usuario_id, materia)
+    if ocupado:
+        return False, motivo_horario
 
     correlativas = list(
         MateriaCorrelativa.objects.filter(materia_id=materia_id).select_related('materia_correlativa')
@@ -209,6 +234,15 @@ def materias_con_requisitos(usuario):
         carrera_id: es_ingresante(usuario.id, carrera_id) for carrera_id in carreras_candidatas
     }
 
+    # (día, horario) -> materia que el alumno está cursando ahora mismo
+    # (EN_CURSO), para el chequeo de superposición horaria.
+    horario_ocupado_por = {
+        (um.materia.dia, um.materia.Horario): um.materia
+        for um in usuarios_materia.objects.filter(
+            usuario_id=usuario.id, estado=EstadoCursada.EN_CURSO
+        ).select_related('materia')
+    }
+
     resultado = []
     for materia in materias:
         if materia.id in materias_con_inscripcion_activa:
@@ -236,6 +270,14 @@ def materias_con_requisitos(usuario):
         ]
         if faltantes:
             resultado.append({'materia': materia, 'disponible': False, 'motivo': _motivo_correlativas_faltantes(faltantes)})
+            continue
+
+        conflicto = horario_ocupado_por.get((materia.dia, materia.Horario))
+        if conflicto and conflicto.id != materia.id:
+            resultado.append({
+                'materia': materia, 'disponible': False,
+                'motivo': f"Cursando los {materia.dia} a las {materia.Horario}",
+            })
         else:
             resultado.append({'materia': materia, 'disponible': True, 'motivo': None})
 
