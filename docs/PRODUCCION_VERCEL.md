@@ -96,19 +96,17 @@ Después de cambiar una variable hay que volver a desplegar (Deployments → ⋯
 ## 3. Migraciones
 
 Como Vercel no corre `migrate`, las migraciones nuevas se aplican a mano, **antes
-de mergear a `main`** el PR que las trae, desde una máquina con el código de ese
-PR:
+de mergear a `main`** el PR que las trae, con el script del MOP (procedimiento
+OP-03 de [MOP.md](MOP.md)):
 
 ```bash
-# 1. Respaldo: crear una rama de Neon desde producción (consola de Neon →
-#    Branches → Create branch). Es instantáneo y sirve como punto de retorno.
-
-# 2. Ver qué se va a aplicar, sin aplicarlo
-DATABASE_URL='<cadena de producción>' python manage.py migrate --plan
-
-# 3. Aplicar
-DATABASE_URL='<cadena de producción>' python manage.py migrate
+./scripts/migrar_neon.sh preview      # rama preview de Neon (PREVIEW_DATABASE_URL del .env)
+./scripts/migrar_neon.sh produccion   # base del instituto (DATABASE_URL del .env)
 ```
+
+El script no muestra la cadena de conexión, se niega a seguir si la de `preview` es
+la de producción, muestra el plan antes de escribir y, en producción, pide confirmar
+que existe la rama de respaldo de hoy (OP-02).
 
 Cuidado: la base de producción es la del instituto. **Nunca correr `migrate`
 contra Neon desde una rama de trabajo**, porque se aplicarían migraciones que
