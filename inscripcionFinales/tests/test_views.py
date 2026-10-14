@@ -543,6 +543,39 @@ class TribunalMesaTest(TestCase):
         self.assertIn('Profesor Dos', contenido)
 
 
+class InscripcionMateriaEstTest(TestCase):
+    """
+    inscripcionMateriaEst (/inscribirse_materia/<id>/<modalidad>): tiene que
+    exigir POST. Antes mutaba en GET, disparable con un simple link o <img>
+    de un sitio externo (CSRF) sin que el alumno lo pidiera.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=carrera, anio=1, inscripcionAbierta=True)
+        cls.alumno = crear_usuario('alu_insc@test.com', 'Estudiante', 'Alumno', 90)
+        cls.alumno.carrera.add(carrera)
+
+    def setUp(self):
+        self.client.force_login(self.alumno)
+        self.url = f'/inscribirse_materia/{self.materia.id}/Regular'
+
+    def test_get_no_inscribe(self):
+        respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 405)
+        # anio=1 autoinscribe por la señal de ingresante en bloque (ver
+        # correlativas.es_ingresante); lo que importa acá es que el GET no
+        # haya sido lo que la creó, sino que no haya pisado la modalidad.
+        self.assertIsNone(usuarios_materia.objects.get(usuario=self.alumno, materia=self.materia).modalidad)
+
+    def test_post_inscribe(self):
+        respuesta = self.client.post(self.url)
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).exists())
+
+
 class InscribirFinalReinscripcionTest(TestCase):
     """
     inscribir_final (vista admin): un resultado ya cargado (ausente o nota

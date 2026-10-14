@@ -1,3 +1,6 @@
+import secrets
+import string
+
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
 from django.db import models
@@ -9,9 +12,21 @@ validador_telefono = RegexValidator(
     'El teléfono debe tener exactamente 10 dígitos (código de área + número, sin espacios ni guiones). Ej: 2211234567'
 )
 
-# Contraseña con la que se crea todo usuario nuevo, antes de su primer login
-# (después se lo obliga a cambiarla vía FirstLoginPasswordChangeView).
-PASSWORD_PREDETERMINADA = '12345678'
+# Alfabeto sin caracteres ambiguos (0/O, 1/l/I) para que una contraseña
+# generada se pueda transcribir a mano sin errores.
+_ALFABETO_PASSWORD = string.ascii_uppercase.replace('O', '').replace('I', '') + \
+    string.ascii_lowercase.replace('l', '') + \
+    string.digits.replace('0', '').replace('1', '')
+
+
+def generar_password_aleatoria(longitud=10):
+    """
+    Contraseña aleatoria para un usuario nuevo o para blanquear una cuenta.
+    Cada cuenta recibe una distinta (antes todas usaban la misma, PASSWORD_PREDETERMINADA
+    = '12345678', un blanco fácil de adivinar). Se muestra una sola vez a quien
+    da de alta/blanquea la cuenta; después queda solo el hash, como cualquier otra.
+    """
+    return ''.join(secrets.choice(_ALFABETO_PASSWORD) for _ in range(longitud))
 
 
 # === Matriz de capacidades por rol ===========================================

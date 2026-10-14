@@ -524,14 +524,6 @@ def exito_cambios_materia(request):
 
 def exito_alta_materia(request):
     return render(request, 'materias/exito_alta_materia.html')
-def listarMateriasFinal(request):
-    materias_final = []
-    materias_disponibles=usuarios_materia.objects.filter(usuario=request.user,aprobada=False)
-    for m in materias_disponibles:
-        if m.puede_inscribirse_en_mesa_final() and MesaFinal.objects.filter(materia=m.materia,vigente=True).exists():
-            for mf in MesaFinal.objects.filter(materia=m.materia,vigente=True):
-                materias_final.append(mf)
-    return render(request, 'listarMateriasFinal.html', {'materias_final' : materias_final})
 
 @capacidad_requerida('gestionar_mesas')
 def altaMesa(request):
@@ -773,37 +765,37 @@ def inscripcionMateria(request):
         form = InscripcionMateriaForm()
     return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form}) 
 
+@require_http_methods(['POST'])
 @capacidad_requerida('inscribirse')
-def inscripcionMateriaEst(request, materia_id,modalidad):
+def inscripcionMateriaEst(request, materia_id, modalidad):
+    """
+    Inscribe al usuario logueado en una materia. Requiere POST (con CSRF): un
+    GET que mutara acá se podía disparar con un simple link o <img> de un
+    sitio externo sin que el alumno lo pidiera.
+    """
     materia = get_object_or_404(Materia, id=materia_id)
-    
-    if request.method == 'GET':
-        inscripcion_usuario = request.user
-        
-        # Si ya tiene una cursada activa de esta materia no puede reinscribirse;
-        # si lo que tiene es RECURSA/ABANDONO, sí puede (recursar).
-        if correlativas.tiene_inscripcion_activa(inscripcion_usuario.id, materia_id):
-            messages.warning(request, 'Ya estás inscrito en esta materia.')
-            return redirect('/inscripcionMateriaEst')
-        
-        # Validar la inscripción
-        if validar_inscripcion_materias(inscripcion_usuario.id, materia_id):
-            # Crear el objeto usuarios_materia
-            nueva_inscripcion = usuarios_materia(
-                usuario=inscripcion_usuario,
-                materia=materia,
-                modalidad=modalidad
-            )
-            nueva_inscripcion.save()
-            
-            messages.success(request, 'Te has inscrito exitosamente en la materia.')
-            return redirect('/inscripcionMateriaEst')
-        else:
-            messages.error(request, 'No cumples con los requisitos para inscribirte en esta materia.')
-            return redirect('/inscripcionMateriaEst')
-    
-    # Si es GET, mostrar el formulario de confirmación
-    return render(request, 'materias/inscripcion_materia_est.html', {'materia': materia})
+    inscripcion_usuario = request.user
+
+    # Si ya tiene una cursada activa de esta materia no puede reinscribirse;
+    # si lo que tiene es RECURSA/ABANDONO, sí puede (recursar).
+    if correlativas.tiene_inscripcion_activa(inscripcion_usuario.id, materia_id):
+        messages.warning(request, 'Ya estás inscrito en esta materia.')
+        return redirect('/inscripcionMateriaEst')
+
+    # Validar la inscripción
+    if validar_inscripcion_materias(inscripcion_usuario.id, materia_id):
+        nueva_inscripcion = usuarios_materia(
+            usuario=inscripcion_usuario,
+            materia=materia,
+            modalidad=modalidad
+        )
+        nueva_inscripcion.save()
+
+        messages.success(request, 'Te has inscrito exitosamente en la materia.')
+        return redirect('/inscripcionMateriaEst')
+    else:
+        messages.error(request, 'No cumples con los requisitos para inscribirte en esta materia.')
+        return redirect('/inscripcionMateriaEst')
 
 def exito_inscripcion_mesa(request):
     return render(request, 'finales/exito_inscripcion_mesa.html')
@@ -873,25 +865,6 @@ def crear_Directivo(request):
         return render(request, 'crear_directivo.html',{'form':form})
     
     
-class EstudianteCreateView(CreateView):
-    model = Estudiante
-    fields = ['username', 'password', 'matricula', ]
-    template_name = 'estudiante_form.html'
-    success_url = reverse_lazy('estudiante_lista')
-
-class EstudianteUpdateView(UpdateView):
-    model = Estudiante
-    fields = ['username', 'matricula',]
-    template_name = 'estudiante.form.html'
-    success_url = reverse_lazy('estudiante_lista')
-
-class EstudianteDeleteView(DeleteView):
-    model = Estudiante
-    template_name = 'confirmar_eliminar_estudiante.html'
-    success_url = reverse_lazy('estudiante_lista')
-    
-
-
 def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
     """
     Si la fila del CSV de carga masiva de usuarios trae columna 'Materia',
@@ -981,7 +954,10 @@ def cargar_usuarios(request):
                 usuarios_duplicados = 0
                 notas_cargadas = 0
                 errores = []
-                
+                # Email -> contraseña generada, para mostrarla una sola vez en
+                # la pantalla de resultado (no queda guardada en ningún lado).
+                credenciales_generadas = []
+
                 # Validar encabezados requeridos
                 campos_requeridos = ['Correo electrónico', 'Nombre estudiante', 'Documento estudiante']
                 if not all(campo in reader.fieldnames for campo in campos_requeridos):
@@ -1106,9 +1082,10 @@ def cargar_usuarios(request):
                                 errores.append(f'Fila {numero_fila}: Carrera no encontrada ({fila["Carrera"].strip()})')
                                 continue
                         
-                        # Crear usuario según el rol
-                        password = PASSWORD_PREDETERMINADA  # Contraseña inicial antes del primer login
-                        
+                        # Crear usuario según el rol. Contraseña aleatoria por
+                        # usuario (antes del primer login, que la obliga a cambiar).
+                        password = generar_password_aleatoria()
+
                         if rol == 'Estudiante':
                             matricula = fila.get('Matricula', str(dni))  # Usar DNI como matrícula por defecto
                             
@@ -1223,6 +1200,7 @@ def cargar_usuarios(request):
                         if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
                             notas_cargadas += 1
 
+                        credenciales_generadas.append({'email': email, 'password': password})
                         usuarios_creados += 1
                         
                     except IntegrityError as e:
@@ -1243,7 +1221,8 @@ def cargar_usuarios(request):
                         'usuarios_creados': usuarios_creados,
                         'usuarios_duplicados': usuarios_duplicados,
                         'notas_cargadas': notas_cargadas,
-                        'errores': errores[:20]  # Mostrar máximo 20 errores
+                        'errores': errores[:20],  # Mostrar máximo 20 errores
+                        'credenciales_generadas': credenciales_generadas,
                     })
                 elif usuarios_creados > 0 or notas_cargadas > 0:
                     partes = []
@@ -1256,6 +1235,7 @@ def cargar_usuarios(request):
                         'usuarios_creados': usuarios_creados,
                         'usuarios_duplicados': usuarios_duplicados,
                         'notas_cargadas': notas_cargadas,
+                        'credenciales_generadas': credenciales_generadas,
                     })
                 elif usuarios_duplicados > 0:
                     messages.warning(request, f'{usuarios_duplicados} usuario(s) ya existían en el sistema; no había notas para cargarles.')
@@ -1911,17 +1891,6 @@ def editar_notas(request, id):
 
 
 
-@capacidad_requerida('abrir_inscripciones')
-def abrir_inscripcion_materia(request, carrera, anio):
-    Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=True)
-    return redirect('lista_materias_admin')
-
-
-@capacidad_requerida('abrir_inscripciones')
-def cerrar_inscripcion_materia(request, carrera, anio):
-    Materia.objects.filter(carrera_id=carrera, anio=anio).update(inscripcionAbierta=False)
-    return redirect('lista_materias_admin')
-    
 @capacidad_requerida('gestionar_usuarios')
 def eliminar_usuarios(request):
     if request.method == 'POST':
@@ -1953,14 +1922,15 @@ def eliminar_usuarios(request):
 
 @rol_requerido('Directivo', 'Secretario')
 def blanquear_password(request, usuario_id):
-    """Restablece la contraseña de un usuario a la predeterminada. Solo Directivo, Secretario o super admin."""
+    """Restablece la contraseña de un usuario a una generada al azar. Solo Directivo, Secretario o super admin."""
     usuario = get_object_or_404(Usuario, id=usuario_id)
     if request.method == 'POST':
-        usuario.set_password(PASSWORD_PREDETERMINADA)
+        password_nueva = generar_password_aleatoria()
+        usuario.set_password(password_nueva)
         usuario.first_login = True
         usuario.save()
         registrar_auditoria(request, f'Blanqueó la contraseña de {usuario.email}', 'Usuario', usuario.pk)
-        messages.success(request, f'Se blanqueó la contraseña de {usuario.nombre_completo or usuario.email}. Ahora es "{PASSWORD_PREDETERMINADA}" y deberá cambiarla en su próximo inicio de sesión.')
+        messages.success(request, f'Se blanqueó la contraseña de {usuario.nombre_completo or usuario.email}. Ahora es "{password_nueva}" y deberá cambiarla en su próximo inicio de sesión.')
         return redirect('list_user')
     return render(request, 'registration/blanquear_password.html', {'usuario': usuario})
 

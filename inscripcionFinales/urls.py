@@ -29,7 +29,6 @@ urlpatterns = [
     path("edit_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/edit_profile.html')), name='edit_profile'),
     path("delete_user/<int:pk>",login_required(deleteUser.as_view(template_name='registration/delete_user.html')),name='delete_user'),
     path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),
-    path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),
     path('blanquear_password/<int:usuario_id>/', login_required(blanquear_password), name='blanquear_password'),
     path("show_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/show_user.html')), name='show_user'),
     path('password_reset/',auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html',email_template_name='registration/password_reset_email.html',success_url='/password_reset/done/'),name='password_reset'),
@@ -52,8 +51,6 @@ path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estu
     path('editar_materia/<int:id>/', login_required(editar_materia), name='editar_materia'),
     path('exito_cambios_materia/', login_required(exito_cambios_materia), name='exito_cambios_materia'),
     path('ver_materias/<int:id>/', ver_materias, name='ver_materias'),
-    path('abrir_inscripcion_materia/<int:carrera>/<int:anio>', abrir_inscripcion_materia, name='abrir_inscripcion_materia'),
-    path('cerrar_inscripcion_materia/<int:carrera>/<int:anio>', cerrar_inscripcion_materia, name='cerrar_inscripcion_materia'),
     path('eliminar_materia/<int:id>/', login_required(eliminar_materia), name='eliminar_materia'),
     path('materias/eliminar_seleccionadas/', eliminar_materias_seleccionadas, name='eliminar_materias_seleccionadas'),
     path('eliminar_inscripcion_materia/<int:id>/', login_required(eliminar_inscripcion_materia), name='eliminar_inscripcion_materia'),
@@ -85,7 +82,6 @@ path('inscribir_final/', inscribir_final, name='inscribir_final'),
     path('quitar_tribunal/<int:tribunal_id>/', login_required(quitar_tribunal), name='quitar_tribunal'),
     path('exito_final_eliminado_est/', exito_final_eliminado_est, name='exito_final_eliminado_est'),
     path('exito_final_eliminado_adm/', exito_final_eliminado_adm, name='exito_final_eliminado_adm'),
-    path('TESTINGlistamateriasfinal/',listarMateriasFinal,name='listarMesas'),
     path('eliminar_inscripcion_final/<int:id>/', login_required(eliminar_inscripcion_final), name='eliminar_inscripcion_final'),
     path('altaMesa/',altaMesa, name='altaMesa'),
     path("edit_mesa/<int:pk>", login_required(editMesa), name='edit_mesa'),
@@ -120,19 +116,12 @@ path('inscribir_final/', inscribir_final, name='inscribir_final'),
     path("delete_inscripcion/<int:pk>",login_required(deleteInscripcion.as_view(template_name='finales/delete_inscripcion.html')),name='delete_inscripcion'),
 
     #Estudiantes
-    path('estudiantes/nuevo', EstudianteCreateView.as_view(), name='estudiante_nuevo'),
-    path('estudiantes/<int:pk>/editar/', EstudianteUpdateView.as_view(), name='estudiante_editar'),
-    path('estudiantes/<int:pk>/eliminar/', EstudianteDeleteView.as_view(), name='estudiante_eliminar'),
     path('cargaMasivaEstudiantes/',login_required(cargar_usuarios),name='cargaMasivaEstudiantes'),
     path('ver_usuario_materia/',listar_usuarios_materia,name='verUsuarioMateria'),
     # Primer logeo
 
 path('change_password_first/', FirstLoginPasswordChangeView.as_view(), name='first_login_password_change'),
 path('change_password_first/done/', first_login_password_change_done, name='first_login_password_change_done'),
-
-    ###TESTING###
-    path('validar-inscripcion/<int:usuario_id>/<int:materia_id>/', validar_inscripcion_final, name='validar_inscripcion_final'),
-    
 
 #     path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estudiante'),
 #     path('reporte_html/<int:usuario_id>', reporte_estudiante_html, name='reporte_estudiante_html'),

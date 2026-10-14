@@ -19,6 +19,21 @@
         </ul>
     </div>
     {% endif %}
+    {% if credenciales_generadas %}
+    <div class="alert alert-info">
+        <strong>Contraseñas generadas (anotalas ahora, no se van a volver a mostrar):</strong>
+        <table class="table table-sm table-bordered mt-2">
+            <thead>
+                <tr><th>Email</th><th>Contraseña</th></tr>
+            </thead>
+            <tbody>
+                {% for credencial in credenciales_generadas %}
+                <tr><td>{{ credencial.email }}</td><td><code>{{ credencial.password }}</code></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
     <p style="font-size: 25px;">Por favor, revise los usuarios cargados en la lista de usuarios.
     </p>
     <button type="button" class="btn btn-primary"><a class="dropdown-item" href="/user_list/">Volver a la lista de usuarios</button></a>
