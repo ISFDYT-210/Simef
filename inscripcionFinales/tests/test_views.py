@@ -993,6 +993,50 @@ class ConstanciaPdfTest(TestCase):
         self.assertIn('No se pudo generar la constancia', logs.output[0])
 
 
+class LoginThrottlingTest(TestCase):
+    """
+    django-axes: bloquea el login tras AXES_FAILURE_LIMIT intentos fallidos
+    seguidos con el mismo usuario (SEC-04 de la auditoría de seguridad).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = crear_usuario('axes@test.com', 'Estudiante', 'Alumno Axes', 70)
+        cls.usuario.set_password('contraseña-correcta')
+        cls.usuario.save()
+
+    def _intentar(self, password):
+        return self.client.post('/accounts/login/', {'username': 'axes@test.com', 'password': password})
+
+    def test_intentos_fallidos_por_debajo_del_limite_no_bloquean(self):
+        from django.conf import settings
+        for _ in range(settings.AXES_FAILURE_LIMIT - 1):
+            self._intentar('mal')
+        respuesta = self._intentar('contraseña-correcta')
+        self.assertIn('_auth_user_id', self.client.session)
+
+    def test_supera_el_limite_bloquea_incluso_con_la_contraseña_correcta(self):
+        from django.conf import settings
+        for _ in range(settings.AXES_FAILURE_LIMIT):
+            self._intentar('mal')
+        respuesta = self._intentar('contraseña-correcta')
+        self.assertNotIn('_auth_user_id', self.client.session)
+        self.assertContains(respuesta, 'Demasiados intentos', status_code=429)
+
+    def test_bloqueo_es_por_usuario_no_por_ip(self):
+        """Otro usuario, misma IP (mismo test client): no debería verse afectado."""
+        from django.conf import settings
+        otro = crear_usuario('axes_otro@test.com', 'Estudiante', 'Otro Alumno', 71)
+        otro.set_password('otra-contraseña')
+        otro.save()
+
+        for _ in range(settings.AXES_FAILURE_LIMIT):
+            self._intentar('mal')  # agota el límite de axes@test.com
+
+        respuesta = self.client.post('/accounts/login/', {'username': 'axes_otro@test.com', 'password': 'otra-contraseña'})
+        self.assertIn('_auth_user_id', self.client.session)
+
+
 class LogoutTest(TestCase):
     """Desde Django 5.0, LogoutView solo acepta POST (#128)."""
 

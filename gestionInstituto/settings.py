@@ -109,7 +109,10 @@ SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', False)
 #   Activarla recien cuando se haya verificado que ninguno se sirve por http.
 # - W021 (PRELOAD) inscribe el dominio en la lista que traen los navegadores; en
 #   la practica no se puede deshacer.
-SILENCED_SYSTEM_CHECKS = ['security.W005', 'security.W021']
+# - axes.W006 sugiere sumar ip_address a AXES_LOCKOUT_PARAMETERS. A proposito
+#   se bloquea solo por username: varios alumnos entran desde el wifi del
+#   instituto (misma IP/NAT) y bloquear por IP los trabaria a todos juntos.
+SILENCED_SYSTEM_CHECKS = ['security.W005', 'security.W021', 'axes.W006']
 
 
 # Application definition
@@ -123,8 +126,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'inscripcionFinales',
     'django_extensions',
+    'axes',
     'gestionInstituto',
-    
+
 ]
 
 MIDDLEWARE = [
@@ -137,7 +141,33 @@ MIDDLEWARE = [
     'inscripcionFinales.middleware.FirstLoginMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Tiene que ir al final: intercepta el login para contar intentos
+    # fallidos antes de que llegue a la vista (ver AXES_* más abajo).
+    'axes.middleware.AxesMiddleware',
 ]
+
+# django-axes: bloquea el login tras varios intentos fallidos seguidos
+# (SEC: "límite de intentos" pendiente de la auditoría de seguridad).
+AUTHENTICATION_BACKENDS = [
+    # Tiene que ir primero: si no, el ModelBackend autentica antes de que
+    # axes pueda contar el intento fallido.
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+AXES_FAILURE_LIMIT = 5
+# Progresivo: 10 minutos el primer bloqueo de una cuenta, +10 cada vez que
+# vuelve a bloquearse (10, 20, 30, ... hasta un tope). Ver
+# inscripcionFinales.models.duracion_bloqueo_login.
+AXES_COOLOFF_TIME = 'inscripcionFinales.models.duracion_bloqueo_login'
+AXES_LOCKOUT_PARAMETERS = ['username']  # bloquea por usuario, no por IP (varios alumnos detrás del mismo NAT del instituto)
+# Por defecto axes busca la credencial bajo la clave de Usuario.USERNAME_FIELD
+# ('email' acá), pero AuthenticationForm siempre manda la credencial con la
+# clave literal 'username' (aunque el campo real del modelo sea otro). Sin
+# esto, axes nunca encuentra el username en los intentos fallidos y no
+# bloquea nada.
+AXES_USERNAME_FORM_FIELD = 'username'
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = 'registration/bloqueado_por_intentos.html'
 
 ROOT_URLCONF = 'gestionInstituto.urls'
 
