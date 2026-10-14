@@ -181,6 +181,71 @@ class PuedeCursarTest(TestCase, EstudianteTestMixin):
         self.assertTrue(puede)
 
 
+class HorarioOcupadoTest(TestCase, EstudianteTestMixin):
+    """
+    Superposición de horarios: no se puede cursar una materia nueva si ya se
+    está cursando (EN_CURSO) otra materia el mismo día al mismo horario.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.lunes_12 = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=2,
+            dia='Lunes', Horario='12:00', inscripcionAbierta=True)
+        cls.tambien_lunes_12 = Materia.objects.create(
+            nombre_materia='Matemática I', carrera=cls.carrera, anio=2,
+            dia='Lunes', Horario='12:00', inscripcionAbierta=True)
+        cls.lunes_14 = Materia.objects.create(
+            nombre_materia='Historia I', carrera=cls.carrera, anio=2,
+            dia='Lunes', Horario='14:00', inscripcionAbierta=True)
+        cls.martes_12 = Materia.objects.create(
+            nombre_materia='Física I', carrera=cls.carrera, anio=2,
+            dia='Martes', Horario='12:00', inscripcionAbierta=True)
+
+    def test_mismo_dia_y_horario_bloquea(self):
+        alumno = self.estudiante(26)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12)  # EN_CURSO
+        puede, motivo = correlativas.puede_cursar(alumno.id, self.tambien_lunes_12.id)
+        self.assertFalse(puede)
+        self.assertIn('Cursando', motivo)
+        self.assertIn('Lunes', motivo)
+
+    def test_mismo_dia_distinto_horario_no_bloquea(self):
+        alumno = self.estudiante(27)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12)
+        puede, _motivo = correlativas.puede_cursar(alumno.id, self.lunes_14.id)
+        self.assertTrue(puede)
+
+    def test_mismo_horario_distinto_dia_no_bloquea(self):
+        alumno = self.estudiante(28)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12)
+        puede, _motivo = correlativas.puede_cursar(alumno.id, self.martes_12.id)
+        self.assertTrue(puede)
+
+    def test_cursada_ya_regular_no_ocupa_mas_el_horario(self):
+        """Ya aprobó la cursada: dejó de asistir a esas clases, no bloquea un horario nuevo."""
+        alumno = self.estudiante(29)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12, nota_cursada=8)  # REGULAR
+        puede, _motivo = correlativas.puede_cursar(alumno.id, self.tambien_lunes_12.id)
+        self.assertTrue(puede)
+
+    def test_recursa_no_ocupa_el_horario(self):
+        alumno = self.estudiante(30)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12, nota_cursada=2)  # RECURSA
+        puede, _motivo = correlativas.puede_cursar(alumno.id, self.tambien_lunes_12.id)
+        self.assertTrue(puede)
+
+    def test_materias_con_requisitos_informa_el_motivo(self):
+        alumno = self.estudiante(31)
+        alumno.carrera.add(self.carrera)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12)
+        items = {i['materia']: i for i in correlativas.materias_con_requisitos(alumno)}
+        self.assertFalse(items[self.tambien_lunes_12]['disponible'])
+        self.assertIn('Cursando', items[self.tambien_lunes_12]['motivo'])
+        self.assertTrue(items[self.lunes_14]['disponible'])
+
+
 class MateriasDisponiblesParaCursarTest(TestCase, EstudianteTestMixin):
     """Bulk usado por lista_materias_user: misma regla de recursada que puede_cursar."""
 
