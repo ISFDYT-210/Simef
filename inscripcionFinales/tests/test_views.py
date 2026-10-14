@@ -108,12 +108,38 @@ class FinalesInscriptosAdmAPITest(TestCase):
             usuario=self.estudiante, materia=self.materia_propia,
             nota_cursada=8, nota_final=7,
         )
+        # La mesa de este llamado ya pasó: recién ahí tiene sentido mostrar
+        # la nota por el camino de compatibilidad (sin InscripcionFinal.nota).
+        mesa_pasada = MesaFinal.objects.create(
+            materia=self.materia_propia, llamado=timezone.now() - timedelta(days=1))
+        InscripcionFinal.objects.create(usuario=self.estudiante, llamado=mesa_pasada, aprobada=False)
+
         self.client.force_login(self.directivo)
         datos = self.client.get(self.url).json()
 
-        por_materia = {f['materia']: f['notas'] for f in datos['results']}
+        por_materia = {f['materia']: f['notas'] for f in datos['results'] if f['mesa_id'] == mesa_pasada.id}
         self.assertEqual(por_materia['Matemática Aplicada'], [7])
-        self.assertEqual(por_materia['Historia'], [])
+
+    def test_nota_por_intento_no_depende_de_usuarios_materia(self):
+        """InscripcionFinal.nota es la fuente de verdad del llamado; no hace
+        falta el truco de 'mesa futura' para evitar la nota de otro intento."""
+        mesa_pasada = MesaFinal.objects.create(
+            materia=self.materia_propia, llamado=timezone.now() - timedelta(days=1))
+        InscripcionFinal.objects.create(usuario=self.estudiante, llamado=mesa_pasada, aprobada=False, nota=9)
+
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url).json()
+
+        fila = next(f for f in datos['results'] if f['mesa_id'] == mesa_pasada.id)
+        self.assertEqual(fila['notas'], [9])
+        self.assertFalse(fila['ausente'])
+
+    def test_ausente_se_informa_en_el_json(self):
+        InscripcionFinal.objects.filter(usuario=self.estudiante, llamado__materia=self.materia_propia).update(ausente=True)
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url).json()
+        fila = next(f for f in datos['results'] if f['materia'] == 'Matemática Aplicada')
+        self.assertTrue(fila['ausente'])
 
     def test_no_hace_una_query_por_fila(self):
         """
@@ -505,6 +531,72 @@ class TribunalMesaTest(TestCase):
         contenido = respuesta.content.decode()
         self.assertIn('Profesor Uno', contenido)
         self.assertIn('Profesor Dos', contenido)
+
+
+class CargarNotaFinalTest(TestCase):
+    """
+    cargar_nota_final: el preceptor transcribe el resultado del acta en
+    papel (nota o ausente) y los datos de cierre de la mesa (número de
+    acta, folio). Es la pieza que cierra el circuito de Inscripción a
+    Mesas de Finales del Sprint 3.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(nombre_materia='Programación I', carrera=carrera, anio=1)
+        cls.preceptor = crear_usuario('prec_nota@test.com', 'Preceptor', 'Preceptora', 70)
+        cls.estudiante = crear_usuario('est_nota@test.com', 'Estudiante', 'Estudiante Nota', 71)
+
+    def setUp(self):
+        self.mesa = MesaFinal.objects.create(materia=self.materia, llamado=timezone.now() - timedelta(days=1))
+        self.usuario_materia = usuarios_materia.objects.create(usuario=self.estudiante, materia=self.materia)
+        self.inscripcion = InscripcionFinal.objects.create(usuario=self.estudiante, llamado=self.mesa, aprobada=None)
+        self.url = f'/cargar_nota_final/{self.inscripcion.id}/'
+        self.client.force_login(self.preceptor)
+
+    def test_carga_nota_actualiza_inscripcion_y_usuarios_materia(self):
+        self.client.post(self.url, {'nota_final': '7'})
+        self.inscripcion.refresh_from_db()
+        self.usuario_materia.refresh_from_db()
+        self.assertEqual(self.inscripcion.nota, 7)
+        self.assertTrue(self.inscripcion.aprobada)
+        self.assertFalse(self.inscripcion.ausente)
+        self.assertEqual(self.usuario_materia.nota_final, 7)
+
+    def test_marca_ausente_sin_nota_y_no_toca_usuarios_materia(self):
+        usuarios_materia.objects.filter(pk=self.usuario_materia.pk).update(nota_final=3)
+        self.client.post(self.url, {'ausente': 'on'})
+        self.inscripcion.refresh_from_db()
+        self.usuario_materia.refresh_from_db()
+        self.assertTrue(self.inscripcion.ausente)
+        self.assertIsNone(self.inscripcion.nota)
+        self.assertFalse(self.inscripcion.aprobada)
+        self.assertEqual(self.usuario_materia.nota_final, 3)  # sin cambios
+
+    def test_no_permite_nota_y_ausente_juntos(self):
+        respuesta = self.client.post(self.url, {'nota_final': '7', 'ausente': 'on'})
+        self.assertEqual(respuesta.status_code, 200)  # vuelve a mostrar el form con error
+        self.inscripcion.refresh_from_db()
+        self.assertIsNone(self.inscripcion.nota)
+        self.assertFalse(self.inscripcion.ausente)
+
+    def test_exige_nota_o_ausente(self):
+        respuesta = self.client.post(self.url, {})
+        self.assertEqual(respuesta.status_code, 200)
+        self.inscripcion.refresh_from_db()
+        self.assertIsNone(self.inscripcion.nota)
+
+    def test_guarda_numero_de_acta_y_folio_en_la_mesa(self):
+        self.client.post(self.url, {'nota_final': '7', 'numero_acta': '123', 'folio': '45'})
+        self.mesa.refresh_from_db()
+        self.assertEqual(self.mesa.numero_acta, '123')
+        self.assertEqual(self.mesa.folio, '45')
+
+    def test_estudiante_no_puede_cargar_su_propia_nota(self):
+        self.client.force_login(self.estudiante)
+        respuesta = self.client.post(self.url, {'nota_final': '10'})
+        self.assertEqual(respuesta.status_code, 403)
 
 
 class ApiListaUsuariosTest(TestCase):

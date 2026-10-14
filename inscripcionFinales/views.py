@@ -628,6 +628,21 @@ def api_finales_inscriptos_adm(request):
         ):
             notas_por_par[(nota.usuario_id, nota.materia_id)].append(nota.nota_final)
 
+    ahora = timezone.now()
+
+    def notas_de(f):
+        # InscripcionFinal.nota es el resultado de ESTE llamado en particular.
+        if f.nota is not None:
+            return [f.nota]
+        # Compatibilidad con resultados cargados antes de que existiera ese
+        # campo: solo quedaron en usuarios_materia, que guarda UNA nota por
+        # materia (no por mesa). Si la mesa de esta fila todavía no pasó, es
+        # imposible que ya tenga nota de este llamado, así que no se muestra
+        # (evita el falso "ya tiene nota X" con la nota de otro intento).
+        if f.llamado.llamado > ahora:
+            return []
+        return notas_por_par.get((f.usuario_id, f.llamado.materia_id), [])
+
     return JsonResponse({
         'results': [{
             'id': f.id,
@@ -638,7 +653,8 @@ def api_finales_inscriptos_adm(request):
             'hora': f.llamado.llamado.strftime('%H:%M'),
             'estudiante': f.usuario.nombre_completo,
             'dni': f.usuario.dni,
-            'notas': notas_por_par.get((f.usuario_id, f.llamado.materia_id), []),
+            'notas': notas_de(f),
+            'ausente': f.ausente,
         } for f in finales],
         'page': page.number,
         'num_pages': paginator.num_pages,
@@ -1770,8 +1786,13 @@ def inscribir_usuario(usuario, materia):
 
 @capacidad_requerida('cargar_notas')
 def cargar_nota_final(request, inscripcion_id):
+    """Carga el resultado de un llamado a final: lo que el preceptor transcribe
+    del acta en papel que firmó el tribunal (nota o ausente), junto con el
+    número de acta y folio de esa mesa. El preceptor transcribe; no decide
+    la nota, eso ya lo hizo el tribunal fuera del sistema."""
     inscripcion = get_object_or_404(InscripcionFinal, id=inscripcion_id)
     usuario_materia = get_object_or_404(usuarios_materia, usuario=inscripcion.usuario, materia=inscripcion.llamado.materia)
+    mesa = inscripcion.llamado
 
     if not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
         return render(request, '403_forbidden.html', status=403)
@@ -1780,25 +1801,45 @@ def cargar_nota_final(request, inscripcion_id):
        form = NotaFinalForm(request.POST)
        if form.is_valid():
             nota_final = form.cleaned_data['nota_final']
-            usuario_materia.nota_final = nota_final
-            usuario_materia.aprobada = nota_final >= 4
-            usuario_materia.save()
-            inscripcion.aprobada = nota_final >= 4
+            ausente = form.cleaned_data['ausente']
+            numero_acta = form.cleaned_data['numero_acta']
+            folio = form.cleaned_data['folio']
+
+            inscripcion.ausente = ausente
+            if ausente:
+                inscripcion.nota = None
+                inscripcion.aprobada = False
+                detalle = 'ausente'
+            else:
+                inscripcion.nota = nota_final
+                inscripcion.aprobada = nota_final >= 4
+                usuario_materia.nota_final = nota_final
+                usuario_materia.aprobada = nota_final >= 4
+                usuario_materia.save()
+                detalle = f'nota {nota_final}'
             inscripcion.save()
 
+            if numero_acta:
+                mesa.numero_acta = numero_acta
+            if folio:
+                mesa.folio = folio
+            if numero_acta or folio:
+                mesa.save()
+
             registrar_auditoria(
-                request, f'Cargó nota final {nota_final} a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}',
-                'usuarios_materia', usuario_materia.pk
+                request, f'Cargó resultado ({detalle}) a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}, acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}',
+                'InscripcionFinal', inscripcion.pk
             )
-            messages.success(request, f'Nota final cargada correctamente: {nota_final}')
+            messages.success(request, f'Resultado cargado correctamente: {detalle}')
             return redirect('/listaFinalesAdm')  # Ajusta esto a tu URL de redirección
     else:
-        form = NotaFinalForm()
+        form = NotaFinalForm(initial={'numero_acta': mesa.numero_acta, 'folio': mesa.folio})
 
     context = {
         'form': form,
         'inscripcion': inscripcion,
         'usuario_materia': usuario_materia,
+        'mesa': mesa,
     }
     return render(request, 'finales/cargar_nota.html', context)
 

@@ -384,6 +384,13 @@ class MesaFinal(models.Model):
     llamado= models.DateTimeField('Llamado', null=False, blank=False)
     vigente= models.BooleanField(default=True)
     inscripcionAbierta = models.BooleanField(default=False)
+
+    # Datos de cierre: el preceptor los transcribe del acta en papel que
+    # firmó el tribunal. Quedan vacíos hasta que se carga el primer
+    # resultado de esta mesa.
+    numero_acta = models.CharField('Número de acta', max_length=50, blank=True, default='')
+    folio = models.CharField('Folio', max_length=50, blank=True, default='')
+
     def __str__(self):
         return f"{self.materia} -> {self.llamado}"
 
@@ -448,10 +455,16 @@ class TribunalMesa(models.Model):
 class InscripcionFinal(models.Model):
     usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, blank=False, null=False)  # 'Usuario' con mayúscula
     llamado = models.ForeignKey('MesaFinal', on_delete=models.CASCADE, blank=False, null=False)
-    aprobada= models.BooleanField(null=True) 
+    aprobada= models.BooleanField(null=True)
     # El alumno se inscribio pero no se presento a rendir.
     ausente = models.BooleanField(default=False)
     inscripcionAbierta=models.BooleanField(default=False)
+
+    # Resultado de ESTE llamado en particular. usuarios_materia.nota_final
+    # guarda una sola nota por materia (se pisa en cada nuevo intento); este
+    # campo es la fuente de verdad por intento, para no mostrarle a un
+    # llamado la nota de otro (ver api_finales_inscriptos_adm).
+    nota = models.FloatField('Nota', null=True, blank=True)
 
 class Estudiante(Usuario):
     matricula= models.CharField(max_length=10,unique=True)
