@@ -210,6 +210,16 @@ class ListaMesasAPITest(TestCase):
         self.client.force_login(self.directivo)
         self.assertEqual(self.client.get(self.url, {'q': 'quimica'}).json()['count'], 0)
 
+    def test_informa_aula_y_sede(self):
+        self.mesa_vigente.aula = 'Aula 3'
+        self.mesa_vigente.sede = 'Sede central'
+        self.mesa_vigente.save()
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url).json()
+        fila = next(f for f in datos['results'] if f['id'] == self.mesa_vigente.id)
+        self.assertEqual(fila['aula'], 'Aula 3')
+        self.assertEqual(fila['sede'], 'Sede central')
+
     def test_distingue_vigente_vencida_y_cerrada(self):
         """La UI muestra tres estados distintos y necesita los dos campos."""
         self.client.force_login(self.directivo)

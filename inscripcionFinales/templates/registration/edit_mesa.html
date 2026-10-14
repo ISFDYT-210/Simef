@@ -35,6 +35,18 @@
         <p class="mt-2 rounded-lg bg-celeste-100/60 px-3 py-2 text-xs text-tinta-800">La fecha del llamado debe ser posterior al momento actual.</p>
       </div>
 
+      <!-- Aula y sede -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label for="{{ form.aula.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Aula</label>
+          {{ form.aula }}
+        </div>
+        <div>
+          <label for="{{ form.sede.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Sede</label>
+          {{ form.sede }}
+        </div>
+      </div>
+
       <!-- Estado de inscripción -->
       <div>
         <p class="mb-1 text-sm font-medium text-slate-700">Estado de inscripción</p>
@@ -68,6 +80,10 @@
           var m = new Date(); m.setHours(m.getHours() + 1);
           ll.setAttribute('min', m.toISOString().slice(0, 16));
         }
+        ['{{ form.aula.id_for_label }}', '{{ form.sede.id_for_label }}'].forEach(function (id) {
+          var inp = document.getElementById(id);
+          if (inp) inp.classList.add.apply(inp.classList, c);
+        });
         // switch de inscripción: refleja y sincroniza estado
         var sw = document.getElementById('id_inscripcionAbierta');
         if (sw) {
