@@ -1074,7 +1074,7 @@ class LogoutTest(TestCase):
         self.assertRedirects(respuesta, '/', fetch_redirect_response=False)
         self.assertNotIn('_auth_user_id', self.client.session)
         mensajes = [str(m) for m in respuesta.context['messages']] if respuesta.context else []
-        self.assertIn('Su sesión se ha cerrado correctamente. Hasta la próxima!', mensajes)
+        self.assertIn('Su sesión se ha cerrado correctamente.', mensajes)
 
     def test_get_no_cierra_la_sesion(self):
         self.client.force_login(self.usuario)
