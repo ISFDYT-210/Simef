@@ -533,6 +533,63 @@ class TribunalMesaTest(TestCase):
         self.assertIn('Profesor Dos', contenido)
 
 
+class InscribirFinalReinscripcionTest(TestCase):
+    """
+    inscribir_final (vista admin): un resultado ya cargado (ausente o nota
+    desaprobada) no debe bloquear para siempre una nueva inscripción, solo
+    mientras haya un tope de oportunidades disponible. Antes, cualquier
+    InscripcionFinal histórica bloqueaba la materia de por vida.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(nombre_materia='Programación II', carrera=cls.carrera, anio=2)
+        cls.preceptor = crear_usuario('prec_reinsc@test.com', 'Preceptor', 'Preceptora', 80)
+        cls.alumno = crear_usuario('alu_reinsc@test.com', 'Estudiante', 'Alumno', 81)
+        cls.alumno.carrera.add(cls.carrera)
+
+    def mesa_abierta(self, dias=5):
+        return MesaFinal.objects.create(
+            materia=self.materia, llamado=timezone.now() + timedelta(days=dias), inscripcionAbierta=True)
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+
+    def test_con_un_intento_desaprobado_puede_anotarse_de_nuevo(self):
+        mesa_vieja = self.mesa_abierta()
+        InscripcionFinal.objects.create(usuario=self.alumno, llamado=mesa_vieja, aprobada=False, nota=2)
+        mesa_nueva = self.mesa_abierta()
+
+        respuesta = self.client.post('/inscribir_final/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id}).json()
+
+        self.assertEqual(respuesta['status'], 'success')
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+    def test_con_inscripcion_pendiente_no_puede_anotarse_a_otra_mesa(self):
+        mesa_pendiente = self.mesa_abierta()
+        InscripcionFinal.objects.create(usuario=self.alumno, llamado=mesa_pendiente)  # sin resultado todavía
+        mesa_nueva = self.mesa_abierta()
+
+        respuesta = self.client.post('/inscribir_final/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id}).json()
+
+        self.assertEqual(respuesta['status'], 'error')
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+    def test_con_tres_intentos_agotados_no_puede_anotarse(self):
+        for _ in range(3):
+            mesa_vieja = self.mesa_abierta()
+            InscripcionFinal.objects.create(usuario=self.alumno, llamado=mesa_vieja, aprobada=False, nota=2)
+        mesa_nueva = self.mesa_abierta()
+
+        respuesta = self.client.post('/inscribir_final/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id}).json()
+
+        self.assertEqual(respuesta['status'], 'error')
+        self.assertIn('oportunidades', respuesta['message'])
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+
 class CargarNotaFinalTest(TestCase):
     """
     cargar_nota_final: el preceptor transcribe el resultado del acta en
