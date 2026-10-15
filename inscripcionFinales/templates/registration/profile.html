@@ -27,7 +27,7 @@
       {% endif %}
       <div class="min-w-0">
         <h2 class="truncate text-xl font-bold text-white">{{ u.nombre_completo|default:"Sin nombre cargado" }}</h2>
-        <p class="truncate text-sm text-tinta-300">{{ u.email }}</p>
+        <p class="truncate text-sm text-tinta-300">DNI {{ u.dni }}{% if u.email %} · {{ u.email }}{% endif %}</p>
         <span class="mt-2 inline-block rounded-full bg-celeste-500/20 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-celeste-400">
           {{ u.get_rol_display }}
         </span>
