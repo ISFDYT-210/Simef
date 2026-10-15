@@ -540,32 +540,19 @@ def exito_alta_materia(request):
 def altaMesa(request):
     if request.method == 'POST':
         form = MesaFinalForm(request.POST)
-        fecha_llamado_str = request.POST.get('llamado')
-        
-        try:
-            # Parsear como datetime naive
-            fecha_llamado_naive = datetime.strptime(fecha_llamado_str, '%Y-%m-%dT%H:%M')
-            
-            # Convertir a timezone-aware usando la zona horaria del proyecto
-            fecha_llamado = timezone.make_aware(fecha_llamado_naive)
-            
-            # Obtener fecha actual (ya es timezone-aware)
-            fecha_actual = timezone.now()
-            
-            print(fecha_llamado)
-            print(fecha_actual)
-            
-            if form.is_valid():
-                if fecha_llamado > fecha_actual:
-                    form.save()
-                    return redirect('list_mesa')
-                else:
-                    return JsonResponse({'status': 'error', 'message': 'La fecha de llamado debe ser posterior a la fecha de hoy'})
-            else:
-                return JsonResponse({'status': 'error', 'message': 'Datos del formulario inválidos'})
-                
-        except ValueError:
-            return JsonResponse({'status': 'error', 'message': 'Formato de fecha inválido'})
+        if form.is_valid():
+            if form.cleaned_data['llamado'] > timezone.now():
+                form.save()
+                return redirect('list_mesa')
+            form.add_error('llamado', 'La fecha de llamado debe ser posterior a la fecha de hoy.')
+
+        # Cualquier error (fecha, materia+llamado duplicados, etc.) se muestra
+        # arriba de la página al volver a renderizar el form con lo ya tipeado.
+        for campo in form:
+            for error in campo.errors:
+                messages.error(request, f'{campo.label}: {error}')
+        for error in form.non_field_errors():
+            messages.error(request, error)
     else:
         form = MesaFinalForm()
 

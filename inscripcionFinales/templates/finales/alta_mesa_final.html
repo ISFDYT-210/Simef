@@ -39,6 +39,7 @@
       <div>
         <label for="{{ form.llamado.id_for_label }}" class="mb-1 block text-sm font-medium text-slate-700">Fecha y hora</label>
         {{ form.llamado }}
+        {% if form.llamado.errors %}<p class="mt-1 text-xs text-red-600">{{ form.llamado.errors|first }}</p>{% endif %}
         <p x-show="errores.llamado" x-cloak class="mt-1 text-xs text-red-600" x-text="errores.llamado"></p>
       </div>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

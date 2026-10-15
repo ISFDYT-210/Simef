@@ -546,6 +546,56 @@ class TribunalMesaTest(TestCase):
         self.assertIn('Profesor Dos', contenido)
 
 
+class AltaMesaFinalSinDuplicadosTest(TestCase):
+    """
+    No se puede cargar dos veces la misma materia en el mismo día y horario
+    (ni crearla duplicada, ni editar una mesa para que choque con otra ya
+    existente); en un horario o día distinto sí se permite.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(nombre_materia='Programación I', carrera=carrera, anio=1)
+        cls.preceptor = crear_usuario('prec_altamesa@test.com', 'Preceptor', 'Preceptora', 70)
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+        # Sin segundos/microsegundos: es la precisión real que entrega el
+        # input datetime-local del form (ver self.datos más abajo).
+        self.llamado = (timezone.now() + timedelta(days=10)).replace(second=0, microsecond=0)
+        self.mesa = MesaFinal.objects.create(materia=self.materia, llamado=self.llamado)
+
+    def datos(self, llamado):
+        return {
+            'materia': self.materia.id, 'llamado': llamado.strftime('%Y-%m-%dT%H:%M'),
+            'aula': '', 'sede': '',
+        }
+
+    def test_no_permite_crear_una_mesa_duplicada(self):
+        respuesta = self.client.post('/altaMesa/', self.datos(self.llamado))
+        self.assertEqual(respuesta.status_code, 200)  # vuelve a la misma pantalla, no redirige
+        self.assertEqual(MesaFinal.objects.filter(materia=self.materia, llamado=self.llamado).count(), 1)
+
+    def test_permite_crear_la_misma_materia_en_otro_horario(self):
+        otro_horario = self.llamado.replace(hour=(self.llamado.hour + 3) % 24)
+        respuesta = self.client.post('/altaMesa/', self.datos(otro_horario))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(MesaFinal.objects.filter(materia=self.materia).count(), 2)
+
+    def test_permite_crear_la_misma_materia_otro_dia(self):
+        otro_dia = self.llamado + timedelta(days=1)
+        respuesta = self.client.post('/altaMesa/', self.datos(otro_dia))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(MesaFinal.objects.filter(materia=self.materia).count(), 2)
+
+    def test_no_permite_editar_una_mesa_para_que_choque_con_otra(self):
+        otra = MesaFinal.objects.create(materia=self.materia, llamado=self.llamado + timedelta(days=1))
+        respuesta = self.client.post(f'/edit_mesa/{otra.id}', self.datos(self.llamado))
+        otra.refresh_from_db()
+        self.assertNotEqual(otra.llamado, self.llamado)
+
+
 class InscripcionMateriaEstTest(TestCase):
     """
     inscripcionMateriaEst (/inscribirse_materia/<id>/<modalidad>): tiene que
