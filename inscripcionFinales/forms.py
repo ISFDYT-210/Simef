@@ -440,6 +440,17 @@ class MesaFinalForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.fields['materia'].disabled = True
 
+    def clean(self):
+        cleaned_data = super().clean()
+        materia = cleaned_data.get('materia')
+        llamado = cleaned_data.get('llamado')
+        if materia and llamado:
+            ya_existe = MesaFinal.objects.filter(materia=materia, llamado=llamado) \
+                .exclude(pk=self.instance.pk).exists()
+            if ya_existe:
+                self.add_error('llamado', 'Ya existe una mesa de esta materia en ese mismo día y horario.')
+        return cleaned_data
+
 class InscripcionFinalForm(forms.ModelForm):
     class Meta:
         model = InscripcionFinal

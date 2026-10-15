@@ -10,11 +10,14 @@ comportamiento de la que quedó, para que no se reintroduzca la confusión.
 Correr con:
     python manage.py test inscripcionFinales --settings=gestionInstituto.settings_TEST
 """
+from datetime import datetime
+
 from django.test import TestCase
+from django.utils import timezone
 
 from inscripcionFinales.forms import MesaFinalForm, profile_students_form
 from inscripcionFinales.models import (
-    Carrera, Materia, MateriaCorrelativa, Usuario, usuarios_materia,
+    Carrera, Materia, MateriaCorrelativa, MesaFinal, Usuario, usuarios_materia,
 )
 from inscripcionFinales.views import validar_inscripcion_final
 
@@ -124,6 +127,74 @@ class MesaFinalFormTest(TestCase):
         html = str(MesaFinalForm()['materia'])
         self.assertIn(f'value="{self.sin_carrera.id}"', html)
         self.assertIn('data-anio="3"', html)
+
+
+class MesaFinalFormSinDuplicadosTest(TestCase):
+    """No puede haber dos mesas de la MISMA materia en el MISMO día y horario."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=1)
+        cls.otra_materia = Materia.objects.create(
+            nombre_materia='Programación II', carrera=cls.carrera, anio=2)
+
+    def aware(self, *args):
+        return timezone.make_aware(datetime(*args))
+
+    def datos(self, materia, llamado, **overrides):
+        datos = {
+            'materia': materia.id, 'llamado': llamado, 'aula': '', 'sede': '',
+            'inscripcionAbierta': False,
+        }
+        datos.update(overrides)
+        return datos
+
+    def test_misma_materia_mismo_dia_y_horario_se_rechaza(self):
+        MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0))
+
+        form = MesaFinalForm(self.datos(self.materia, '2030-11-10T09:00'))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('mismo día y horario', form.errors['llamado'][0])
+
+    def test_misma_materia_distinto_horario_se_permite(self):
+        MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0))
+
+        form = MesaFinalForm(self.datos(self.materia, '2030-11-10T15:00'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_misma_materia_distinto_dia_se_permite(self):
+        MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0))
+
+        form = MesaFinalForm(self.datos(self.materia, '2030-11-11T09:00'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_distinta_materia_mismo_dia_y_horario_se_permite(self):
+        MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0))
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T09:00'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_editar_una_mesa_sin_cambiar_el_llamado_no_choca_consigo_misma(self):
+        mesa = MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0))
+
+        form = MesaFinalForm(self.datos(self.materia, '2030-11-10T09:00'), instance=mesa)
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_editar_una_mesa_para_chocar_con_otra_existente_se_rechaza(self):
+        mesa = MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0))
+        MesaFinal.objects.create(materia=self.materia, llamado=self.aware(2030, 11, 11, 9, 0))
+
+        form = MesaFinalForm(self.datos(self.materia, '2030-11-11T09:00'), instance=mesa)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('mismo día y horario', form.errors['llamado'][0])
 
 
 class ProfileStudentsFormTest(TestCase):
