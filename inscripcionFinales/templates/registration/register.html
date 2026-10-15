@@ -55,8 +55,9 @@
       </div>
 
       <div>
-        <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
+        <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI <span class="text-red-500">*</span></label>
         {{ form.dni }}
+        <p class="mt-1 text-xs text-slate-400">Es el identificador de inicio de sesión: no se podrá modificar después.</p>
         {% if form.dni.errors %}<p class="mt-1 text-xs text-red-600">{{ form.dni.errors|striptags }}</p>{% endif %}
       </div>
       <div>
@@ -77,7 +78,7 @@
       </div>
 
       <div>
-        <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+        <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email <span class="text-slate-400">(opcional)</span></label>
         {{ form.email }}
         {% if form.email.errors %}<p class="mt-1 text-xs text-red-600">El email ya existe.</p>{% endif %}
       </div>
@@ -197,7 +198,7 @@
       var errores = [];
       if (nombre && (!nombre.value.trim() || !esNombre(nombre.value))) { errores.push('nombre'); marcarError(nombre); }
       if (dni && (!dni.value.trim() || !esDNI(dni.value.trim()))) { errores.push('DNI'); marcarError(dni); }
-      if (email && (!email.value.trim() || !esEmail(email.value.trim()))) { errores.push('email'); marcarError(email); }
+      if (email && email.value.trim() && !esEmail(email.value.trim())) { errores.push('email'); marcarError(email); }
       if (rol && !rol.value) { errores.push('rol'); marcarError(rol); }
       if (fecha && fecha.value && !esFecha(fecha.value)) { errores.push('fecha'); marcarError(fecha); }
       if (t1 && t1.value.trim() && !esTel(t1.value.trim())) { errores.push('teléfono'); marcarError(t1); }

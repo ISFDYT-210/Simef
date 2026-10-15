@@ -13,6 +13,8 @@ validador_telefono = RegexValidator(
     'El teléfono debe tener exactamente 10 dígitos (código de área + número, sin espacios ni guiones). Ej: 2211234567'
 )
 
+validador_dni = RegexValidator(r'^[0-9]+$', 'El DNI solo puede tener números.')
+
 # Alfabeto sin caracteres ambiguos (0/O, 1/l/I) para que una contraseña
 # generada se pueda transcribir a mano sin errores.
 _ALFABETO_PASSWORD = string.ascii_uppercase.replace('O', '').replace('I', '') + \
@@ -47,28 +49,38 @@ CAPACIDADES_POR_ROL = {
 
 class UsuarioManager(BaseUserManager):
 
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError('Los usuarios deben tener una dirección de email')
-        user = self.model(email=self.normalize_email(email), **extra_fields)
+    def create_user(self, dni, password=None, **extra_fields):
+        if not dni:
+            raise ValueError('Los usuarios deben tener un DNI')
+        email = extra_fields.get('email')
+        if email:
+            extra_fields['email'] = self.normalize_email(email)
+        user = self.model(dni=dni, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(self, dni, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_admin', True)
-        return self.create_user(email, password, **extra_fields)
+        return self.create_user(dni, password, **extra_fields)
 
 
 class Usuario(AbstractBaseUser, PermissionsMixin):
 
-    email = models.EmailField('email', max_length=254, unique=True)
+    # Opcional: a diferencia del dni, no es el identificador de login. null=True
+    # (y no solo blank=True) para que varias cuentas sin email no choquen contra
+    # el unique (Postgres permite múltiples NULL en una columna unique; con
+    # cadenas vacías '' violaría la restricción).
+    email = models.EmailField('email', max_length=254, unique=True, null=True, blank=True)
     username = models.CharField('username', unique=True, null=True, max_length=100, blank=False)
     nombre_completo = models.CharField('nombre_completo', max_length=200, null=True, blank=True)
     fecha_nac = models.DateField('fecha_nac', null=True, blank=True)
-    dni = models.IntegerField('dni', unique=True, null=True, blank=True)
+    # Identificador de login (ver USERNAME_FIELD). Obligatorio y, por convención
+    # de los formularios de edición (no a nivel de base), no se puede modificar
+    # una vez creada la cuenta.
+    dni = models.CharField('dni', max_length=15, unique=True, validators=[validador_dni])
     direccion = models.CharField('direccion', max_length=50, null=True, blank=True)
     localidad = models.CharField('localidad', max_length=50, null=True, blank=True)
     ciudad = models.CharField('ciudad', max_length=100, null=True, blank=True)
@@ -108,11 +120,11 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     objects = UsuarioManager()
 
-    USERNAME_FIELD = 'email'
+    USERNAME_FIELD = 'dni'
     REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.nombre_completo or self.email
+        return self.nombre_completo or self.dni
 
     # === Identidad por rol ===================================================
     def es_estudiante(self):
@@ -245,12 +257,12 @@ def duracion_bloqueo_login(request):
     la duración ya fijada; recién cuando no hay uno vigente se arranca un
     episodio nuevo y ahí sí sube de nivel.
     """
-    email = (request.POST.get('username') or '').strip() if request else ''
+    dni = (request.POST.get('username') or '').strip() if request else ''
     duracion_default = timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_BASE)
-    if not email:
+    if not dni:
         return duracion_default
 
-    usuario = Usuario.objects.filter(email__iexact=email).first()
+    usuario = Usuario.objects.filter(dni=dni).first()
     if not usuario:
         return duracion_default
 
@@ -601,7 +613,7 @@ class RegistroAuditoria(models.Model):
         verbose_name_plural = 'Registros de auditoría'
 
     def __str__(self):
-        quien = self.usuario.email if self.usuario else 'Sistema'
+        quien = (self.usuario.nombre_completo or self.usuario.dni) if self.usuario else 'Sistema'
         return f"[{self.fecha:%Y-%m-%d %H:%M}] {quien}: {self.accion}"
 
 

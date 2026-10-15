@@ -42,12 +42,6 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
             <tr class="hover:bg-slate-50">
-              <td class="px-4 py-2 font-medium text-tinta-900">Correo electrónico</td>
-              <td class="px-4 py-2"><span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Sí</span></td>
-              <td class="px-4 py-2 text-slate-500">juan.perez@email.com</td>
-              <td class="px-4 py-2 text-slate-500">Debe ser único en el sistema</td>
-            </tr>
-            <tr class="hover:bg-slate-50">
               <td class="px-4 py-2 font-medium text-tinta-900">Nombre estudiante</td>
               <td class="px-4 py-2"><span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Sí</span></td>
               <td class="px-4 py-2 text-slate-500">Juan Pérez</td>
@@ -57,7 +51,13 @@
               <td class="px-4 py-2 font-medium text-tinta-900">Documento estudiante</td>
               <td class="px-4 py-2"><span class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Sí</span></td>
               <td class="px-4 py-2 text-slate-500">12345678</td>
-              <td class="px-4 py-2 text-slate-500">Solo números, debe ser único</td>
+              <td class="px-4 py-2 text-slate-500">Solo números, debe ser único. Es el usuario de inicio de sesión y no se puede modificar después</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2 font-medium text-tinta-900">Correo electrónico</td>
+              <td class="px-4 py-2"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No</span></td>
+              <td class="px-4 py-2 text-slate-500">juan.perez@email.com</td>
+              <td class="px-4 py-2 text-slate-500">Si se especifica, debe ser único en el sistema</td>
             </tr>
             <tr class="hover:bg-slate-50">
               <td class="px-4 py-2 font-medium text-tinta-900">Username</td>
@@ -179,9 +179,8 @@
   <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
     <p class="font-semibold">Notas importantes</p>
     <ul class="mt-1 list-inside list-disc space-y-0.5">
-      <li>Los usuarios se crean con la contraseña predeterminada <strong>12345678</strong>, que deberán cambiar en su primer inicio de sesión.</li>
-      <li>Se recomienda que la cambien en el primer acceso.</li>
-      <li>Los emails y DNI deben ser únicos en el sistema.</li>
+      <li>Cada usuario se crea con una contraseña aleatoria distinta, que se muestra una sola vez al terminar la carga (no se vuelve a mostrar). Deberán cambiarla en su primer inicio de sesión.</li>
+      <li>El DNI es el usuario para iniciar sesión: debe ser único y no se puede modificar después. El email, si se completa, también debe ser único.</li>
       <li>Las carreras deben estar creadas previamente.</li>
       <li>Para estudiantes, se usa el DNI como matrícula por defecto.</li>
       <li>Si el email o DNI ya existe, no se crea un usuario nuevo, pero igual se le carga la Materia/Nota/Carrera de esa fila si las trae: sirve para cargar notas de alumnos que ya están en el sistema con el mismo archivo.</li>

@@ -1,6 +1,6 @@
 {% extends 'base/base.html' %}
 {% block title %}Perfil de usuario{% endblock %}
-{% block encabezado %}Perfil de {{ object.email }}{% endblock %}
+{% block encabezado %}Perfil de {{ object.nombre_completo|default:object.dni }}{% endblock %}
 {% block content %}
 <div class="mx-auto max-w-3xl">
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -12,7 +12,7 @@
       {% endif %}
       <div class="min-w-0">
         <h2 class="truncate text-xl font-bold text-white">{{ object.nombre_completo|default:"Sin nombre cargado" }}</h2>
-        <p class="truncate text-sm text-tinta-300">{{ object.email }}</p>
+        <p class="truncate text-sm text-tinta-300">DNI {{ object.dni }}{% if object.email %} · {{ object.email }}{% endif %}</p>
         <span class="mt-2 inline-block rounded-full bg-celeste-500/20 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-celeste-400">{{ object.get_rol_display }}</span>
       </div>
     </div>

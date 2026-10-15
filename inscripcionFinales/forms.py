@@ -74,8 +74,8 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 class registri_user_form(UserCreationForm):
-    email = forms.EmailField(required=True)
-    dni = forms.CharField(max_length=15, validators=[validador])
+    email = forms.EmailField(required=False, label="Email")
+    dni = forms.CharField(max_length=15, required=True, validators=[validador], label="DNI")
     
     password1 = None
     password2 = None
@@ -175,6 +175,12 @@ class registri_user_form(UserCreationForm):
         # NO tocamos password1/password2 (no existen en este form)
         return cleaned_data
 
+    def clean_email(self):
+        # El email es opcional y el campo del modelo es null=True (no solo
+        # blank=True) para que varias cuentas sin email no choquen contra el
+        # unique: '' sí chocaría, None no.
+        return self.cleaned_data.get('email') or None
+
     def _post_clean(self):
         # Evitamos la validación de password1/password2 de UserCreationForm,
         # porque este formulario usa un solo campo 'password'.
@@ -257,12 +263,13 @@ Sistema Educativo
             usuario.save()
             if self.cleaned_data.get('carrera'):
                 usuario.carrera.set([self.cleaned_data['carrera']])
-            self.enviar_credenciales_email(usuario, self.password_generado)
+            if usuario.email:
+                self.enviar_credenciales_email(usuario, self.password_generado)
 
         return usuario
 
 
-class profile_students_form(forms.ModelForm):   
+class profile_students_form(forms.ModelForm):
     class Meta:
         model = Usuario
         fields = (
@@ -270,6 +277,7 @@ class profile_students_form(forms.ModelForm):
             'nombre_completo',
             'fecha_nac',
             'dni',
+            'email',
             'direccion',
             'localidad',
             'ciudad',
@@ -279,16 +287,20 @@ class profile_students_form(forms.ModelForm):
             'estado_civil',
             'sexo',
         )
-    
-    dni = forms.CharField(max_length=15, validators=[validador], required=False)
+
+    # El DNI es el identificador de login: no se puede modificar una vez
+    # creada la cuenta. disabled=True hace que Django ignore lo que venga en
+    # el POST y use siempre el valor actual de la instancia.
+    dni = forms.CharField(max_length=15, disabled=True, required=True, label="DNI",
+                           help_text="No se puede modificar.")
+    email = forms.EmailField(required=False, label="Email")
     telefono_1 = forms.CharField(max_length=10, validators=[validador_telefono], required=False)
     telefono_2 = forms.CharField(max_length=10, validators=[validador_telefono], required=False)
 
-    def clean_dni(self):
-        # dni es IntegerField en el modelo; sin esto, guardar '' revienta en
-        # la base (int('') no existe) apenas se permite dejarlo vacío.
-        dni = self.cleaned_data.get('dni')
-        return int(dni) if dni else None
+    def clean_email(self):
+        # Opcional: '' chocaría contra el unique del modelo (el campo es
+        # null=True justamente para permitir varias cuentas sin email).
+        return self.cleaned_data.get('email') or None
 
     def __init__(self, *args, puede_editar_rol=False, **kwargs):
         super().__init__(*args, **kwargs)

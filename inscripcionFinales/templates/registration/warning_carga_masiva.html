@@ -24,11 +24,11 @@
         <strong>Contraseñas generadas (anotalas ahora, no se van a volver a mostrar):</strong>
         <table class="table table-sm table-bordered mt-2">
             <thead>
-                <tr><th>Email</th><th>Contraseña</th></tr>
+                <tr><th>DNI (usuario)</th><th>Email</th><th>Contraseña</th></tr>
             </thead>
             <tbody>
                 {% for credencial in credenciales_generadas %}
-                <tr><td>{{ credencial.email }}</td><td><code>{{ credencial.password }}</code></td></tr>
+                <tr><td>{{ credencial.dni }}</td><td>{{ credencial.email|default:"—" }}</td><td><code>{{ credencial.password }}</code></td></tr>
                 {% endfor %}
             </tbody>
         </table>
