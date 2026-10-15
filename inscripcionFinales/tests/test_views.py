@@ -832,6 +832,15 @@ class BlanquearPasswordTest(TestCase):
         self.alumno.refresh_from_db()
         self.assertTrue(self.alumno.first_login)
 
+    def test_la_contrasena_nueva_se_muestra_en_la_misma_pantalla(self):
+        """No redirige: la contraseña generada se ve ahí mismo, una sola vez."""
+        self.client.force_login(self.directivo)
+        response = self.client.post(f'/blanquear_password/{self.alumno.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.check_password(response.context['password_nueva']))
+        self.assertContains(response, response.context['password_nueva'])
+
     def test_secretario_puede_blanquear(self):
         self.client.force_login(self.secretario)
         self.client.post(f'/blanquear_password/{self.alumno.id}/')

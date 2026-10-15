@@ -1902,8 +1902,11 @@ def blanquear_password(request, usuario_id):
         usuario.save()
         identificador = usuario.nombre_completo or usuario.dni
         registrar_auditoria(request, f'Blanqueó la contraseña de {identificador}', 'Usuario', usuario.pk)
-        messages.success(request, f'Se blanqueó la contraseña de {identificador}. Ahora es "{password_nueva}" y deberá cambiarla en su próximo inicio de sesión.')
-        return redirect('list_user')
+        # Se muestra en esta misma pantalla (no se redirige): es la única vez
+        # que esta contraseña va a estar visible en algún lado.
+        return render(request, 'registration/blanquear_password.html', {
+            'usuario': usuario, 'password_nueva': password_nueva,
+        })
     return render(request, 'registration/blanquear_password.html', {'usuario': usuario})
 
 @capacidad_requerida('gestionar_mesas')
