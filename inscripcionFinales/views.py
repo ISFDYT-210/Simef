@@ -22,7 +22,7 @@ from django.urls import reverse_lazy
 from django.core.paginator import *
 from django.db import IntegrityError,models
 from django.utils import timezone
-from django.contrib.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
+from django.contrib.auth.views import PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from django.views.decorators.csrf import csrf_protect
 from math import *
 from json import *
@@ -44,7 +44,7 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 
 # Agregar estos imports específicos para el primer login
-from django.contrib.auth.forms import SetPasswordForm  # ← Nuevo
+from django.contrib.auth.forms import SetPasswordForm, PasswordResetForm  # ← Nuevo
 from django.contrib.auth import login    
 
 #from weasyprint import HTML, CSS
@@ -2416,10 +2416,33 @@ def obtener_contexto_reporte(usuario):
 
 
 # ========== RECUPERACIÓN DE CONTRASEÑA ==========
-class CustomPasswordResetView(PasswordResetView):
-    template_name = 'registration/password_reset_form.html'
-    email_template_name = 'registration/password_reset_email.html'
-    success_url = reverse_lazy('password_reset_done')
+def recuperar_password(request):
+    """
+    El login es por DNI (no por email, ver CustomLoginView), así que acá
+    también se pide el DNI en vez de un email. Si esa cuenta tiene un email
+    cargado, se dispara el mismo flujo de siempre (link con token de un solo
+    uso, vía PasswordResetForm). Si no tiene email, o el DNI no existe, no se
+    manda nada - pero se muestra exactamente la misma pantalla de éxito en
+    los tres casos, para no revelar qué DNIs están registrados ni cuáles
+    tienen email. Quien no tenga email cargado tiene que pedirle a
+    Preceptoría/Secretaría que le blanquee la contraseña (ver
+    blanquear_password).
+    """
+    if request.method == 'POST':
+        dni = (request.POST.get('dni') or '').strip()
+        usuario = Usuario.objects.filter(dni=dni).exclude(email__isnull=True).exclude(email='').first()
+        if usuario:
+            form = PasswordResetForm(data={'email': usuario.email})
+            if form.is_valid():
+                form.save(
+                    request=request,
+                    use_https=request.is_secure(),
+                    email_template_name='registration/password_reset_email.html',
+                    html_email_template_name='registration/password_reset_email_html.html',
+                    extra_email_context={'nombre_completo': usuario.nombre_completo},
+                )
+        return redirect('password_reset_done')
+    return render(request, 'registration/recuperar_pass.html')
 
 class CustomPasswordResetDoneView(PasswordResetDoneView):
     template_name = 'registration/password_reset_done.html'
