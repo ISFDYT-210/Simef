@@ -4,7 +4,7 @@ from django.urls import path, include
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import views as auth_views
 from .views import *
-from .views import CustomPasswordResetView, CustomPasswordResetDoneView, CustomPasswordResetConfirmView, CustomPasswordResetCompleteView
+from .views import CustomPasswordResetDoneView, CustomPasswordResetConfirmView, CustomPasswordResetCompleteView
 
 
 
@@ -14,8 +14,7 @@ urlpatterns = [
     path('accounts/login/', CustomLoginView.as_view(), name='login'),
     path('accounts/logout/', CustomLogoutView.as_view(), name='logout'),
     path("accounts/", include("django.contrib.auth.urls")),
-    path("recuperar_pass/",auth_views.PasswordResetView.as_view(template_name="registration/recuperar_pass.html"),name='Recuperar Contraseña'),
-    path("password_reset_done/", auth_views.PasswordResetDoneView.as_view(template_name="registration/password_reset_send.html"), name='password_reset_done'),
+    path("recuperar_pass/", recuperar_password, name='recuperar_password'),
     path("create_user/",login_required(registerView.as_view(template_name= 'registration/register.html')), name='register'),
     path("career/", login_required(carreraView.as_view(template_name= 'carrera.html')), name='carrera'),
     path('lista_carreras/', lista_carreras, name='lista_carreras'),
@@ -31,11 +30,9 @@ urlpatterns = [
     path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),
     path('blanquear_password/<int:usuario_id>/', login_required(blanquear_password), name='blanquear_password'),
     path("show_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/show_user.html')), name='show_user'),
-    path('password_reset/',auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html',email_template_name='registration/password_reset_email.html',success_url='/password_reset/done/'),name='password_reset'),
     path('password_reset/done/', CustomPasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', CustomPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', CustomPasswordResetCompleteView.as_view(), name='password_reset_complete'),
-    path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='registration/password_reset_confirm.html'), name='password_reset_confirm'),
 path('reporte/<int:usuario_id>', reporte_estudiante_descarga, name='reporte_estudiante'),
 
     #Alta e Inscripcion materias

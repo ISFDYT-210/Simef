@@ -9,18 +9,17 @@
   <h1 class="text-lg font-semibold text-tinta-900">Recuperar contraseña</h1>
 </div>
 
-{% if form.errors %}
-<div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-  Ingresá un email válido para continuar.
-</div>
-{% endif %}
+<p class="mb-4 text-center text-sm text-slate-500">
+  Ingresá tu DNI: si tenés un email cargado, te vamos a mandar un link para elegir una contraseña nueva.
+</p>
 
-<form action="{% url 'password_reset' %}" method="post" class="space-y-4">
+<form method="post" class="space-y-4">
   {% csrf_token %}
 
   <div>
-    <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
-    <input type="email" name="email" id="id_email" autocomplete="email" autofocus required
+    <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
+    <input type="text" name="dni" id="id_dni" inputmode="numeric" autocomplete="username"
+           placeholder="Sin puntos ni espacios" autofocus required
            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
   </div>
 

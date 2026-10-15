@@ -11,6 +11,7 @@ Correr con:
 """
 from datetime import timedelta
 
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase
@@ -1150,3 +1151,52 @@ class LogoutTest(TestCase):
         respuesta = self.client.get('/accounts/logout/')
         self.assertEqual(respuesta.status_code, 405)
         self.assertIn('_auth_user_id', self.client.session)
+
+
+class RecuperarPasswordPorDniTest(TestCase):
+    """
+    El login es por DNI, no por email (ver CustomLoginView), así que acá
+    también se pide el DNI. La respuesta tiene que ser idéntica exista o no
+    la cuenta, y tenga o no email cargado, para no revelar esos datos.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.con_email = crear_usuario('recuperar_con_mail@test.com', 'Estudiante', 'Con Email', 70)
+        cls.sin_email = Usuario.objects.create(
+            username='recuperar_sin_mail', nombre_completo='Sin Email', rol='Estudiante', dni=71,
+        )
+
+    def test_get_muestra_el_formulario_pidiendo_dni(self):
+        respuesta = self.client.get('/recuperar_pass/')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'DNI')
+
+    def test_dni_con_email_manda_el_correo_de_reseteo(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '70'})
+        self.assertRedirects(respuesta, '/password_reset/done/')
+        self.assertEqual(len(mail.outbox), 1)
+        enviado = mail.outbox[0]
+        self.assertEqual(enviado.to, ['recuperar_con_mail@test.com'])
+        self.assertEqual(enviado.subject, 'Recuperar tu contraseña - SIMEF')
+        self.assertIn('Con Email', enviado.body)  # nombre_completo en el contexto del mail
+        # multipart/alternative: versión HTML además de la de texto plano
+        self.assertEqual(len(enviado.alternatives), 1)
+        html, mimetype = enviado.alternatives[0]
+        self.assertEqual(mimetype, 'text/html')
+        self.assertIn('Elegir nueva contraseña', html)
+
+    def test_dni_sin_email_no_manda_nada_pero_misma_respuesta(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '71'})
+        self.assertRedirects(respuesta, '/password_reset/done/')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_dni_inexistente_no_manda_nada_pero_misma_respuesta(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '000000'})
+        self.assertRedirects(respuesta, '/password_reset/done/')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_el_link_del_correo_usa_el_token_de_django(self):
+        self.client.post('/recuperar_pass/', {'dni': '70'})
+        cuerpo = mail.outbox[0].body
+        self.assertIn('/reset/', cuerpo)
