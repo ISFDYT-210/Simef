@@ -726,7 +726,7 @@ class ApiListaUsuariosTest(TestCase):
         self.client.force_login(self.directivo)
         datos = self.client.get(self.url, {'q': '71'}).json()
         dnis = {r['dni'] for r in datos['results']}
-        self.assertIn(71, dnis)
+        self.assertIn('71', dnis)
 
     def test_busqueda_por_email(self):
         self.client.force_login(self.directivo)
@@ -748,21 +748,21 @@ class ApiListaUsuariosTest(TestCase):
 class EditUserCambioDeRolTest(TestCase):
     """
     El Directivo puede cambiar el rol de un usuario sin tocar sus datos
-    personales, incluso si a ese usuario le faltan dni/teléfonos (antes el
-    form se los exigía igual y bloqueaba el cambio).
+    personales, incluso si a ese usuario le faltan teléfonos u otros datos
+    opcionales (antes el form se los exigía igual y bloqueaba el cambio).
+    El DNI es el identificador de login: el form lo ignora pase lo que
+    pase en el POST (ver profile_students_form, campo disabled=True).
     """
 
     @classmethod
     def setUpTestData(cls):
         cls.directivo = crear_usuario('dir_rol@test.com', 'Directivo', 'Directiva', 80)
         cls.profesor = crear_usuario('prof_rol@test.com', 'Profesor', 'Profesor Incompleto', 81)
-        cls.profesor.dni = None
-        cls.profesor.save()
 
     def datos_formulario(self, usuario, **overrides):
         datos = {
             'username': usuario.username, 'nombre_completo': usuario.nombre_completo,
-            'fecha_nac': '', 'dni': '', 'direccion': '', 'localidad': '', 'ciudad': '',
+            'fecha_nac': '', 'dni': usuario.dni, 'direccion': '', 'localidad': '', 'ciudad': '',
             'nacionalidad': '', 'telefono_1': '', 'telefono_2': '', 'estado_civil': '', 'sexo': '',
         }
         datos.update(overrides)
@@ -778,7 +778,17 @@ class EditUserCambioDeRolTest(TestCase):
         self.profesor.refresh_from_db()
         self.assertEqual(self.profesor.rol, 'Preceptor')
         self.assertEqual(self.profesor.nombre_completo, 'Profesor Incompleto')
-        self.assertIsNone(self.profesor.dni)
+        self.assertEqual(self.profesor.dni, '81')
+
+    def test_el_dni_no_se_puede_modificar_desde_el_form(self):
+        """Aunque el POST mande otro DNI, el campo disabled lo ignora."""
+        self.client.force_login(self.directivo)
+        self.client.post(
+            f'/edit_user/{self.profesor.id}',
+            self.datos_formulario(self.profesor, dni='99999999'),
+        )
+        self.profesor.refresh_from_db()
+        self.assertEqual(self.profesor.dni, '81')
 
     def test_secretario_tambien_puede_cambiar_el_rol(self):
         """Secretario comparte el resto de la matriz con Directivo; esto ya no era la excepción."""
@@ -1030,7 +1040,7 @@ class LoginThrottlingTest(TestCase):
         cls.usuario.save()
 
     def _intentar(self, password):
-        return self.client.post('/accounts/login/', {'username': 'axes@test.com', 'password': password})
+        return self.client.post('/accounts/login/', {'username': '70', 'password': password})
 
     def test_intentos_fallidos_por_debajo_del_limite_no_bloquean(self):
         from django.conf import settings
@@ -1057,7 +1067,7 @@ class LoginThrottlingTest(TestCase):
         for _ in range(settings.AXES_FAILURE_LIMIT):
             self._intentar('mal')  # agota el límite de axes@test.com
 
-        respuesta = self.client.post('/accounts/login/', {'username': 'axes_otro@test.com', 'password': 'otra-contraseña'})
+        respuesta = self.client.post('/accounts/login/', {'username': '71', 'password': 'otra-contraseña'})
         self.assertIn('_auth_user_id', self.client.session)
 
 

@@ -125,7 +125,7 @@ class registerView(CapacidadRequeridaMixin, CreateView):
     form_class = registri_user_form
     
     def form_valid(self, form):
-        usuario_email = form.cleaned_data.get('email')
+        usuario_dni = form.cleaned_data.get('dni')
         password_generado = form.password_generado
 
         form.instance.first_login = True
@@ -133,9 +133,9 @@ class registerView(CapacidadRequeridaMixin, CreateView):
 
         messages.success(
             self.request,
-            f'Usuario {usuario_email} creado correctamente. Contraseña: {password_generado}'
+            f'Usuario con DNI {usuario_dni} creado correctamente. Contraseña: {password_generado}'
         )
-        registrar_auditoria(self.request, f'Creó el usuario {usuario_email}', 'Usuario', form.instance.pk)
+        registrar_auditoria(self.request, f'Creó el usuario con DNI {usuario_dni}', 'Usuario', form.instance.pk)
         return redirect('/user_list')
     
 
@@ -916,36 +916,42 @@ def cargar_usuarios(request):
                 usuarios_duplicados = 0
                 notas_cargadas = 0
                 errores = []
-                # Email -> contraseña generada, para mostrarla una sola vez en
+                # DNI -> contraseña generada, para mostrarla una sola vez en
                 # la pantalla de resultado (no queda guardada en ningún lado).
                 credenciales_generadas = []
 
-                # Validar encabezados requeridos
-                campos_requeridos = ['Correo electrónico', 'Nombre estudiante', 'Documento estudiante']
+                # Validar encabezados requeridos. El email quedó opcional (el
+                # login es por DNI), por eso no está en esta lista.
+                campos_requeridos = ['Nombre estudiante', 'Documento estudiante']
                 if not all(campo in reader.fieldnames for campo in campos_requeridos):
                     messages.error(request, f'El archivo debe contener las columnas: {", ".join(campos_requeridos)}')
                     return render(request, 'registration/cargar_usuarios.html', {'formulario': formulario})
-                
+
                 for numero_fila, fila in enumerate(reader, start=2):
                     try:
                         # Campos obligatorios
                         email = fila.get('Correo electrónico', '').strip()
                         nombre_completo = fila.get('Nombre estudiante', '').strip()
                         dni_str = fila.get('Documento estudiante', '').strip()
-                        
+
                         # Validaciones básicas
-                        if not email or not nombre_completo or not dni_str:
-                            errores.append(f'Fila {numero_fila}: Campos obligatorios faltantes (email, nombre o DNI)')
+                        if not nombre_completo or not dni_str:
+                            errores.append(f'Fila {numero_fila}: Campos obligatorios faltantes (nombre o DNI)')
                             continue
-                        
-                        # Validar email
-                        from django.core.validators import validate_email
-                        try:
-                            validate_email(email)
-                        except:
-                            errores.append(f'Fila {numero_fila}: Email inválido ({email})')
-                            continue
-                        
+
+                        # Validar email (opcional). '' -> None: el campo del
+                        # modelo es null=True+unique para permitir varias
+                        # cuentas sin email sin chocar entre sí.
+                        if email:
+                            from django.core.validators import validate_email
+                            try:
+                                validate_email(email)
+                            except:
+                                errores.append(f'Fila {numero_fila}: Email inválido ({email})')
+                                continue
+                        else:
+                            email = None
+
                         # Validar y convertir DNI
                         try:
                             dni = int(dni_str)
@@ -954,12 +960,15 @@ def cargar_usuarios(request):
                         except ValueError:
                             errores.append(f'Fila {numero_fila}: DNI inválido ({dni_str})')
                             continue
-                        
+
                         # Si el usuario ya existe no se recrea, pero igual se le
                         # carga la materia/nota (y se le suma la carrera) si la
                         # fila las trae: así no hace falta un CSV aparte para
                         # cargar notas de alumnos que ya están en el sistema.
-                        usuario_existente = Usuario.objects.filter(Q(email=email) | Q(dni=dni)).first()
+                        duplicado_query = Q(dni=dni)
+                        if email:
+                            duplicado_query |= Q(email=email)
+                        usuario_existente = Usuario.objects.filter(duplicado_query).first()
                         if usuario_existente:
                             usuarios_duplicados += 1
                             carrera_para_notas = None
@@ -1162,7 +1171,7 @@ def cargar_usuarios(request):
                         if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
                             notas_cargadas += 1
 
-                        credenciales_generadas.append({'email': email, 'password': password})
+                        credenciales_generadas.append({'dni': dni, 'email': email, 'password': password})
                         usuarios_creados += 1
                         
                     except IntegrityError as e:
@@ -1868,8 +1877,8 @@ def eliminar_usuarios(request):
         if len(usuarios_ids) > 0:
             try:
                 # Eliminar los usuarios seleccionados
-                emails = list(Usuario.objects.filter(id__in=usuarios_ids).values_list('email', flat=True))
-                registrar_auditoria(request, f'Eliminó usuarios: {", ".join(emails)}', 'Usuario', ",".join(usuarios_ids))
+                dnis = list(Usuario.objects.filter(id__in=usuarios_ids).values_list('dni', flat=True))
+                registrar_auditoria(request, f'Eliminó usuarios (DNI): {", ".join(dnis)}', 'Usuario', ",".join(usuarios_ids))
                 usuarios_eliminados = Usuario.objects.filter(id__in=usuarios_ids)
                 cantidad_eliminadas = usuarios_eliminados.count()
                 usuarios_eliminados.delete()
@@ -1891,8 +1900,9 @@ def blanquear_password(request, usuario_id):
         usuario.set_password(password_nueva)
         usuario.first_login = True
         usuario.save()
-        registrar_auditoria(request, f'Blanqueó la contraseña de {usuario.email}', 'Usuario', usuario.pk)
-        messages.success(request, f'Se blanqueó la contraseña de {usuario.nombre_completo or usuario.email}. Ahora es "{password_nueva}" y deberá cambiarla en su próximo inicio de sesión.')
+        identificador = usuario.nombre_completo or usuario.dni
+        registrar_auditoria(request, f'Blanqueó la contraseña de {identificador}', 'Usuario', usuario.pk)
+        messages.success(request, f'Se blanqueó la contraseña de {identificador}. Ahora es "{password_nueva}" y deberá cambiarla en su próximo inicio de sesión.')
         return redirect('list_user')
     return render(request, 'registration/blanquear_password.html', {'usuario': usuario})
 

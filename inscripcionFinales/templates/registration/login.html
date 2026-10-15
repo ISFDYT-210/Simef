@@ -239,7 +239,7 @@
       <circle cx="12" cy="12" r="10" fill="#dc2626"/>
       <path d="M15 9l-6 6m0-6l6 6" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
     </svg>
-    <span>El email o la contraseña son incorrectos. Intentá nuevamente.</span>
+    <span>El DNI o la contraseña son incorrectos. Intentá nuevamente.</span>
   </div>
   {% endif %}
 
@@ -247,31 +247,31 @@
         x-data="{
           mostrar: false,
           errorPass: false,
-          errorEmail: false,
-          emailErrorMsg: '',
-          validarEmail() {
+          errorDni: false,
+          dniErrorMsg: '',
+          validarDni() {
             let v = this.$el.elements.username.value.trim();
             if (v === '') {
-              this.errorEmail = true;
-              this.emailErrorMsg = 'Ingresá tu email para continuar.';
-            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
-              this.errorEmail = true;
-              this.emailErrorMsg = 'Ingresá un email válido.';
+              this.errorDni = true;
+              this.dniErrorMsg = 'Ingresá tu DNI para continuar.';
+            } else if (!/^[0-9]+$/.test(v)) {
+              this.errorDni = true;
+              this.dniErrorMsg = 'El DNI solo puede tener números.';
             } else {
-              this.errorEmail = false;
-              this.emailErrorMsg = '';
+              this.errorDni = false;
+              this.dniErrorMsg = '';
             }
           },
           submitForm(event) {
-            this.validarEmail();
+            this.validarDni();
             if (!this.$el.elements.password.value.trim()) {
               this.errorPass = true;
             } else {
               this.errorPass = false;
             }
-            if (this.errorEmail || this.errorPass) {
+            if (this.errorDni || this.errorPass) {
               event.preventDefault();
-              if (this.errorEmail) {
+              if (this.errorDni) {
                 this.$el.elements.username.focus();
               } else {
                 this.$el.elements.password.focus();
@@ -284,12 +284,13 @@
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
     <div class="login-field">
-      <label for="id_username">Email</label>
+      <label for="id_username">DNI</label>
       <input type="text" name="username" id="id_username" autofocus
+             inputmode="numeric" autocomplete="username" placeholder="Sin puntos ni espacios"
              class="login-input"
-             :class="{ 'login-input-error': errorEmail }"
-             @input="validarEmail()">
-      <span class="login-error-msg" x-show="errorEmail" x-cloak x-text="emailErrorMsg"></span>
+             :class="{ 'login-input-error': errorDni }"
+             @input="validarDni()">
+      <span class="login-error-msg" x-show="errorDni" x-cloak x-text="dniErrorMsg"></span>
     </div>
 
     <div class="login-field">

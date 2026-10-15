@@ -52,9 +52,16 @@
       <div>
         <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
         {{ form.dni }}
+        <p class="mt-1 text-xs text-slate-400">No se puede modificar.</p>
         {% if form.dni.errors %}<p class="mt-1 text-xs text-red-600">{{ form.dni.errors|striptags }}</p>{% endif %}
       </div>
       {% endif %}
+
+      <div>
+        <label for="id_email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}<p class="mt-1 text-xs text-red-600">{{ form.email.errors|striptags }}</p>{% endif %}
+      </div>
 
       <div>
         <label for="retroll_fecha_nac" class="mb-1 block text-sm font-medium text-slate-700">Fecha de nacimiento</label>
@@ -133,8 +140,8 @@
       if (visible && djangoFecha.value) visible.value = djangoFecha.value;
     }
 
-    // ── Validaciones en vivo: solo números en DNI y teléfonos ──
-    ['id_dni', 'id_telefono_1', 'id_telefono_2'].forEach(function (id) {
+    // ── Validaciones en vivo: solo números en teléfonos (el DNI no se edita) ──
+    ['id_telefono_1', 'id_telefono_2'].forEach(function (id) {
       var f = document.getElementById(id);
       if (f) f.addEventListener('input', function () { this.value = this.value.replace(/[^0-9]/g, ''); });
     });
@@ -143,12 +150,10 @@
     var form = document.getElementById('editUserForm');
     form.addEventListener('submit', function (e) {
       var errores = false;
-      var dni = document.getElementById('id_dni');
       var t1 = document.getElementById('id_telefono_1');
       var t2 = document.getElementById('id_telefono_2');
       var user = document.getElementById('id_username');
       var nombre = document.getElementById('id_nombre_completo');
-      if (dni && dni.value && (dni.value.trim().length < 7 || dni.value.trim().length > 8)) { alert('El DNI debe tener entre 7 y 8 dígitos.'); errores = true; }
       if (t1 && t1.value && t1.value.trim().length !== 10) { alert('El teléfono debe tener exactamente 10 dígitos.'); errores = true; }
       if (t2 && t2.value && t2.value.trim().length !== 10) { alert('El celular debe tener exactamente 10 dígitos.'); errores = true; }
       if (user && user.value && user.value.trim().length < 3) { alert('El nombre de usuario debe tener al menos 3 caracteres.'); errores = true; }

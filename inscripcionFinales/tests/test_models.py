@@ -190,11 +190,11 @@ class DuracionBloqueoLoginTest(TestCase):
     def setUpTestData(cls):
         cls.usuario = Usuario.objects.create(
             email='bloqueo@test.com', username='bloqueo', nombre_completo='Bloqueo Test',
-            rol='Estudiante', dni=80,
+            rol='Estudiante', dni='80',
         )
 
     def _request(self):
-        return RequestFactory().post('/accounts/login/', {'username': 'bloqueo@test.com', 'password': 'x'})
+        return RequestFactory().post('/accounts/login/', {'username': '80', 'password': 'x'})
 
     def test_primer_bloqueo_dura_el_minimo_base(self):
         duracion = duracion_bloqueo_login(self._request())
@@ -227,5 +227,5 @@ class DuracionBloqueoLoginTest(TestCase):
         self.assertEqual(duracion, timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_TOPE))
 
     def test_cuenta_inexistente_usa_el_minimo_base(self):
-        request = RequestFactory().post('/accounts/login/', {'username': 'no-existe@test.com', 'password': 'x'})
+        request = RequestFactory().post('/accounts/login/', {'username': '99999999', 'password': 'x'})
         self.assertEqual(duracion_bloqueo_login(request), timedelta(minutes=BLOQUEO_LOGIN_MINUTOS_BASE))
