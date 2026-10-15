@@ -1,38 +1,31 @@
 {% extends 'base/base.html' %}
-
-{% block title %}Registro de usuario{% endblock %}
-
+{% block title %}Informe de usuarios por materia{% endblock %}
+{% block encabezado %}Informe de usuarios por materia{% endblock %}
 {% block content %}
-
-
-    <h1>Informe de Usuarios Materia</h1>
-    
-    <table border="1">
-        <tr>
-            <th>Materia</th>
-            <th>Usuario</th>
-            <th>Nota de Cursada</th>
-            <th>Nota Final</th>
-            <th>Aprobada</th>
-            <th>Modalidad</th>
-            <th>Ciclo Lectivo</th>
-            <th>Puede Inscribirse</th>
+<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+  <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-sm font-semibold text-tinta-900">Informe de usuarios por materia</h2></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400"><th class="px-5 py-3 font-semibold">Materia</th><th class="px-5 py-3 font-semibold">Usuario</th><th class="px-5 py-3 font-semibold">Nota cursada</th><th class="px-5 py-3 font-semibold">Nota final</th><th class="px-5 py-3 font-semibold">Aprobada</th><th class="px-5 py-3 font-semibold">Modalidad</th><th class="px-5 py-3 font-semibold">Ciclo lectivo</th><th class="px-5 py-3 font-semibold">Puede inscribirse</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for um in usuarios_materia_data %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-5 py-3 font-medium text-tinta-900">{{ um.materia }}</td>
+          <td class="px-5 py-3">{{ um.usuario }}</td>
+          <td class="px-5 py-3">{{ um.nota_cursada|default:"—" }}</td>
+          <td class="px-5 py-3">{{ um.nota_final|default:"—" }}</td>
+          <td class="px-5 py-3">{% if um.aprobada %}<span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Sí</span>{% else %}<span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">No</span>{% endif %}</td>
+          <td class="px-5 py-3">{{ um.modalidad|default:"—" }}</td>
+          <td class="px-5 py-3">{{ um.ciclo_lectivo|default:"—" }}</td>
+          <td class="px-5 py-3">{% if um.puede_inscribirse_en_mesa_final %}<span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Sí</span>{% else %}<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">No</span>{% endif %}</td>
         </tr>
-    
-        {% for usuario_materia in usuarios_materia_data %}
-        <tr>
-            <td>{{ usuario_materia.materia }}</td>
-            <td>{{ usuario_materia.usuario }}</td>
-            <td>{{ usuario_materia.nota_cursada }}</td>
-            <td>{{ usuario_materia.nota_final }}</td>
-            <td>{{ usuario_materia.aprobada }}</td>
-            <td>{{ usuario_materia.modalidad }}</td>
-            <td>{{ usuario_materia.ciclo_lectivo }}</td>
-            <td>{{ usuario_materia.puede_inscribirse_en_mesa_final }}</td>
-        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="px-5 py-10 text-center text-sm text-slate-500">No hay registros.</td></tr>
         {% endfor %}
+      </tbody>
     </table>
-    
-   
-
+  </div>
+</div>
 {% endblock %}

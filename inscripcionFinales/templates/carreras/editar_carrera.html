@@ -1,0 +1,29 @@
+{% extends 'base/base.html' %}
+{% block title %}Editar carrera{% endblock %}
+{% block encabezado %}Editar carrera{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-xl">
+  <div id="formCard" class="rounded-2xl border border-slate-200 bg-white p-6">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Guardar</button>
+        <a href="{% url 'lista_carreras' %}" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const base = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100';
+    document.querySelectorAll('#formCard input, #formCard select, #formCard textarea').forEach(el => {
+      if (['checkbox','radio','submit','button','hidden'].includes(el.type)) return;
+      el.className = base;
+    });
+    document.querySelectorAll('#formCard label').forEach(l => l.className = 'mb-1 block text-sm font-medium text-slate-700');
+    document.querySelectorAll('#formCard form > p').forEach(p => p.className = 'mb-4');
+  });
+</script>
+{% endblock %}

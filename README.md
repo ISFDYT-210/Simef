@@ -1,420 +1,165 @@
-# Proyecto Gestión de Inscripciones a Final - Instituto 210
+<div align="center">
 
-## Proyecto de articulación de materias de la carrera  
-**Tecnicatura Superior en Análisis de Sistemas**
+<img src="inscripcionFinales/static/imagenes/SIMEF.png" alt="SIMEF" width="140">
+
+# SIMEF
+
+**Sistema de inscripción a mesas de examen final del ISFDyT N.º 210**
+
+Inscripciones a cursadas y finales, actas, notas y constancias, con las reglas
+académicas del instituto aplicadas en el servidor.
+
+[![CI](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml)
+![Django 5.2 LTS](https://img.shields.io/badge/Django-5.2_LTS-0C4B33?logo=django&logoColor=white)
+![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
+![Vercel](https://img.shields.io/badge/deploy-Vercel-000000?logo=vercel&logoColor=white)
+
+[Qué hace](#qué-hace) · [Cómo funciona](#cómo-funciona) · [Levantarlo](#levantarlo-en-tu-máquina) · [Documentación](#documentación) · [Contribuir](#cómo-contribuir) · [Seguridad](#seguridad-y-datos-personales)
+
+</div>
 
 ---
 
-## Descripción
+## Qué hace
 
-Este proyecto corresponde al sistema de **Gestión de Inscripciones a Mesas de Examen Final** del **Instituto 210**.
+SIMEF reemplaza las planillas y las inscripciones en papel del instituto. Cada rol
+ve solo lo que le corresponde:
 
-Su objetivo es facilitar la administración de inscripciones, el acceso de usuarios y la gestión interna mediante un panel de administración (*backoffice*).
+| Rol | Puede |
+|---|---|
+| **Estudiante** | Inscribirse a cursadas y a mesas de final. Ver por qué no puede rendir una materia: correlativas, nota de cursada, oportunidades agotadas o mesa cerrada. Descargar su constancia académica en PDF. |
+| **Preceptor** | Crear y habilitar mesas, con tribunal, aula y sede. Consultar la nómina de inscriptos, generar el acta volante y transcribir los resultados del acta: nota o Ausente, número de acta y folio. |
+| **Profesor** | Cargar las notas de sus materias y ver los reportes de sus alumnos. |
+| **Secretario** y **Directivo** | Administrar usuarios (alta individual o carga masiva), carreras y materias, abrir y cerrar inscripciones, y ver reportes. Dirección consulta además el registro de auditoría. |
 
----
+**Reglas que el sistema hace cumplir, no solo muestra:**
+- correlativas y nota mínima de cursada;
+- plazo de inscripción de cada mesa;
+- una sola inscripción por mesa, sin cancelación por parte del estudiante;
+- un **máximo de tres oportunidades** por materia, en las que Ausente cuenta como una;
+- superposición de horarios al cursar.
 
-## Requisitos previos
+## En números
 
-Antes de comenzar, asegurate de tener instalado en tu sistema:
+Cifras medidas sobre `develop`, no objetivos:
 
-- Python 3
-- `pip`
-- `venv`
-- Git
+| | |
+|---|---|
+| Tests automatizados | **172**, con PostgreSQL en cada PR |
+| Dependencias con vulnerabilidades conocidas | **0** (`pip-audit` frena el PR si aparece una) |
+| Avisos de `manage.py check --deploy` | **0** con `DEBUG=False` |
+| Controles obligatorios para llegar a `main` | **4**: lint, tests, checklist de despliegue y build de Docker |
+| Dependencia de servicios externos para los PDF | **ninguna**: la constancia y el listado de mesas se generan dentro del sistema |
 
-En GNU/Linux Debian podés instalarlos con:
+## Cómo funciona
 
-```bash
-sudo apt update
-sudo apt install -y git python3 python3-pip python3-venv
+El circuito de un final, de punta a punta:
+
+```mermaid
+flowchart LR
+    P1["Preceptor<br/>crea y habilita la mesa"] --> E["Estudiante<br/>se inscribe"]
+    E -->|"SIMEF valida correlativas,<br/>plazo y oportunidades"| N["Preceptor<br/>consulta la nómina"]
+    N --> A["Acta volante"]
+    A --> F["Presidente de mesa<br/>firma el acta en papel"]
+    F --> R["Preceptor<br/>transcribe los resultados"]
+    R --> H["SIMEF conserva el resultado<br/>y actualiza las oportunidades"]
 ```
 
----
+La firma del acta y el libro de actas son procedimientos en papel, fuera de SIMEF.
+El sistema registra lo que el preceptor transcribe del acta firmada.
 
-## Instalación en GNU/Linux Debian
+**Arquitectura:**
 
-### 1. Clonar el repositorio
-
-Podés clonar el proyecto usando **SSH** o **HTTPS**.
-
-#### Usando SSH
-
-```bash
-git clone git@github.com:ISFDYT-210/Simef.git
+```mermaid
+flowchart LR
+    U["Navegador"] -->|HTTPS| V["Vercel<br/>Django 5.2 + WhiteNoise"]
+    V --> N[("Neon<br/>PostgreSQL")]
+    G["GitHub<br/>main protegida"] -->|"cada merge a main"| V
+    CI["GitHub Actions<br/>lint · tests · checklist ·<br/>pip-audit · Docker"] -.->|"obligatorio antes del merge"| G
 ```
 
-#### Usando HTTPS
+| Pieza | Para qué |
+|---|---|
+| Django 5.2 LTS | Aplicación, reglas académicas y permisos por rol |
+| PostgreSQL en Neon | Base de datos. Producción y vistas previas usan ramas separadas |
+| Vercel | Publica `main` en producción y arma una vista previa de cada PR |
+| WhiteNoise | Sirve los estáticos con nombres con hash y compresión |
+| reportlab | Genera la constancia y los listados en PDF |
+| django-axes | Límite de intentos de inicio de sesión, con bloqueo progresivo |
+| Tailwind CSS + Alpine.js | Interfaz |
+
+## Levantarlo en tu máquina
+
+Con Docker no hace falta instalar Python ni PostgreSQL:
 
 ```bash
 git clone https://github.com/ISFDYT-210/Simef.git
-```
-
----
-
-### 2. Ingresar al directorio del proyecto
-
-```bash
 cd Simef
+cat .env.example > .env          # trae DEBUG=True para desarrollo; ver docs/ENV.md
+docker compose up -d --build
 ```
 
----
+La app queda en **http://localhost:8000**. El entorno local usa su propia base, así
+que la del instituto no se toca. Para probar con una copia de los datos reales,
+seguí [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md).
 
-### 3. Crear el entorno virtual
+Sin Docker (Linux o Windows, con `venv`): [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md).
+
+**Correr los tests:**
 
 ```bash
-python3 -m venv env
+docker compose exec web python manage.py test --settings=gestionInstituto.settings_TEST
 ```
+
+## Documentación
+
+| Para | Documento |
+|---|---|
+| Levantar el proyecto con Docker | [docs/DOCKER.md](docs/DOCKER.md) |
+| Instalarlo sin Docker (Linux y Windows) | [docs/INSTALACION_MANUAL.md](docs/INSTALACION_MANUAL.md) |
+| Entender cada variable del `.env` | [docs/ENV.md](docs/ENV.md) |
+| Copiar los datos de producción a tu base local | [docs/COPIA_DATOS.md](docs/COPIA_DATOS.md) |
+| Cómo entra un cambio: ramas y Pull Requests | [docs/GITFLOW.md](docs/GITFLOW.md) |
+| Cargar tarjetas de trabajo al tablero | [docs/TARJETAS_GH.md](docs/TARJETAS_GH.md) |
+| Operar producción: publicar, migrar, respaldar, volver atrás | [docs/MOP.md](docs/MOP.md) |
+| Cómo funciona producción en Vercel | [docs/PRODUCCION_VERCEL.md](docs/PRODUCCION_VERCEL.md) |
+| Alternativa: un servidor Debian propio | [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) |
+| Compilar el CSS de Tailwind | [docs/tailwind.md](docs/tailwind.md) |
+| Historial de cambios de los sprints anteriores | [docs/INFORME_MODIFICACIONES.md](docs/INFORME_MODIFICACIONES.md) |
+
+## Cómo contribuir
+
+1. Tomá una tarjeta del [tablero](https://github.com/orgs/ISFDYT-210/projects/1), o creá
+   una con el prefijo del sprint (por ejemplo `SP3-BACK: …`).
+2. Creá una rama desde `develop` (`feature/…`, `fix/…`, `docs/…`).
+3. Abrí un Pull Request hacia `develop`. El CI tiene que quedar en verde, y la
+   vista previa de Vercel del PR sirve para probarlo funcionando.
+4. A `main`, que es producción, solo se llega con un PR desde `develop` y con todos
+   los controles en verde.
+
+Detalle completo en [docs/GITFLOW.md](docs/GITFLOW.md).
+
+## Seguridad y datos personales
+
+SIMEF guarda datos personales de estudiantes, protegidos por la Ley 25.326 de
+Protección de Datos Personales. Por eso:
+
+- **No se suben credenciales al repositorio.** El `.env` está ignorado, y el repo
+  tiene activados el escaneo de secretos y la protección contra pushes que los
+  incluyan.
+- **No se usan datos reales fuera de producción,** salvo en la copia local de
+  desarrollo, que no se comparte.
+- **Si encontrás una vulnerabilidad, no abras un issue público:** avisale en privado
+  a un integrante del equipo, para que se corrija antes de que se conozca.
 
 ---
 
-### 4. Activar el entorno virtual
+<div align="center">
 
-```bash
-source env/bin/activate
-```
+Proyecto de **Prácticas Profesionalizantes** de la Tecnicatura Superior en Análisis
+de Sistemas · ISFDyT N.º 210 · 2026
 
----
+[Contribuidores](https://github.com/ISFDYT-210/Simef/graphs/contributors)
 
-### 5. Instalar las dependencias
-
-```bash
-pip3 install -r requirements.txt
-```
-
----
-
-### 6. Configurar el archivo de settings
-
-Ingresar a la carpeta principal del proyecto Django:
-
-```bash
-cd gestionInstituto
-```
-
-Copiar el archivo de configuración de desarrollo:
-
-```bash
-cp settings_DEV.py settings.py
-```
-
----
-
-### 7. Ejecutar las migraciones
-
-```bash
-cd ..
-python manage.py migrate
-```
-
----
-
-### 8. Crear un usuario administrador
-
-Para acceder al panel de administración (*backoffice*), es necesario crear un usuario con permisos de superusuario:
-
-```bash
-python manage.py createsuperuser
-```
-
----
-
-### 9. Ejecutar el servidor de desarrollo
-
-```bash
-python manage.py runserver
-```
-
----
-
-## Acceso al sistema
-
-### Panel de administración (Backoffice)
-
-Una vez iniciado el servidor, podés acceder al panel de administración desde:
-
-```text
-http://127.0.0.1:8000/admin
-```
-
----
-
-### Pantalla de login
-
-Para ingresar al sistema desde el navegador:
-
-```text
-http://127.0.0.1:8000/
-```
-
----
-
-## Redirección luego del login
-
-Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista `inicio`, agregá la siguiente línea en el archivo `settings.py`:
-
-```python
-LOGIN_REDIRECT_URL = 'inicio'
-```
-
----
-
-## Notas
-
-- Este entorno está pensado para **desarrollo local**.
-- Para un entorno de **producción**, se recomienda:
-  - usar variables de entorno para datos sensibles,
-  - configurar `DEBUG = False`,
-  - definir `ALLOWED_HOSTS`,
-  - utilizar un servidor como **Gunicorn** o **uWSGI** detrás de **Nginx** o **Apache**.
-
----
-## Instalación en Windows
-
-### Requisitos previos
-
-Antes de comenzar, asegurate de tener instalado en tu sistema:
-
-- **Python 3**
-- **Git**
-
-> **Importante:** durante la instalación de Python en Windows, marcá la opción  
-> **“Add Python to PATH”** antes de hacer clic en **Install Now**.
-
----
-
-### 1. Clonar el repositorio
-
-Podés clonar el proyecto usando **Git Bash**, **PowerShell** o **Símbolo del sistema (CMD)**.
-
-#### Usando HTTPS
-
-```powershell
-git clone https://github.com/ISFDYT-210/Simef.git
-```
-
-#### Usando SSH (si ya tenés tu clave configurada)
-
-```powershell
-git clone git@github.com:ISFDYT-210/Simef.git
-```
-
----
-
-### 2. Ingresar al directorio del proyecto
-
-```powershell
-cd Simef
-```
-
----
-
-### 3. Crear el entorno virtual
-
-```powershell
-python -m venv env
-```
-
-> Si `python` no funciona, probá con:
-
-```powershell
-py -m venv env
-```
-
----
-
-### 4. Activar el entorno virtual
-
-#### En PowerShell
-
-```powershell
-.\env\Scripts\Activate.ps1
-```
-
-#### En CMD
-
-```cmd
-env\Scripts\activate.bat
-```
-
-#### En Git Bash
-
-```bash
-source env/Scripts/activate
-```
-
----
-
-### 5. Instalar las dependencias
-
-```powershell
-pip install -r requirements.txt
-```
-
-> Si `pip` no responde correctamente, podés usar:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-o
-
-```powershell
-py -m pip install -r requirements.txt
-```
-
----
-
-### 6. Configurar el archivo de settings
-
-Ingresar a la carpeta principal del proyecto Django:
-
-```powershell
-cd gestionInstituto
-```
-
-Copiar el archivo de configuración de desarrollo:
-
-#### En PowerShell
-
-```powershell
-Copy-Item settings_DEV.py settings.py
-```
-
-#### En CMD
-
-```cmd
-copy settings_DEV.py settings.py
-```
-
----
-
-### 7. Ejecutar las migraciones
-
-```powershell
-python manage.py migrate
-```
-
-> Si fuera necesario:
-
-```powershell
-py manage.py migrate
-```
-
----
-
-### 8. Crear un usuario administrador
-
-Para acceder al panel de administración (*backoffice*), es necesario crear un usuario con permisos de superusuario:
-
-```powershell
-python manage.py createsuperuser
-```
-
----
-
-### 9. Ejecutar el servidor de desarrollo
-
-```powershell
-python manage.py runserver
-```
-
----
-
-## Acceso al sistema
-
-### Panel de administración (Backoffice)
-
-Una vez iniciado el servidor, podés acceder al panel de administración desde:
-
-```text
-http://127.0.0.1:8000/admin
-```
-
----
-
-### Pantalla de login
-
-Para ingresar al sistema desde el navegador:
-
-```text
-http://127.0.0.1:8000/
-```
-
----
-
-## Redirección luego del login
-
-Si querés que, luego de iniciar sesión, el usuario sea redirigido a la vista `inicio`, agregá la siguiente línea en el archivo `settings.py`:
-
-```python
-LOGIN_REDIRECT_URL = 'inicio'
-```
-
----
-
-## Problemas comunes en Windows
-
-### Error GTK
-
-En sistemas windows es necesario instalar el software GTK. El siguiente link los deriva al archivo .exe que se debe bajar : (https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe)
-
-### Error de ejecución de scripts en PowerShell
-
-Si PowerShell bloquea la activación del entorno virtual, ejecutá:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-Luego cerrá y abrí nuevamente PowerShell, y volvé a activar el entorno:
-
-```powershell
-.\env\Scripts\Activate.ps1
-```
-
----
-
-### Python no reconocido como comando
-
-Si aparece un error como:
-
-```text
-'python' no se reconoce como un comando interno o externo
-```
-
-probá con:
-
-```powershell
-py
-```
-
-Si tampoco funciona, reinstalá Python y asegurate de marcar:
-
-- **Add Python to PATH**
-
----
-
-### Error al instalar dependencias con pip
-
-Actualizá `pip` con:
-
-```powershell
-python -m pip install --upgrade pip
-```
-
-o
-
-```powershell
-py -m pip install --upgrade pip
-```
-
----
-
-## Notas
-
-- Este entorno está pensado para **desarrollo local**.
-- Para un entorno de **producción**, se recomienda:
-  - usar variables de entorno para datos sensibles,
-  - configurar `DEBUG = False`,
-  - definir `ALLOWED_HOSTS`,
-  - utilizar un servidor como **Gunicorn** o **uWSGI** detrás de **Nginx** o **Apache**.
+</div>
