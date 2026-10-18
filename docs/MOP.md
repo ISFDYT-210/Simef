@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Estado | **Borrador.** Faltan los responsables de la sección 2 (pendiente P-04 del decision log) y la comprobación de QA de la sección 8. |
-| Versión del documento | 0.1 · 14/10/2026 |
+| Versión del documento | 0.2 · 18/10/2026 |
 | Coordina | Backend, con Frontend y el responsable del entorno |
 | Comprueba | QA, ejecutando cada procedimiento (sección 8) |
 | Revisa los límites | Análisis Funcional (sección 7) |
@@ -348,6 +348,48 @@ de publicación.
 instituto evalúa qué corresponde hacer según la Ley 25.326 de Protección de Datos
 Personales.
 
+### OP-11 · Cargar una base de prueba con datos sintéticos
+
+**Cuándo:** para las pruebas de QA, sobre todo las negativas y las de seguridad, que
+no se hacen con datos reales de estudiantes.
+**Ejecuta:** responsable de la base. **Valida:** QA.
+
+1. En la consola de Neon, crear una rama nueva **sin datos**: la opción *Schema only*
+   copia la estructura de producción sin ninguna fila. Nunca sobre `main` ni sobre
+   `preview`.
+2. Copiar su cadena de conexión a una variable solo para esta terminal, sin
+   guardarla en el `.env` ni en el repositorio.
+3. Cargar el instituto ficticio:
+
+   ```bash
+   docker run --rm -v "$PWD":/app:ro -w /app -e DEBUG=True -e DATABASE_URL \
+     --entrypoint python simef-web manage.py generar_datos_sinteticos
+   ```
+
+   El comando se niega a correr si la base ya tiene usuarios. Así nunca se mezcla
+   con datos reales.
+4. Guardar las contraseñas que muestra al final en el gestor de contraseñas del
+   equipo. No se vuelven a mostrar y no van en tarjetas ni en el chat.
+
+**Qué trae:**
+- un usuario de cada rol;
+- una carrera con correlativas;
+- tres llamados ya rendidos con acta y folio, una mesa abierta y otra sin habilitar;
+- seis estudiantes, uno por situación:
+  - recién inscripta;
+  - habilitado para rendir;
+  - con una oportunidad restante, donde el Ausente cuenta;
+  - con las tres agotadas;
+  - con el final aprobado y la correlativa disponible;
+  - recursando.
+
+**Cómo se verifica:** con cada cuenta de estudiante, la pantalla de finales muestra
+lo que dice su caso. Por ejemplo, el estudiante con las tres oportunidades usadas ve
+el motivo y no puede inscribirse.
+
+**Si falla:** el comando no deja nada a medias: o carga todo o no carga nada. Se
+corrige la causa y se vuelve a correr sobre la misma rama vacía.
+
 ---
 
 ## 7. Límites de responsabilidad
@@ -382,9 +424,11 @@ comprobación registrada.*
 | OP-07 Rotar | | | | |
 | OP-08 Habilitar el admin | | | | |
 | OP-09 Desbloquear o blanquear | | | | |
+| OP-11 Datos sintéticos | 18/10/2026 | Backend | base de tests | Comando probado con tests automáticos; se niega sobre una base con usuarios. Falta cargar la rama de Neon y la comprobación de QA. |
 
 ## 9. Historial
 
 | Versión | Fecha | Cambios |
 |---|---|---|
 | 0.1 | 14/10/2026 | Primera versión: destino, configuración, controles y procedimientos OP-01 a OP-10. Faltan los responsables y la comprobación de QA. |
+| 0.2 | 18/10/2026 | OP-11: base de prueba con datos sintéticos. |
