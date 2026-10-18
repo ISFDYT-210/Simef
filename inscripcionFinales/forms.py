@@ -1,4 +1,5 @@
 import csv
+import logging
 from django.shortcuts import render
 from django.http import HttpResponse
 from django import forms
@@ -8,6 +9,8 @@ from django.core.validators import RegexValidator
 #from django.forms import ModelForm, CustomPasswordChangeForm
 from .models import *
 from django.utils.crypto import get_random_string
+
+logger = logging.getLogger(__name__)
 
 validador= RegexValidator(r'^[0-9]*$','Solo se permiten números')
 
@@ -230,16 +233,14 @@ Sistema Educativo
                 fail_silently=False,
             )
             
-            print(f"[OK] Credenciales enviadas exitosamente a {usuario.email}")
-            print(f"   [EMAIL] Email: {usuario.email}")
-            print(f"   [PASS] Password: {password}")
+            logger.info('Credenciales enviadas por email a la cuenta %s', usuario.pk)
             return True
-            
-        except Exception as e:
-            print(f"[ERROR] Error enviando email a {usuario.email}: {str(e)}")
-            # Mostrar las credenciales en consola como fallback
-            print(f"   [EMAIL] Email: {usuario.email}")
-            print(f"   [PASS] Password: {password}")
+
+        except Exception:
+            # Nunca registrar la contraseña ni el email: los logs del servidor
+            # los ve cualquiera con acceso al panel. La contraseña ya se le
+            # mostró a quien dio de alta la cuenta.
+            logger.exception('No se pudo enviar el email de credenciales a la cuenta %s', usuario.pk)
             return False
 
     def save(self, commit=True):
