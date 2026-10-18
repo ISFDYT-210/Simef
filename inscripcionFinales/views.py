@@ -1025,9 +1025,12 @@ def cargar_usuarios(request):
                             sexo = 'F'
                         
                         # Rol (por defecto Estudiante)
+                        # Se valida contra los roles reales del modelo, sin
+                        # importar mayúsculas: 'PRECEPTOR' se guarda como 'Preceptor'.
                         rol = fila.get('Rol', '').strip() or 'Estudiante'
-                        roles_validos = ['Estudiante', 'Profesor', 'Directivo', 'Preceptor', 'Administrador', 'Bibliotecario']
-                        if rol not in roles_validos:
+                        roles_validos = [valor for valor, _ in Usuario.ROL_CHOICES]
+                        rol = next((r for r in roles_validos if r.lower() == rol.lower()), None)
+                        if rol is None:
                             errores.append(f'Fila {numero_fila}: Rol inválido. Opciones: {", ".join(roles_validos)}')
                             continue
                         
