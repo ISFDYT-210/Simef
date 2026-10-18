@@ -15,7 +15,7 @@ from datetime import datetime
 from django.test import TestCase
 from django.utils import timezone
 
-from inscripcionFinales.forms import MesaFinalForm, profile_students_form
+from inscripcionFinales.forms import MesaFinalForm, profile_students_form, registri_user_form
 from inscripcionFinales.models import (
     Carrera, Materia, MateriaCorrelativa, MesaFinal, Usuario, usuarios_materia,
 )
@@ -244,3 +244,38 @@ class ProfileStudentsFormTest(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         guardado = form.save()
         self.assertIsNone(guardado.email)
+
+
+class CredencialesFueraDeLosLogsTest(TestCase):
+    """
+    El alta de un usuario escribía su email y su contraseña en los logs del
+    servidor, que en Vercel ve cualquiera con acceso al panel (#183).
+    """
+
+    PASSWORD = 'Clave-De-Prueba-123'
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create(dni='4500', email='alta@test.com', nombre_completo='Alta Nueva')
+        self.form = registri_user_form()
+
+    def enviar_y_capturar(self):
+        import contextlib
+        import io
+        salida = io.StringIO()
+        with self.assertLogs('inscripcionFinales.forms', level='DEBUG') as logs, contextlib.redirect_stdout(salida):
+            enviado = self.form.enviar_credenciales_email(self.usuario, self.PASSWORD)
+        return enviado, salida.getvalue() + '\n'.join(logs.output)
+
+    def test_envio_correcto_no_deja_la_contrasena_ni_el_email(self):
+        enviado, registrado = self.enviar_y_capturar()
+        self.assertTrue(enviado)
+        self.assertNotIn(self.PASSWORD, registrado)
+        self.assertNotIn(self.usuario.email, registrado)
+
+    def test_envio_fallido_no_deja_la_contrasena_ni_el_email(self):
+        from unittest import mock
+        with mock.patch('inscripcionFinales.forms.send_mail', side_effect=OSError('sin SMTP')):
+            enviado, registrado = self.enviar_y_capturar()
+        self.assertFalse(enviado)
+        self.assertNotIn(self.PASSWORD, registrado)
+        self.assertNotIn(self.usuario.email, registrado)

@@ -526,7 +526,6 @@ def alta_materia(request):
           
     else:
         form = MateriaForm()
-        print(form)
     return render(request, 'materias/alta_materia.html', {'form': form})
 
 
@@ -2242,11 +2241,11 @@ def imprimir_mesas_finales_pdf(request):
         
         return response
         
-    except Exception as e:
-        # En caso de error, retornar mensaje descriptivo
-        error_msg = f"Error al generar el PDF: {str(e)}"
-        print(error_msg)  # Para logs de Vercel
-        return HttpResponse(error_msg, status=500)
+    except Exception:
+        # El detalle va al log del servidor; al usuario no se le muestra la
+        # excepción, que puede traer rutas o datos internos.
+        logger.exception('No se pudo generar el PDF de mesas de finales')
+        return HttpResponse('No se pudo generar el PDF. Probá de nuevo más tarde.', status=500)
     
     
 def render_to_pdf(template_src, context_dict={}):
