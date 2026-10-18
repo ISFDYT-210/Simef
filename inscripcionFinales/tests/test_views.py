@@ -1018,6 +1018,53 @@ class CargarUsuariosConNotaTest(TestCase):
         self.assertIn('Materia no encontrada', response.content.decode())
 
 
+    def test_rol_en_mayusculas_se_guarda_en_su_forma_canonica(self):
+        self.client.force_login(self.directivo)
+        contenido = (
+            "Correo electrónico,Nombre estudiante,Documento estudiante,Rol\n"
+            "prece@test.com,Preceptora Nueva,4321,PRECEPTOR\n"
+            "secre@test.com,Secretario Nuevo,4322,secretario\n"
+        )
+        self.client.post('/cargaMasivaEstudiantes/', {'csv_file': self.csv_file(contenido)})
+
+        self.assertEqual(Usuario.objects.get(dni=4321).rol, 'Preceptor')
+        self.assertEqual(Usuario.objects.get(dni=4322).rol, 'Secretario')
+
+    def test_rol_que_no_existe_en_el_sistema_se_rechaza(self):
+        # Antes se aceptaba 'Bibliotecario': la cuenta quedaba sin ningún permiso.
+        self.client.force_login(self.directivo)
+        contenido = (
+            "Correo electrónico,Nombre estudiante,Documento estudiante,Rol\n"
+            "biblio@test.com,Bibliotecaria,4323,Bibliotecario\n"
+        )
+        response = self.client.post('/cargaMasivaEstudiantes/', {'csv_file': self.csv_file(contenido)})
+
+        self.assertFalse(Usuario.objects.filter(dni=4323).exists())
+        self.assertIn('Rol inválido', response.content.decode())
+
+
+class RolesCanonicosMigracionTest(TestCase):
+    """La migración 0022 lleva cada rol a la forma que usa CAPACIDADES_POR_ROL (P-12)."""
+
+    def test_normaliza_mayusculas_y_deja_lo_desconocido(self):
+        from importlib import import_module
+        from django.apps import apps as apps_actuales
+
+        prece = crear_usuario('p@test.com', 'PRECEPTOR', 'Preceptora', 4401)
+        prof = crear_usuario('q@test.com', 'profesor', 'Profesor', 4402)
+        raro = crear_usuario('r@test.com', 'Otro', 'Sin Rol', 4403)
+
+        migracion = import_module('inscripcionFinales.migrations.0022_roles_canonicos')
+        migracion.normalizar_roles(apps_actuales, None)
+
+        prece.refresh_from_db()
+        prof.refresh_from_db()
+        raro.refresh_from_db()
+        self.assertEqual(prece.rol, 'Preceptor')
+        self.assertTrue(prece.puede_gestionar_mesas())
+        self.assertEqual(prof.rol, 'Profesor')
+        self.assertEqual(raro.rol, 'Otro')
+
 class ConstanciaPdfTest(TestCase):
     """
     La constancia se genera dentro del sistema (#130, SEC-08). Antes se mandaba
