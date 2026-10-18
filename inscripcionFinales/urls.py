@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import views as auth_views
+from django.views.generic import RedirectView
 from .views import *
 from .views import CustomPasswordResetDoneView, CustomPasswordResetConfirmView, CustomPasswordResetCompleteView
 
@@ -13,6 +14,12 @@ urlpatterns = [
     path('', HomePageView.as_view(), name= 'inicio'),
     path('accounts/login/', CustomLoginView.as_view(), name='login'),
     path('accounts/logout/', CustomLogoutView.as_view(), name='logout'),
+    # Estas tres vistas de django.contrib.auth no tienen plantilla propia y
+    # usan la del admin, que falla con el admin apagado (producción). El
+    # sistema tiene las suyas: se redirige a ellas.
+    path('accounts/password_reset/', RedirectView.as_view(pattern_name='recuperar_password')),
+    path('accounts/password_change/', login_required(RedirectView.as_view(url='/change_password/'))),
+    path('accounts/password_change/done/', login_required(RedirectView.as_view(url='/change_password_done/'))),
     path("accounts/", include("django.contrib.auth.urls")),
     path("recuperar_pass/", recuperar_password, name='recuperar_password'),
     path("create_user/",login_required(registerView.as_view(template_name= 'registration/register.html')), name='register'),

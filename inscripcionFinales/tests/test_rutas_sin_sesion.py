@@ -32,6 +32,10 @@ RUTAS_PUBLICAS = {
     'reset/done/': 'Aviso de contraseña cambiada',
 }
 
+# Con ADMIN_HABILITADO apagado (producción y CI), /admin es esta ruta, que
+# redirige al inicio (ver gestionInstituto/urls.py).
+RUTA_ADMIN_APAGADO = '^admin(/.*)?$'
+
 # Valor de ejemplo para cada tipo de parámetro de las rutas.
 VALORES_DE_EJEMPLO = {
     'int': '1',
@@ -53,6 +57,8 @@ def _rutas(patrones=None, prefijo=''):
             yield from _rutas(patron.url_patterns, prefijo + str(patron.pattern))
         elif isinstance(patron, URLPattern):
             ruta = prefijo + str(patron.pattern)
+            if ruta == RUTA_ADMIN_APAGADO:
+                continue  # se prueba aparte, en test_admin_pide_login
             if not isinstance(patron.pattern, RoutePattern):
                 raise AssertionError(
                     f'La ruta {ruta!r} usa una expresión regular; '
@@ -102,8 +108,17 @@ class RutasSinSesionTest(TestCase):
                     self.assertLess(respuesta.status_code, 500, url)
 
     def test_admin_pide_login(self):
-        # Con el admin habilitado (desarrollo y tests) manda a su propio login;
-        # en producción ni existe: redirige al inicio (ver test_settings.py).
+        # Con el admin habilitado (desarrollo) manda a su propio login; con el
+        # admin apagado (producción y CI) redirige al inicio.
         respuesta = self.client.get('/admin/')
         self.assertEqual(respuesta.status_code, 302)
-        self.assertIn('/admin/login/', respuesta.url)
+        if settings.ADMIN_HABILITADO:
+            self.assertIn('/admin/login/', respuesta.url)
+        else:
+            self.assertEqual(respuesta.url, '/')
+
+    def test_recuperar_contrasena_de_django_lleva_a_la_del_sistema(self):
+        # La vista de Django usa la plantilla del admin y fallaba con el admin
+        # apagado; ahora redirige a la recuperación por DNI.
+        respuesta = self.client.get('/accounts/password_reset/')
+        self.assertRedirects(respuesta, '/recuperar_pass/')
