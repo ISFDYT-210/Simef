@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Estado | **Borrador.** Faltan los responsables de la sección 2 (pendiente P-04 del decision log) y la comprobación de QA de la sección 8. |
-| Versión del documento | 0.2 · 18/10/2026 |
+| Versión del documento | 0.3 · 18/10/2026 |
 | Coordina | Backend, con Frontend y el responsable del entorno |
 | Comprueba | QA, ejecutando cada procedimiento (sección 8) |
 | Revisa los límites | Análisis Funcional (sección 7) |
@@ -69,8 +69,10 @@ Para operar hace falta:
   - `DATABASE_URL`: la cadena de la rama principal de Neon (producción);
   - `PREVIEW_DATABASE_URL`: la cadena de la rama `preview`.
 
-  Las dos se copian desde la consola de Neon, con **Connect** y eligiendo la rama en
-  el selector *Branch*.
+  Las dos son del dueño de la base y se copian desde la consola de Neon, con
+  **Connect** y eligiendo la rama en el selector *Branch*. OP-12 agrega al `.env`
+  `APP_DATABASE_URL` y `PREVIEW_APP_DATABASE_URL`, las cadenas del usuario acotado
+  de la app, que son las que van en Vercel.
 
 ## 4. Configuración
 
@@ -85,7 +87,7 @@ vuelve a generar o se copia de Neon.
 | `SECRET_KEY` | **Secret** | clave propia, de 50 caracteres o más | otra clave, distinta de la de Production |
 | `ALLOWED_HOSTS` | Config | los dos dominios del instituto | `.vercel.app` |
 | `CSRF_TRUSTED_ORIGINS` | Config | los dos dominios, con `https://` | `https://*.vercel.app` |
-| `DATABASE_URL` | **Secret** | rama principal de Neon | rama `preview` de Neon |
+| `DATABASE_URL` | **Secret** | rama principal de Neon, con el usuario `simef_app` (OP-12) | rama `preview` de Neon, con el usuario `simef_app` |
 | `EMAIL_HOST_USER`, `EMAIL_PORT` (`587`) | Config | cuenta de correo del sistema | igual |
 | `EMAIL_HOST_PASSWORD` | **Secret** | contraseña de aplicación del correo | igual |
 | `ADMIN_HABILITADO` | Config | **no definirla** (ver OP-08) | no definirla |
@@ -390,6 +392,40 @@ el motivo y no puede inscribirse.
 **Si falla:** el comando no deja nada a medias: o carga todo o no carga nada. Se
 corrige la causa y se vuelve a correr sobre la misma rama vacía.
 
+### OP-12 · Crear o renovar el usuario de base de la app
+
+**Cuándo:** una vez por rama, y cada vez que haya que cambiar su contraseña: por
+rotación (OP-07) o porque se expuso.
+**Ejecuta:** responsable de la base. **Valida:** responsable de publicación.
+
+La app no se conecta como dueña de la base, sino con `simef_app`. Ese usuario puede
+leer y escribir datos, pero no crear, modificar ni borrar tablas, así que una falla en
+la app no puede cambiar la estructura de la base (SEC-05). Las migraciones siguen
+corriendo con el dueño (OP-03).
+
+```bash
+./scripts/crear_rol_app.sh preview      # rama preview
+./scripts/crear_rol_app.sh produccion   # base del instituto
+```
+
+El script:
+1. Crea el usuario, o le pone una contraseña nueva si ya existe.
+2. Le da permisos solo sobre los datos y deja esos permisos por defecto para las
+   tablas de futuras migraciones.
+3. Se conecta como `simef_app` y comprueba que lee pero no puede crear tablas.
+4. Guarda la cadena en el `.env` como `PREVIEW_APP_DATABASE_URL` o
+   `APP_DATABASE_URL`, sin mostrarla.
+
+Después, en Vercel, se pega esa cadena en `DATABASE_URL` del entorno que corresponde
+y se redeploya. En producción, el cambio se hace el día de la salida, después de
+aplicar las migraciones.
+
+**Cómo se verifica:** la app inicia sesión y guarda cambios. En los logs de Vercel no
+aparece `permission denied`.
+
+**Si falla:** volver a poner en Vercel la cadena del dueño y redeployar. Copiar el
+error, sin cadenas de conexión, y revisar los permisos con el responsable de la base.
+
 ---
 
 ## 7. Límites de responsabilidad
@@ -424,6 +460,7 @@ comprobación registrada.*
 | OP-07 Rotar | | | | |
 | OP-08 Habilitar el admin | | | | |
 | OP-09 Desbloquear o blanquear | | | | |
+| OP-12 Usuario de la app (`preview`) | 18/10/2026 | Backend | rama `preview` | Usuario creado: lee, escribe sesiones, intentos de axes y usuarios dentro de una transacción revertida, y no puede crear tablas. Falta producción y el cambio en Vercel. |
 | OP-11 Datos sintéticos | 18/10/2026 | Backend | base de tests | Comando probado con tests automáticos; se niega sobre una base con usuarios. Falta cargar la rama de Neon y la comprobación de QA. |
 
 ## 9. Historial
@@ -432,3 +469,4 @@ comprobación registrada.*
 |---|---|---|
 | 0.1 | 14/10/2026 | Primera versión: destino, configuración, controles y procedimientos OP-01 a OP-10. Faltan los responsables y la comprobación de QA. |
 | 0.2 | 18/10/2026 | OP-11: base de prueba con datos sintéticos. |
+| 0.3 | 18/10/2026 | OP-12: usuario de base acotado para la app. |
