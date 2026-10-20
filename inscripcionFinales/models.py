@@ -489,6 +489,12 @@ class MesaFinal(models.Model):
     # de días para el examen.
     LIMITE_DIAS_EXCEPCION = 2
 
+    # Toda mesa dura lo mismo (confirmado con el instituto): no hay un campo
+    # de hora de fin en la base, se calcula sumando esto a `llamado`. Se usa
+    # para detectar si dos mesas en la misma aula se superponen en el tiempo
+    # (ver MesaFinalForm.clean en forms.py).
+    DURACION = timedelta(hours=2)
+
     SEDE_CHOICES = (
         ('SEDE LA PLATA', 'SEDE LA PLATA'),
         ('SEDE ABASTO', 'SEDE ABASTO'),
