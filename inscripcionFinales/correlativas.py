@@ -36,7 +36,7 @@ ESTADOS_INACTIVOS = {EstadoCursada.RECURSA, EstadoCursada.ABANDONO}
 # todavía sin resultado cargado no consume nada. Si el alumno recursa la
 # cursada, los intentos de antes del ciclo actual dejan de contar (ver
 # usuarios_materia.ciclo_actual_desde).
-MAX_OPORTUNIDADES_FINAL = 3
+MAX_OPORTUNIDADES_FINAL = 4
 
 
 def intentos_consumidos(usuario_id, materia_id, inscripcion_materia=None):

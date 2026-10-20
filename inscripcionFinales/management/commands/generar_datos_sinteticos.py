@@ -66,10 +66,10 @@ ESTUDIANTES = [
      {}, []),
     ('Bruno Habilitado', 'Cursada de Programación I aprobada: puede rendir el final.',
      {'prog1': 7}, []),
-    ('Carla Ultima', 'Programación I: un ausente y un desaprobado, le queda una oportunidad.',
-     {'prog1': 6}, [('prog1', 0, 'ausente'), ('prog1', 1, 2)]),
-    ('Diego Agotado', 'Programación I: tres oportunidades usadas, ya no puede inscribirse.',
-     {'prog1': 5}, [('prog1', 0, 'ausente'), ('prog1', 1, 2), ('prog1', 2, 3)]),
+    ('Carla Ultima', 'Programación I: un ausente y dos desaprobados, le queda una oportunidad.',
+     {'prog1': 6}, [('prog1', 0, 'ausente'), ('prog1', 1, 2), ('prog1', 2, 3)]),
+    ('Diego Agotado', 'Programación I: cuatro oportunidades usadas, ya no puede inscribirse.',
+     {'prog1': 5}, [('prog1', 0, 'ausente'), ('prog1', 1, 2), ('prog1', 2, 3), ('prog1', 3, 2)]),
     ('Elena Avanzada', 'Final de Programación I aprobado: puede cursar Programación II. '
      'Recursa Matemática I.',
      {'prog1': 8, 'mate1': 2}, [('prog1', 1, 8)]),
@@ -163,10 +163,12 @@ class Command(BaseCommand):
             TribunalMesa.objects.create(mesa=mesa, docente=profesores[1], rol=TribunalMesa.VOCAL)
             return mesa
 
-        # Tres llamados ya rendidos de Programación I, con su acta cargada.
+        # Cuatro llamados ya rendidos de Programación I, con su acta cargada
+        # (tantos como MAX_OPORTUNIDADES_FINAL, para poder armar el caso de
+        # "agotó todas las oportunidades").
         mesas_pasadas = [
             crear_mesa(materias['prog1'], ahora - timedelta(days=dias), False, acta=f'PRUEBA-{n}')
-            for n, dias in enumerate((150, 90, 30), start=1)
+            for n, dias in enumerate((150, 90, 30, 10), start=1)
         ]
         # Una mesa abierta y otra todavía sin habilitar (para ver el motivo de rechazo).
         crear_mesa(materias['prog1'], ahora + timedelta(days=15), True)

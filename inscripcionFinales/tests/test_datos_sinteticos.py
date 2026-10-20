@@ -45,10 +45,10 @@ class DatosSinteticosTest(TestCase):
 
     def test_carla_tiene_una_oportunidad_y_el_ausente_cuenta(self):
         carla = self.estudiante('Carla Ultima')
-        self.assertEqual(intentos_consumidos(carla.pk, self.prog1.pk), 2)
+        self.assertEqual(intentos_consumidos(carla.pk, self.prog1.pk), 3)
         self.assertTrue(puede_rendir(carla.pk, self.prog1.pk)[0])
 
-    def test_diego_agoto_las_tres_oportunidades(self):
+    def test_diego_agoto_las_cuatro_oportunidades(self):
         puede, motivo = puede_rendir(self.estudiante('Diego Agotado').pk, self.prog1.pk)
         self.assertFalse(puede)
         self.assertIn('oportunidades', motivo)

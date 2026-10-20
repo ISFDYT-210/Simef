@@ -674,8 +674,8 @@ class InscribirFinalReinscripcionTest(TestCase):
         self.assertEqual(respuesta['status'], 'error')
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
 
-    def test_con_tres_intentos_agotados_no_puede_anotarse(self):
-        for _ in range(3):
+    def test_con_cuatro_intentos_agotados_no_puede_anotarse(self):
+        for _ in range(4):
             mesa_vieja = self.mesa_abierta()
             InscripcionFinal.objects.create(usuario=self.alumno, llamado=mesa_vieja, aprobada=False, nota=2)
         mesa_nueva = self.mesa_abierta()
@@ -685,6 +685,63 @@ class InscribirFinalReinscripcionTest(TestCase):
         self.assertEqual(respuesta['status'], 'error')
         self.assertIn('oportunidades', respuesta['message'])
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+
+class InscripcionMesaFormValidaReglasTest(TestCase):
+    """
+    /inscripcionMesa/ (Preceptor/Directivo inscribe a mano desde la gestión
+    de la mesa): usaba un InscripcionFinalForm que no validaba nada de
+    negocio (ni correlativas, ni cursada aprobada, ni el tope de
+    oportunidades) - de hecho había DOS clases con el mismo nombre
+    InscripcionFinalForm en forms.py, y la que realmente se usaba (la
+    segunda, que pisaba a la primera) no tenía ni clean(). D-19: esto
+    permitía anotar a un alumno a una 5ª mesa superando el tope de 4
+    oportunidades. Ahora pasa por correlativas.puede_rendir(), igual que la
+    autoinscripción del alumno.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(nombre_materia='Programación II', carrera=cls.carrera, anio=2)
+        cls.preceptor = crear_usuario('prec_inscmesa@test.com', 'Preceptor', 'Preceptora', 85)
+        cls.alumno = crear_usuario('alu_inscmesa@test.com', 'Estudiante', 'Alumno', 86)
+        cls.alumno.carrera.add(cls.carrera)
+
+    def mesa_abierta(self, dias=5):
+        return MesaFinal.objects.create(
+            materia=self.materia, llamado=timezone.now() + timedelta(days=dias), inscripcionAbierta=True)
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+
+    def test_con_el_tope_de_oportunidades_agotado_no_se_puede_inscribir(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        for _ in range(4):
+            InscripcionFinal.objects.create(
+                usuario=self.alumno, llamado=self.mesa_abierta(), aprobada=False, nota=2)
+        mesa_nueva = self.mesa_abierta()
+
+        self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
+
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+    def test_sin_cursada_aprobada_no_se_puede_inscribir(self):
+        """Antes este form ni pedía que el alumno hubiera cursado la materia."""
+        mesa_nueva = self.mesa_abierta()
+
+        self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
+
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+    def test_con_cursada_aprobada_y_oportunidades_disponibles_se_puede_inscribir(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        mesa_nueva = self.mesa_abierta()
+
+        respuesta = self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
 
 
 class CargarNotaFinalTest(TestCase):

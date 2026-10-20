@@ -381,12 +381,12 @@ no se hacen con datos reales de estudiantes.
   - recién inscripta;
   - habilitado para rendir;
   - con una oportunidad restante, donde el Ausente cuenta;
-  - con las tres agotadas;
+  - con las cuatro agotadas;
   - con el final aprobado y la correlativa disponible;
   - recursando.
 
 **Cómo se verifica:** con cada cuenta de estudiante, la pantalla de finales muestra
-lo que dice su caso. Por ejemplo, el estudiante con las tres oportunidades usadas ve
+lo que dice su caso. Por ejemplo, el estudiante con las cuatro oportunidades usadas ve
 el motivo y no puede inscribirse.
 
 **Si falla:** el comando no deja nada a medias: o carga todo o no carga nada. Se
