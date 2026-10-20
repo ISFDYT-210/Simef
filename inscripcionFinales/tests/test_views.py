@@ -19,7 +19,8 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from inscripcionFinales.models import (
-    Carrera, EstadoCursada, InscripcionFinal, Materia, MesaFinal, TribunalMesa, Usuario, usuarios_materia,
+    Carrera, EstadoCursada, InscripcionFinal, Materia, MateriaCorrelativa, MesaFinal, TribunalMesa, Usuario,
+    usuarios_materia,
 )
 
 
@@ -595,6 +596,43 @@ class AltaMesaFinalSinDuplicadosTest(TestCase):
         respuesta = self.client.post(f'/edit_mesa/{otra.id}', self.datos(self.llamado))
         otra.refresh_from_db()
         self.assertNotEqual(otra.llamado, self.llamado)
+
+
+class ListaMateriasUserViewTest(TestCase):
+    """
+    lista_materias_user (/inscripcionMateriaEst/): tabla con búsqueda, filtro
+    de carrera y el panel de correlativas pendientes del rediseño.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.primero = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=1, inscripcionAbierta=True)
+        cls.segundo = Materia.objects.create(
+            nombre_materia='Programación II', carrera=cls.carrera, anio=2, inscripcionAbierta=True)
+        MateriaCorrelativa.objects.create(materia=cls.segundo, materia_correlativa=cls.primero)
+        cls.alumno = crear_usuario('alu_lista_mat@test.com', 'Estudiante', 'Alumno', 95)
+        cls.alumno.carrera.add(cls.carrera)  # bloque de ingresante: primero queda EN_CURSO
+
+    def test_la_pagina_renderiza_sin_errores(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_informa_las_correlativas_que_faltan_en_el_panel(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        self.assertIn('bloqueadas_por_correlativas', respuesta.context)
+        materias_bloqueadas = [i['materia'] for i in respuesta.context['bloqueadas_por_correlativas']]
+        self.assertIn(self.segundo, materias_bloqueadas)
+        self.assertContains(respuesta, 'Correlativas pendientes')
+        self.assertContains(respuesta, 'Programación I')
+
+    def test_la_carrera_del_alumno_aparece_como_opcion_del_filtro(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        self.assertContains(respuesta, 'Tecnicatura')
 
 
 class InscripcionMateriaEstTest(TestCase):

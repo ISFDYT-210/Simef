@@ -249,7 +249,7 @@ def materias_con_requisitos(usuario):
             continue  # cursada en curso o ya completa: no es candidata a "inscribirse"
 
         if materia.anio == 1 and ingresante_por_carrera.get(materia.carrera_id):
-            resultado.append({'materia': materia, 'disponible': True, 'motivo': None})
+            resultado.append({'materia': materia, 'disponible': True, 'motivo': None, 'correlativas_faltantes': []})
             continue
 
         correlativas = correlativas_por_materia.get(materia.id, [])
@@ -261,6 +261,7 @@ def materias_con_requisitos(usuario):
             resultado.append({
                 'materia': materia, 'disponible': False,
                 'motivo': "Tenés que completar primer año antes de cursar materias de años superiores",
+                'correlativas_faltantes': [],
             })
             continue
 
@@ -269,7 +270,10 @@ def materias_con_requisitos(usuario):
             if not tiene_cursada_aprobada(inscripciones_usuario.get(c.materia_correlativa_id))
         ]
         if faltantes:
-            resultado.append({'materia': materia, 'disponible': False, 'motivo': _motivo_correlativas_faltantes(faltantes)})
+            resultado.append({
+                'materia': materia, 'disponible': False, 'motivo': _motivo_correlativas_faltantes(faltantes),
+                'correlativas_faltantes': faltantes,
+            })
             continue
 
         conflicto = horario_ocupado_por.get((materia.dia, materia.Horario))
@@ -277,9 +281,10 @@ def materias_con_requisitos(usuario):
             resultado.append({
                 'materia': materia, 'disponible': False,
                 'motivo': f"Cursando los {materia.dia} a las {materia.Horario}",
+                'correlativas_faltantes': [],
             })
         else:
-            resultado.append({'materia': materia, 'disponible': True, 'motivo': None})
+            resultado.append({'materia': materia, 'disponible': True, 'motivo': None, 'correlativas_faltantes': []})
 
     return resultado
 
