@@ -467,10 +467,8 @@ class showUser(ListView):
 
 def lista_materias_user(request):
     materias_con_requisitos = correlativas.materias_con_requisitos(request.user)
-    bloqueadas_por_correlativas = [item for item in materias_con_requisitos if item['correlativas_faltantes']]
     return render(request, 'materias/lista_materias_disponibles_user.html', {
         'materias_con_requisitos': materias_con_requisitos,
-        'bloqueadas_por_correlativas': bloqueadas_por_correlativas,
     })
 
 def lista_materias_inscriptas_user(request):

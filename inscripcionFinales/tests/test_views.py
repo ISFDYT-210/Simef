@@ -601,7 +601,7 @@ class AltaMesaFinalSinDuplicadosTest(TestCase):
 class ListaMateriasUserViewTest(TestCase):
     """
     lista_materias_user (/inscripcionMateriaEst/): tabla con búsqueda, filtro
-    de carrera y el panel de correlativas pendientes del rediseño.
+    de carrera y el visor de correlativas pendientes por fila del rediseño.
     """
 
     @classmethod
@@ -620,12 +620,11 @@ class ListaMateriasUserViewTest(TestCase):
         respuesta = self.client.get('/inscripcionMateriaEst/')
         self.assertEqual(respuesta.status_code, 200)
 
-    def test_informa_las_correlativas_que_faltan_en_el_panel(self):
+    def test_informa_las_correlativas_que_faltan_en_el_visor_de_la_fila(self):
         self.client.force_login(self.alumno)
         respuesta = self.client.get('/inscripcionMateriaEst/')
-        self.assertIn('bloqueadas_por_correlativas', respuesta.context)
-        materias_bloqueadas = [i['materia'] for i in respuesta.context['bloqueadas_por_correlativas']]
-        self.assertIn(self.segundo, materias_bloqueadas)
+        items = {i['materia']: i for i in respuesta.context['materias_con_requisitos']}
+        self.assertIn(self.primero, items[self.segundo]['correlativas_faltantes'])
         self.assertContains(respuesta, 'Correlativas pendientes')
         self.assertContains(respuesta, 'Programación I')
 

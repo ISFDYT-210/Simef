@@ -109,16 +109,4 @@
     </div>
   </div>
 
-  {% if bloqueadas_por_correlativas %}
-  <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-    <p class="font-semibold text-amber-800">Correlativas pendientes</p>
-    {% for item in bloqueadas_por_correlativas %}
-    <p class="mt-1 text-amber-700">
-      Para <strong>{{ item.materia.nombre_materia }}</strong> {% if item.correlativas_faltantes|length == 1 %}falta aprobar{% else %}faltan aprobar{% endif %}
-      {% for c in item.correlativas_faltantes %}{% if not forloop.first %}{% if forloop.last %} y {% else %}, {% endif %}{% endif %}{{ c.nombre_materia }}{% endfor %}.
-    </p>
-    {% endfor %}
-  </div>
-  {% endif %}
-
 {% endblock %}
