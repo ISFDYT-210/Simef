@@ -168,6 +168,39 @@ class FinalesInscriptosAdmAPITest(TestCase):
         self.assertEqual(len(respuesta.json()['results']), 10)
         self.assertEqual(len(con_muchas), len(con_pocas))
 
+    def test_una_inscripcion_aprobada_tambien_aparece(self):
+        """
+        Issue #175: antes esta API solo traía aprobada=False o sin resultado
+        ("pendientes"); apenas se cargaba una nota aprobatoria, la fila
+        desaparecía del listado para siempre, sin forma de volver a
+        encontrarla. Ahora se ven todas, con su estado en el badge.
+        """
+        mesa_pasada = MesaFinal.objects.create(
+            materia=self.materia_propia, llamado=timezone.now() - timedelta(days=1))
+        InscripcionFinal.objects.create(
+            usuario=self.estudiante, llamado=mesa_pasada, aprobada=True, nota=8)
+
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url).json()
+
+        fila = next(f for f in datos['results'] if f['mesa_id'] == mesa_pasada.id)
+        self.assertEqual(fila['notas'], [8])
+
+
+class ListaFinalesAdmPageTest(TestCase):
+    """lista_finales_inscriptos_adm: el botón "Dar de baja" ya no existe (#175)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.directivo = crear_usuario('dir_lista_finales@test.com', 'Directivo', 'Directiva', 6)
+
+    def test_no_muestra_el_boton_de_dar_de_baja(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.get('/listaFinalesAdm/')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotContains(respuesta, 'Dar de baja')
+        self.assertNotContains(respuesta, 'eliminar_inscripcion_final')
+
 
 class ListaMesasAPITest(TestCase):
     """api_lista_mesas: permisos, búsqueda sin tildes y estado de inscripción."""
