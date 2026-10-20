@@ -658,7 +658,10 @@ def inscripcionMesa(request):
         form = InscripcionFinalForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('finales/inscripcion_final.html')  # Redirige a la página de éxito de inscripción
+            # Antes: redirect('finales/inscripcion_final.html'), una ruta de
+            # template (no un nombre de URL) - Django la toma como URL
+            # literal y nunca resuelve a nada real (404 tras un alta exitosa).
+            return redirect('exito_inscripcion_final')
     else:
         form = InscripcionFinalForm()
     return render(request, 'finales/inscripcion_final.html', {'form': form})
@@ -749,18 +752,23 @@ def obtener_materias_estudiante(request):
 @capacidad_requerida('abrir_inscripciones')
 def inscripcionMateria(request):
     if request.method == 'POST':
-        inscripcion_usuario=request.POST['usuario']
-        inscripcion_materia=request.POST['materia']
+        inscripcion_usuario = request.POST['usuario']
+        inscripcion_materia = request.POST['materia']
         form = InscripcionMateriaForm(request.POST)
         if form.is_valid():
-            if usuarios_materia.objects.filter(usuario=inscripcion_usuario, materia=inscripcion_materia).count()<1:
+            # Issue #174: este chequeo contaba CUALQUIER registro histórico
+            # (count() < 1), así que un alumno en RECURSA o ABANDONO -que sí
+            # puede volver a inscribirse- quedaba bloqueado como "ya
+            # inscripto" sin tener ninguna inscripción activa. Mismo criterio
+            # que ya usa inscripcionMateriaEst (autoinscripción del alumno).
+            if not correlativas.tiene_inscripcion_activa(inscripcion_usuario, inscripcion_materia):
                 form.save()
                 return redirect('exito_inscripcion_mesa')  # Redirige a pagina de exito de alta de mesa
             else:
-                return redirect('error_inscripcion_adm')             
+                return redirect('error_inscripcion_adm')
     else:
         form = InscripcionMateriaForm()
-    return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form}) 
+    return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form})
 
 @require_http_methods(['POST'])
 @capacidad_requerida('inscribirse')
