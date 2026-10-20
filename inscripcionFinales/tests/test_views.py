@@ -1133,6 +1133,29 @@ class FirstLoginPasswordChangeViewTest(TestCase):
         respuesta = self.client.get('/change_password_first/')
         self.assertEqual(respuesta.status_code, 200)
 
+    def test_cambiar_la_contrasena_no_rompe_con_multiples_backends(self):
+        """
+        AUTHENTICATION_BACKENDS trae dos backends (axes + ModelBackend): un
+        login() posterior al cambio de contraseña sin indicar backend tira
+        ValueError. La vista usa update_session_auth_hash en vez de volver a
+        loguear, así que esto tiene que completar sin levantar ninguna
+        excepción y dejar la sesión activa.
+        """
+        self.usuario.first_login = True
+        self.usuario.save()
+        self.client.force_login(self.usuario)
+
+        respuesta = self.client.post('/change_password_first/', {
+            'new_password1': 'UnaClaveNueva123',
+            'new_password2': 'UnaClaveNueva123',
+        })
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.usuario.refresh_from_db()
+        self.assertFalse(self.usuario.first_login)
+        self.assertTrue(self.usuario.check_password('UnaClaveNueva123'))
+        self.assertIn('_auth_user_id', self.client.session)
+
 
 class LoginThrottlingTest(TestCase):
     """

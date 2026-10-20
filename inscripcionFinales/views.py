@@ -45,7 +45,7 @@ from django.shortcuts import render, redirect
 
 # Agregar estos imports específicos para el primer login
 from django.contrib.auth.forms import SetPasswordForm, PasswordResetForm  # ← Nuevo
-from django.contrib.auth import login    
+from django.contrib.auth import update_session_auth_hash
 
 #from weasyprint import HTML, CSS
 from django.utils.timezone import now
@@ -2055,8 +2055,10 @@ class FirstLoginPasswordChangeView(LoginRequiredMixin, FormView):
         self.request.user.first_login = False
         self.request.user.save()
         
-        # Mantener la sesión activa después del cambio
-        login(self.request, self.request.user)
+        # Mantener la sesión activa después del cambio (no re-loguear con
+        # login(): con AXES_... + ModelBackend hay dos backends configurados,
+        # y el user de la sesión no trae `.backend` seteado -> ValueError).
+        update_session_auth_hash(self.request, self.request.user)
         
         messages.success(self.request, 'Contraseña cambiada exitosamente. Ya puedes usar el sistema normalmente.')
         return super().form_valid(form)
