@@ -357,10 +357,21 @@ class MateriasConRequisitosTest(TestCase, EstudianteTestMixin):
         items = {i['materia']: i for i in correlativas.materias_con_requisitos(alumno)}
         self.assertEqual(items[self.segundo]['correlativas_faltantes'], [])
 
-    def test_materia_con_cursada_activa_no_aparece_en_el_desglose(self):
-        """Ya la está cursando: no es candidata a "inscribirse", no tiene sentido listarla acá."""
+    def test_materia_en_curso_aparece_marcada_como_cursando(self):
+        """La está cursando ahora mismo: aparece en el desglose con 'cursando', no desaparece."""
         alumno = self.estudiante(42)
         alumno.carrera.add(self.carrera)  # la señal la inscribe en bloque (EN_CURSO)
+        items = {i['materia']: i for i in correlativas.materias_con_requisitos(alumno)}
+        self.assertTrue(items[self.primero]['cursando'])
+        self.assertFalse(items[self.primero]['disponible'])
+        self.assertEqual(items[self.primero]['horario'], f"{self.primero.dia} · {self.primero.Horario} hs")
+
+    def test_materia_ya_cursada_por_completo_no_aparece_en_el_desglose(self):
+        """Ya la cursó (no la está cursando ahora): no es candidata a nada de esto, no tiene sentido listarla."""
+        alumno = self.estudiante(45)
+        alumno.carrera.add(self.carrera)
+        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(
+            nota_cursada=8, estado=EstadoCursada.APROBADO)
         materias = [i['materia'] for i in correlativas.materias_con_requisitos(alumno)]
         self.assertNotIn(self.primero, materias)
 
