@@ -19,7 +19,8 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from inscripcionFinales.models import (
-    Carrera, EstadoCursada, InscripcionFinal, Materia, MesaFinal, TribunalMesa, Usuario, usuarios_materia,
+    Carrera, EstadoCursada, InscripcionFinal, Materia, MesaFinal, RegistroAuditoria, TribunalMesa, Usuario,
+    usuarios_materia,
 )
 
 
@@ -751,6 +752,75 @@ class CargarNotaFinalTest(TestCase):
         self.client.force_login(self.estudiante)
         respuesta = self.client.post(self.url, {'nota_final': '10'})
         self.assertEqual(respuesta.status_code, 403)
+
+
+class CorreccionNotaFinalTest(TestCase):
+    """
+    Issue #204 (P-05): una segunda carga sobre una inscripción que ya tenía
+    resultado es una corrección de un error de tipeo, no una carga nueva.
+    Regla acordada: solo Directivo/Secretario/Preceptor pueden corregir (el
+    profesor de la materia puede hacer la carga original, pero no corregirla
+    después), y hace falta un motivo que quede en la auditoría.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.profesor = crear_usuario('prof_corr@test.com', 'Profesor', 'Profesor Materia', 80)
+        cls.materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=carrera, anio=1, profesor=cls.profesor)
+        cls.preceptor = crear_usuario('prec_corr@test.com', 'Preceptor', 'Preceptora', 81)
+        cls.directivo = crear_usuario('dir_corr@test.com', 'Directivo', 'Directora', 82)
+        cls.estudiante = crear_usuario('est_corr@test.com', 'Estudiante', 'Estudiante Corr', 83)
+
+    def setUp(self):
+        self.mesa = MesaFinal.objects.create(materia=self.materia, llamado=timezone.now() - timedelta(days=1))
+        self.usuario_materia = usuarios_materia.objects.create(usuario=self.estudiante, materia=self.materia)
+        # Ya tiene una nota cargada: cualquier carga posterior es "corrección".
+        self.inscripcion = InscripcionFinal.objects.create(
+            usuario=self.estudiante, llamado=self.mesa, aprobada=True, nota=6)
+        self.url = f'/cargar_nota_final/{self.inscripcion.id}/'
+
+    def test_el_profesor_puede_hacer_la_carga_original_pero_no_corregirla(self):
+        """La carga original (aprobada=None) sí la puede hacer; ver CargarNotaFinalTest."""
+        self.client.force_login(self.profesor)
+        respuesta = self.client.post(self.url, {'nota_final': '8', 'motivo_correccion': 'Error de tipeo'})
+        self.assertEqual(respuesta.status_code, 403)
+        self.inscripcion.refresh_from_db()
+        self.assertEqual(self.inscripcion.nota, 6)  # no cambió
+
+    def test_preceptor_puede_corregir_con_motivo(self):
+        self.client.force_login(self.preceptor)
+        respuesta = self.client.post(self.url, {'nota_final': '8', 'motivo_correccion': 'Error de tipeo: era 8, no 6'})
+        self.assertEqual(respuesta.status_code, 302)
+        self.inscripcion.refresh_from_db()
+        self.assertEqual(self.inscripcion.nota, 8)
+
+    def test_directivo_tambien_puede_corregir(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.post(self.url, {'nota_final': '8', 'motivo_correccion': 'Error de tipeo'})
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_corregir_sin_motivo_no_guarda_el_cambio(self):
+        self.client.force_login(self.preceptor)
+        respuesta = self.client.post(self.url, {'nota_final': '8'})
+        self.assertEqual(respuesta.status_code, 200)  # vuelve a mostrar el form con error
+        self.inscripcion.refresh_from_db()
+        self.assertEqual(self.inscripcion.nota, 6)  # no cambió
+
+    def test_corregir_a_ausente_tambien_exige_motivo_y_permiso(self):
+        self.client.force_login(self.profesor)
+        respuesta = self.client.post(self.url, {'ausente': 'on', 'motivo_correccion': 'Se corrige'})
+        self.assertEqual(respuesta.status_code, 403)
+
+    def test_la_correccion_queda_en_la_auditoria_con_motivo_y_valor_anterior(self):
+        self.client.force_login(self.preceptor)
+        self.client.post(self.url, {'nota_final': '8', 'motivo_correccion': 'Error de tipeo: era 8, no 6'})
+        ultimo = RegistroAuditoria.objects.filter(modelo_afectado='InscripcionFinal', objeto_id=str(self.inscripcion.pk)).latest('fecha')
+        self.assertIn('Corrigió', ultimo.accion)
+        self.assertIn('nota 6', ultimo.accion)
+        self.assertIn('Error de tipeo: era 8, no 6', ultimo.accion)
+        self.assertEqual(ultimo.usuario, self.preceptor)
 
 
 class ApiListaUsuariosTest(TestCase):

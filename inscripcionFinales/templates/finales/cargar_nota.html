@@ -20,10 +20,21 @@
     </div>
   </div>
 
+  {% if es_correccion %}
+  <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+    <p class="font-semibold">Esta mesa ya tiene un resultado cargado.</p>
+    <p class="mt-1">
+      Valor actual:
+      <strong>{% if inscripcion.ausente %}ausente{% elif inscripcion.nota is not None %}nota {{ inscripcion.nota }}{% else %}sin cargar{% endif %}</strong>.
+      Lo que guardes acá queda registrado como una corrección, con tu usuario, la fecha y el motivo en la auditoría.
+    </p>
+  </div>
+  {% endif %}
+
   <form method="POST" id="notaForm" novalidate @submit="validar($event)" class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
     {% csrf_token %}
     <div class="border-b border-slate-200 px-6 py-4">
-      <h2 class="text-sm font-semibold text-tinta-900">Calificación final</h2>
+      <h2 class="text-sm font-semibold text-tinta-900">{% if es_correccion %}Corregir calificación final{% else %}Calificación final{% endif %}</h2>
     </div>
 
     <div class="space-y-4 px-6 py-6">
@@ -76,6 +87,16 @@
           </div>
         </div>
       </div>
+
+      {% if es_correccion %}
+      <div>
+        <label for="id_motivo_correccion" class="mb-1 block text-sm font-medium text-slate-700">Motivo de la corrección</label>
+        {{ form.motivo_correccion }}
+        {% if form.motivo_correccion.errors %}
+        <p class="mt-1 text-xs text-red-600">{{ form.motivo_correccion.errors|first }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
 
     <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
@@ -101,7 +122,7 @@
       init() {
         var inp = document.getElementById('id_nota_final');
         var ausenteInp = document.getElementById('id_ausente');
-        var textInputs = [document.getElementById('id_numero_acta'), document.getElementById('id_folio')];
+        var textInputs = [document.getElementById('id_numero_acta'), document.getElementById('id_folio'), document.getElementById('id_motivo_correccion')];
 
         if (inp) {
           inp.classList.add('w-full','rounded-lg','border','border-slate-300','px-3','py-2','text-sm','focus:border-celeste-500','focus:outline-none','focus:ring-2','focus:ring-celeste-100');
