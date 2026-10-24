@@ -12,7 +12,7 @@ from django.views.generic import CreateView,TemplateView,ListView,UpdateView,Del
 from django.core.mail import send_mail
 from django.contrib.auth import *
 from django.contrib import messages
-from django.db.models import Q,Prefetch,OuterRef,F
+from django.db.models import Q,Prefetch,OuterRef,F,Count
 from django import forms
 from datetime import datetime   
 from django.http import HttpResponse,JsonResponse
@@ -1668,18 +1668,29 @@ def acta_volante(request, final_id):
     tribunal_activo = final.tribunal.filter(activo=True).select_related('docente')
     presidente = tribunal_activo.filter(rol=TribunalMesa.PRESIDENTE).first()
     vocales = list(tribunal_activo.filter(rol=TribunalMesa.VOCAL))
-    if finales_inscriptos.count() <= 25:
+    cant_inscriptos = finales_inscriptos.count()
+    # Issue #201: totales de la nómina completa de la mesa (no por página),
+    # igual que cant_inscriptos. Una inscripción sin nota ni ausente cargados
+    # todavía (recién inscripto, acta sin cerrar) no cuenta en ninguno de los
+    # tres: resumen() solo refleja resultados ya cargados.
+    resumen = finales_inscriptos.aggregate(
+        aprobados=Count('id', filter=Q(ausente=False, aprobada=True)),
+        aplazados=Count('id', filter=Q(ausente=False, aprobada=False)),
+        ausentes=Count('id', filter=Q(ausente=True)),
+    )
+    if cant_inscriptos <= 25:
         context = {
             'finales_inscriptos': finales_inscriptos,
             'final': final,
-            'cant_inscriptos': finales_inscriptos.count(),
+            'cant_inscriptos': cant_inscriptos,
+            'resumen': resumen,
             'piso': 0,
             'presidente': presidente,
             'vocales': vocales,
         }
         return render(request, 'finales/acta_volante.html', context)
     else:
-        for i in range(1, ceil(finales_inscriptos.count() / 25) + 1):
+        for i in range(1, ceil(cant_inscriptos / 25) + 1):
             inscriptos = []
             for inscripto in range(25 * (i - 1), 25 * (i - 1) + 25):
                 try:
@@ -1689,7 +1700,8 @@ def acta_volante(request, final_id):
             context = {
                 'finales_inscriptos': inscriptos,
                 'final': final,
-                'cant_inscriptos': finales_inscriptos.count(),
+                'cant_inscriptos': cant_inscriptos,
+                'resumen': resumen,
                 'piso': 25 * (i - 1),
                 'presidente': presidente,
                 'vocales': vocales,

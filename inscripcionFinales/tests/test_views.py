@@ -580,6 +580,44 @@ class TribunalMesaTest(TestCase):
         self.assertIn('Profesor Dos', contenido)
 
 
+class ActaVolanteResumenTest(TestCase):
+    """
+    Issue #201: el acta volante tiene que traer los totales de aprobados,
+    aplazados y ausentes de la nómina completa de la mesa.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        materia = Materia.objects.create(nombre_materia='Programación I', carrera=carrera, anio=1)
+        cls.preceptor = crear_usuario('prec_acta@test.com', 'Preceptor', 'Preceptora', 70)
+        cls.mesa = MesaFinal.objects.create(materia=materia, llamado=timezone.now() + timedelta(days=5))
+
+        def inscripto(dni, **datos):
+            alumno = crear_usuario(f'alu_acta_{dni}@test.com', 'Estudiante', f'Alumno {dni}', dni)
+            InscripcionFinal.objects.create(usuario=alumno, llamado=cls.mesa, **datos)
+
+        inscripto(71, aprobada=True, nota=8)
+        inscripto(72, aprobada=True, nota=7)
+        inscripto(73, aprobada=False, nota=2)
+        inscripto(74, ausente=True)
+        inscripto(75)  # todavía sin nota cargada: no debe contar en ninguna de las tres
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+
+    def test_el_contexto_trae_los_totales_correctos(self):
+        respuesta = self.client.get(f'/acta_volante/{self.mesa.id}')
+        self.assertEqual(respuesta.context['resumen'], {'aprobados': 2, 'aplazados': 1, 'ausentes': 1})
+
+    def test_los_totales_aparecen_en_el_html_renderizado(self):
+        respuesta = self.client.get(f'/acta_volante/{self.mesa.id}')
+        contenido = respuesta.content.decode()
+        self.assertIn('<td>Aprobados</td>\n                <td style=\'text-align:center\'>2</td>', contenido)
+        self.assertIn('<td>Aplazados</td>\n                <td style=\'text-align:center\'>1</td>', contenido)
+        self.assertIn('<td>Ausentes</td>\n                <td style=\'text-align:center\'>1</td>', contenido)
+
+
 class AltaMesaFinalSinDuplicadosTest(TestCase):
     """
     No se puede cargar dos veces la misma materia en el mismo día y horario
