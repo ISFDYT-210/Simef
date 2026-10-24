@@ -414,7 +414,7 @@ class usuarios_materia(models.Model):
         help_text=(
             'Se renueva cada vez que el alumno vuelve a cursar después de quedar '
             'en RECURSA o ABANDONO. Los finales rendidos antes de esta fecha no '
-            'cuentan para el tope de 3 oportunidades (ver correlativas.MAX_OPORTUNIDADES_FINAL).'
+            'cuentan para el tope de oportunidades (ver correlativas.MAX_OPORTUNIDADES_FINAL).'
         ),
     )
 
@@ -444,7 +444,7 @@ class usuarios_materia(models.Model):
         Marca cuándo empezó el ciclo de cursada actual. Primera vez: ahora.
         Si ya existía y la fila venía de RECURSA/ABANDONO y le están cargando
         una nota_cursada distinta, es que el alumno volvió a cursar: eso
-        arranca un ciclo nuevo y 'reinicia' el tope de 3 oportunidades de
+        arranca un ciclo nuevo y 'reinicia' el tope de oportunidades de
         final (los intentos de antes quedan fuera del conteo).
         """
         if not self.pk:
