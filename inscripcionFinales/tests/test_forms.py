@@ -197,6 +197,103 @@ class MesaFinalFormSinDuplicadosTest(TestCase):
         self.assertIn('mismo día y horario', form.errors['llamado'][0])
 
 
+class MesaFinalFormAulaSinSuperposicionTest(TestCase):
+    """
+    Dos mesas (de cualquier materia) no pueden compartir aula si sus horarios
+    se superponen. Toda mesa dura MesaFinal.DURACION (2hs, fija para todas:
+    no hay hora de fin en la base).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=1)
+        cls.otra_materia = Materia.objects.create(
+            nombre_materia='Programación II', carrera=cls.carrera, anio=2)
+
+    def aware(self, *args):
+        return timezone.make_aware(datetime(*args))
+
+    def datos(self, materia, llamado, aula, **overrides):
+        datos = {
+            'materia': materia.id, 'llamado': llamado, 'aula': aula, 'sede': '',
+            'inscripcionAbierta': False,
+        }
+        datos.update(overrides)
+        return datos
+
+    def test_misma_aula_mismo_horario_distinta_materia_se_rechaza(self):
+        MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T09:00', 'Aula 3'))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('ocupada', form.errors['aula'][0])
+
+    def test_misma_aula_horario_superpuesto_parcialmente_se_rechaza(self):
+        """Mesa existente 09:00-11:00; una nueva a las 10:00 (10:00-12:00) se superpone."""
+        MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T10:00', 'Aula 3'))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('ocupada', form.errors['aula'][0])
+
+    def test_misma_aula_justo_despues_de_que_termine_la_anterior_se_permite(self):
+        """Mesa existente 09:00-11:00; una nueva arranca exactamente a las 11:00: no se superponen."""
+        MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T11:00', 'Aula 3'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_misma_aula_otro_dia_se_permite(self):
+        MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-11T09:00', 'Aula 3'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_distinta_aula_mismo_horario_se_permite(self):
+        MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T09:00', 'Aula 4'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_sin_aula_no_valida_superposicion(self):
+        MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='')
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T09:00', ''))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_mesa_no_vigente_no_ocupa_el_aula(self):
+        mesa = MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+        mesa.vigente = False
+        mesa.save()
+
+        form = MesaFinalForm(self.datos(self.otra_materia, '2030-11-10T09:00', 'Aula 3'))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_editar_una_mesa_sin_cambiar_nada_no_choca_consigo_misma(self):
+        mesa = MesaFinal.objects.create(
+            materia=self.materia, llamado=self.aware(2030, 11, 10, 9, 0), aula='Aula 3')
+
+        form = MesaFinalForm(self.datos(self.materia, '2030-11-10T09:00', 'Aula 3'), instance=mesa)
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+
 class ProfileStudentsFormTest(TestCase):
     """
     telefono_1/telefono_2 son opcionales en el modelo (blank=True, null=True)

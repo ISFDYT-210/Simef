@@ -507,7 +507,7 @@ class FinalesConRequisitosTest(TestCase, EstudianteTestMixin):
 
 
 class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
-    """Tope de MAX_OPORTUNIDADES_FINAL (3) intentos de final por materia."""
+    """Tope de MAX_OPORTUNIDADES_FINAL (4) intentos de final por materia."""
 
     @classmethod
     def setUpTestData(cls):
@@ -535,15 +535,15 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
         InscripcionFinal.objects.create(usuario=alumno, llamado=self.mesa(1), aprobada=False, nota=3)
         self.assertEqual(correlativas.intentos_consumidos(alumno.id, self.materia.id, um), 1)
 
-    def test_tercer_intento_agotado_bloquea_el_cuarto(self):
+    def test_cuarto_intento_agotado_bloquea_el_quinto(self):
         alumno = self.estudiante(63)
         usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
-        for i in range(3):
+        for i in range(4):
             InscripcionFinal.objects.create(
                 usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
         puede, motivo = correlativas.puede_rendir(alumno.id, self.materia.id)
         self.assertFalse(puede)
-        self.assertIn('3 oportunidades', motivo)
+        self.assertIn('4 oportunidades', motivo)
 
     def test_con_dos_intentos_todavia_puede_rendir(self):
         alumno = self.estudiante(64)
@@ -554,23 +554,32 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
         puede, _motivo = correlativas.puede_rendir(alumno.id, self.materia.id)
         self.assertTrue(puede)
 
+    def test_con_tres_intentos_todavia_puede_rendir(self):
+        alumno = self.estudiante(67)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        for i in range(3):
+            InscripcionFinal.objects.create(
+                usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
+        puede, _motivo = correlativas.puede_rendir(alumno.id, self.materia.id)
+        self.assertTrue(puede)
+
     def test_finales_con_requisitos_informa_oportunidades_agotadas(self):
         alumno = self.estudiante(65)
         alumno.carrera.add(self.carrera)
         usuarios_materia.objects.filter(usuario=alumno, materia=self.materia).update(nota_cursada=8)
-        for i in range(3):
+        for i in range(4):
             InscripcionFinal.objects.create(
                 usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
         mesa_nueva = self.mesa(10)
         items = {i['mesa']: i for i in correlativas.finales_con_requisitos(alumno)}
         self.assertFalse(items[mesa_nueva]['disponible'])
-        self.assertIn('3 oportunidades', items[mesa_nueva]['motivo'])
+        self.assertIn('4 oportunidades', items[mesa_nueva]['motivo'])
 
     def test_recursar_la_cursada_resetea_el_tope(self):
-        """3 finales desaprobados, el alumno recursa la cursada: puede volver a rendir."""
+        """4 finales desaprobados, el alumno recursa la cursada: puede volver a rendir."""
         alumno = self.estudiante(66)
         um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=2)  # RECURSA
-        for _ in range(3):
+        for _ in range(4):
             # Sin offset: estos llamados quedan fechados ENTRE la creación de
             # `um` y el save() que recursa más abajo, así el reset los deja
             # afuera (ver _detectar_nuevo_ciclo en models.py).

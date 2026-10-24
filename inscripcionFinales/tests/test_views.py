@@ -168,6 +168,39 @@ class FinalesInscriptosAdmAPITest(TestCase):
         self.assertEqual(len(respuesta.json()['results']), 10)
         self.assertEqual(len(con_muchas), len(con_pocas))
 
+    def test_una_inscripcion_aprobada_tambien_aparece(self):
+        """
+        Issue #175: antes esta API solo traía aprobada=False o sin resultado
+        ("pendientes"); apenas se cargaba una nota aprobatoria, la fila
+        desaparecía del listado para siempre, sin forma de volver a
+        encontrarla. Ahora se ven todas, con su estado en el badge.
+        """
+        mesa_pasada = MesaFinal.objects.create(
+            materia=self.materia_propia, llamado=timezone.now() - timedelta(days=1))
+        InscripcionFinal.objects.create(
+            usuario=self.estudiante, llamado=mesa_pasada, aprobada=True, nota=8)
+
+        self.client.force_login(self.directivo)
+        datos = self.client.get(self.url).json()
+
+        fila = next(f for f in datos['results'] if f['mesa_id'] == mesa_pasada.id)
+        self.assertEqual(fila['notas'], [8])
+
+
+class ListaFinalesAdmPageTest(TestCase):
+    """lista_finales_inscriptos_adm: el botón "Dar de baja" ya no existe (#175)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.directivo = crear_usuario('dir_lista_finales@test.com', 'Directivo', 'Directiva', 6)
+
+    def test_no_muestra_el_boton_de_dar_de_baja(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.get('/listaFinalesAdm/')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotContains(respuesta, 'Dar de baja')
+        self.assertNotContains(respuesta, 'eliminar_inscripcion_final')
+
 
 class ListaMesasAPITest(TestCase):
     """api_lista_mesas: permisos, búsqueda sin tildes y estado de inscripción."""
@@ -668,6 +701,121 @@ class InscripcionMateriaEstTest(TestCase):
         self.assertTrue(usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).exists())
 
 
+class InscripcionMateriaAdmTest(TestCase):
+    """
+    Issue #174: inscripcionMateria (Preceptor/Directivo inscribe a un alumno
+    a mano desde /inscripcionMateria/) contaba CUALQUIER usuarios_materia
+    histórico (count() < 1) como "ya inscripto", sin excluir RECURSA/
+    ABANDONO. Un alumno que recursa -sin ninguna inscripción activa- quedaba
+    bloqueado como falso positivo. Mismo criterio que ya usa
+    inscripcionMateriaEst (tiene_inscripcion_activa).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=1, inscripcionAbierta=True)
+        cls.preceptor = crear_usuario('prec_inscmat@test.com', 'Preceptor', 'Preceptora', 91)
+        cls.alumno = crear_usuario('alu_inscmat@test.com', 'Estudiante', 'Alumno', 92)
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+
+    def datos(self, **overrides):
+        datos = {'usuario': self.alumno.id, 'materia': self.materia.id, 'modalidad': 'Regular'}
+        datos.update(overrides)
+        return datos
+
+    def test_alumno_que_recursa_no_es_falso_positivo(self):
+        """El alumno tiene un registro RECURSA (sin inscripción activa): tiene que poder inscribirse."""
+        usuarios_materia.objects.create(
+            usuario=self.alumno, materia=self.materia, nota_cursada=2)  # RECURSA
+
+        respuesta = self.client.post('/inscripcionMateria/', self.datos())
+
+        self.assertRedirects(respuesta, '/exito_inscripcion_mesa/', fetch_redirect_response=False)
+        self.assertEqual(
+            usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).count(), 2)
+
+    def test_alumno_con_inscripcion_activa_se_rechaza(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia)  # EN_CURSO
+
+        respuesta = self.client.post('/inscripcionMateria/', self.datos())
+
+        self.assertRedirects(respuesta, '/error_inscripcion_adm/', fetch_redirect_response=False)
+        self.assertEqual(
+            usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).count(), 1)
+
+    def test_alumno_sin_ninguna_inscripcion_previa_se_puede_inscribir(self):
+        respuesta = self.client.post('/inscripcionMateria/', self.datos())
+
+        self.assertRedirects(respuesta, '/exito_inscripcion_mesa/', fetch_redirect_response=False)
+        self.assertTrue(usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).exists())
+
+
+class InscripcionMesaRedirectTest(TestCase):
+    """
+    inscripcionMesa redirigía con redirect('finales/inscripcion_final.html'):
+    una ruta de template, no un nombre de URL. Django la toma como URL
+    literal, así que un alta exitosa terminaba en una página que no existe.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=carrera, anio=1, inscripcionAbierta=True)
+        cls.preceptor = crear_usuario('prec_inscmesa_redir@test.com', 'Preceptor', 'Preceptora', 93)
+        cls.alumno = crear_usuario('alu_inscmesa_redir@test.com', 'Estudiante', 'Alumno', 94)
+        # Cursada aprobada: InscripcionFinalForm valida puede_rendir, que la exige.
+        usuarios_materia.objects.create(
+            usuario=cls.alumno, materia=materia, nota_cursada=7, estado=EstadoCursada.REGULAR)
+        cls.mesa = MesaFinal.objects.create(
+            materia=materia, llamado=timezone.now() + timedelta(days=5), inscripcionAbierta=True)
+
+    def test_alta_exitosa_redirige_a_una_url_real(self):
+        self.client.force_login(self.preceptor)
+        respuesta = self.client.post(
+            '/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': self.mesa.id})
+
+        self.assertRedirects(respuesta, '/exito-inscripcion/', fetch_redirect_response=False)
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+
+class ListaMateriasUserBotonesPostTest(TestCase):
+    """
+    Issue #197: Regular/Libre en /inscripcionMateriaEst/ eran <a href> (GET)
+    contra una vista que solo acepta POST (ver InscripcionMateriaEstTest):
+    el click tiraba 405. La tabla tiene que enviar esos botones como POST.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Teoría de Prueba', carrera=carrera, anio=2,
+            dia='Viernes', inscripcionAbierta=True)
+        cls.alumno = crear_usuario('alu_botones@test.com', 'Estudiante', 'Alumno', 91)
+        cls.alumno.carrera.add(carrera)
+        # Simula que el alumno ya avanzó más allá de primer año, para que
+        # puede_cursar no lo bloquee con "completá primer año" y las
+        # acciones Regular/Libre aparezcan (lo único que importa acá).
+        otra = Materia.objects.create(
+            nombre_materia='Previa Aprobada', carrera=carrera, anio=2, dia='Lunes')
+        usuarios_materia.objects.create(
+            usuario=cls.alumno, materia=otra, modalidad='Regular', estado=EstadoCursada.APROBADO)
+
+    def test_regular_y_libre_son_formularios_post_no_links(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        contenido = respuesta.content.decode()
+        accion = f'/inscribirse_materia/{self.materia.id}/Regular'
+        self.assertNotIn(f'href="{accion}"', contenido)
+        self.assertIn(f'action="{accion}"', contenido)
+        self.assertIn('method="post"', contenido)
+
+
 class InscribirFinalReinscripcionTest(TestCase):
     """
     inscribir_final (vista admin): un resultado ya cargado (ausente o nota
@@ -712,8 +860,8 @@ class InscribirFinalReinscripcionTest(TestCase):
         self.assertEqual(respuesta['status'], 'error')
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
 
-    def test_con_tres_intentos_agotados_no_puede_anotarse(self):
-        for _ in range(3):
+    def test_con_cuatro_intentos_agotados_no_puede_anotarse(self):
+        for _ in range(4):
             mesa_vieja = self.mesa_abierta()
             InscripcionFinal.objects.create(usuario=self.alumno, llamado=mesa_vieja, aprobada=False, nota=2)
         mesa_nueva = self.mesa_abierta()
@@ -723,6 +871,63 @@ class InscribirFinalReinscripcionTest(TestCase):
         self.assertEqual(respuesta['status'], 'error')
         self.assertIn('oportunidades', respuesta['message'])
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+
+class InscripcionMesaFormValidaReglasTest(TestCase):
+    """
+    /inscripcionMesa/ (Preceptor/Directivo inscribe a mano desde la gestión
+    de la mesa): usaba un InscripcionFinalForm que no validaba nada de
+    negocio (ni correlativas, ni cursada aprobada, ni el tope de
+    oportunidades) - de hecho había DOS clases con el mismo nombre
+    InscripcionFinalForm en forms.py, y la que realmente se usaba (la
+    segunda, que pisaba a la primera) no tenía ni clean(). D-19: esto
+    permitía anotar a un alumno a una 5ª mesa superando el tope de 4
+    oportunidades. Ahora pasa por correlativas.puede_rendir(), igual que la
+    autoinscripción del alumno.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(nombre_materia='Programación II', carrera=cls.carrera, anio=2)
+        cls.preceptor = crear_usuario('prec_inscmesa@test.com', 'Preceptor', 'Preceptora', 85)
+        cls.alumno = crear_usuario('alu_inscmesa@test.com', 'Estudiante', 'Alumno', 86)
+        cls.alumno.carrera.add(cls.carrera)
+
+    def mesa_abierta(self, dias=5):
+        return MesaFinal.objects.create(
+            materia=self.materia, llamado=timezone.now() + timedelta(days=dias), inscripcionAbierta=True)
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+
+    def test_con_el_tope_de_oportunidades_agotado_no_se_puede_inscribir(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        for _ in range(4):
+            InscripcionFinal.objects.create(
+                usuario=self.alumno, llamado=self.mesa_abierta(), aprobada=False, nota=2)
+        mesa_nueva = self.mesa_abierta()
+
+        self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
+
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+    def test_sin_cursada_aprobada_no_se_puede_inscribir(self):
+        """Antes este form ni pedía que el alumno hubiera cursado la materia."""
+        mesa_nueva = self.mesa_abierta()
+
+        self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
+
+        self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
+
+    def test_con_cursada_aprobada_y_oportunidades_disponibles_se_puede_inscribir(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        mesa_nueva = self.mesa_abierta()
+
+        respuesta = self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
 
 
 class CargarNotaFinalTest(TestCase):
