@@ -697,6 +697,9 @@ class InscripcionMesaRedirectTest(TestCase):
             nombre_materia='Programación I', carrera=carrera, anio=1, inscripcionAbierta=True)
         cls.preceptor = crear_usuario('prec_inscmesa_redir@test.com', 'Preceptor', 'Preceptora', 93)
         cls.alumno = crear_usuario('alu_inscmesa_redir@test.com', 'Estudiante', 'Alumno', 94)
+        # Cursada aprobada: InscripcionFinalForm valida puede_rendir, que la exige.
+        usuarios_materia.objects.create(
+            usuario=cls.alumno, materia=materia, nota_cursada=7, estado=EstadoCursada.REGULAR)
         cls.mesa = MesaFinal.objects.create(
             materia=materia, llamado=timezone.now() + timedelta(days=5), inscripcionAbierta=True)
 
