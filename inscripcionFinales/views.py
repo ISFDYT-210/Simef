@@ -575,10 +575,14 @@ def lista_finales_inscriptos_user(request):
     return render(request, 'finales/lista_finales_inscriptos_user.html', {'finales': finales_inscriptos})
 
 def _finales_inscriptos_visibles(usuario):
-    """Inscripciones a final pendientes que este usuario tiene permitido ver."""
-    qs = InscripcionFinal.objects.filter(
-        Q(aprobada=False) | Q(aprobada__isnull=True)
-    ).select_related('llamado__materia', 'usuario')
+    """
+    Inscripciones a final que este usuario tiene permitido ver. Issue #175:
+    antes filtraba aprobada=False | aprobada__isnull=True ("solo pendientes"),
+    así que apenas se cargaba una nota aprobatoria la fila desaparecía del
+    listado sin dejar forma de volver a encontrarla. Ahora trae todas; el
+    estado (pendiente/aprobada/desaprobada/ausente) se ve con el badge.
+    """
+    qs = InscripcionFinal.objects.select_related('llamado__materia', 'usuario')
     if usuario.es_profesor() and not usuario.is_superuser:
         # El profesor solo ve a sus propios alumnos, no los de toda la escuela
         qs = qs.filter(llamado__materia__profesor=usuario)
