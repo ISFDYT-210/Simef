@@ -1,5 +1,7 @@
 import csv
 import logging
+
+from . import correlativas
 from django.shortcuts import render
 from django.http import HttpResponse
 from django import forms
@@ -445,11 +447,27 @@ class MesaFinalForm(forms.ModelForm):
         cleaned_data = super().clean()
         materia = cleaned_data.get('materia')
         llamado = cleaned_data.get('llamado')
+        aula = cleaned_data.get('aula')
+
         if materia and llamado:
             ya_existe = MesaFinal.objects.filter(materia=materia, llamado=llamado) \
                 .exclude(pk=self.instance.pk).exists()
             if ya_existe:
                 self.add_error('llamado', 'Ya existe una mesa de esta materia en ese mismo día y horario.')
+
+        if aula and llamado:
+            # Toda mesa dura MesaFinal.DURACION (misma para todas, no hay hora
+            # de fin en la base): dos mesas de `aula` se superponen si sus
+            # llamados quedan a menos de esa duración de distancia uno del
+            # otro, sea cual sea la materia.
+            ocupada = MesaFinal.objects.filter(
+                aula=aula, vigente=True,
+                llamado__gt=llamado - MesaFinal.DURACION,
+                llamado__lt=llamado + MesaFinal.DURACION,
+            ).exclude(pk=self.instance.pk).exists()
+            if ocupada:
+                self.add_error('aula', 'El aula seleccionada ya se encuentra ocupada en ese horario.')
+
         return cleaned_data
 
 class InscripcionFinalForm(forms.ModelForm):
@@ -464,36 +482,43 @@ class InscripcionFinalForm(forms.ModelForm):
             'usuario': 'Estudiante',
             'llamado': 'Mesa Final'
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Filtrar solo usuarios con rol 'Estudiante'
         self.fields['usuario'].queryset = Usuario.objects.filter(rol='Estudiante').order_by('nombre_completo')
-        
+        self.fields['usuario'].empty_label = "Seleccione un estudiante"
+
         # Filtrar solo mesas con inscripción abierta y vigentes
         self.fields['llamado'].queryset = MesaFinal.objects.filter(
             inscripcionAbierta=True,
             vigente=True
         ).select_related('materia').order_by('materia__nombre_materia', 'llamado')
-        
-        # Configurar etiquetas para mostrar información útil
-        self.fields['usuario'].empty_label = "Seleccione un estudiante"
         self.fields['llamado'].empty_label = "Seleccione una mesa final"
-    
+        # "Materia - dd/mm/aaaa HH:MM" en vez del __str__ crudo de MesaFinal.
+        self.fields['llamado'].label_from_instance = (
+            lambda mesa: f"{mesa.materia.nombre_materia} - {mesa.llamado.strftime('%d/%m/%Y %H:%M')}"
+        )
+
     def clean(self):
         cleaned_data = super().clean()
         usuario = cleaned_data.get('usuario')
         llamado = cleaned_data.get('llamado')
-        
+
         if usuario and llamado:
-            # Verificar que el usuario sea estudiante
             if usuario.rol != 'Estudiante':
                 raise forms.ValidationError("Solo los estudiantes pueden inscribirse a mesas finales.")
-            
-            # Verificar duplicados
-            if InscripcionFinal.objects.filter(usuario=usuario, llamado__materia=llamado.materia).exists():
-                raise forms.ValidationError(f"El estudiante ya está inscripto a una mesa de {llamado.materia.nombre_materia}")
-        
+
+            # Misma regla que usa el alumno al inscribirse solo (ver
+            # inscripcionFinalEst): correlativas, cursada aprobada, final no
+            # aprobado todavía, y el tope de MAX_OPORTUNIDADES_FINAL. Esta
+            # vista es la que un Preceptor/Directivo usa para inscribir a un
+            # alumno a mano, así que tiene que pasar por la misma validación
+            # (antes este form no chequeaba nada de esto).
+            puede, motivo = correlativas.puede_rendir(usuario.id, llamado.materia_id)
+            if not puede:
+                raise forms.ValidationError(motivo or "El estudiante no cumple los requisitos para rendir este final.")
+
         return cleaned_data
 
 
@@ -625,51 +650,6 @@ class NotaCursadaForm(forms.ModelForm):
         return cleaned_data
     
     
-
-class InscripcionFinalForm(forms.ModelForm):
-    # Filtrar solo usuarios con rol de estudiante
-    usuario = forms.ModelChoiceField(
-        queryset=Usuario.objects.filter(rol='Estudiante').order_by('nombre_completo'),
-        empty_label="Seleccione un estudiante",
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label='Estudiante'
-    )
-    
-    # Filtrar solo mesas finales con inscripción abierta
-    llamado = forms.ModelChoiceField(
-        queryset=MesaFinal.objects.filter(inscripcionAbierta=True, vigente=True).order_by('materia__nombre_materia', 'llamado'),
-        empty_label="Seleccione una mesa final",
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label='Mesa Final'
-    )
-    
-    class Meta:
-        model = InscripcionFinal
-        fields = ['usuario', 'llamado']
-        widgets = {
-            'aprobada': forms.HiddenInput(),  # Ocultar el campo aprobada
-        }
-        labels = {
-            'usuario': 'Estudiante',
-            'llamado': 'Mesa Final'
-        }
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Personalizar la representación de las opciones de llamado
-        self.fields['llamado'].queryset = MesaFinal.objects.filter(
-            inscripcionAbierta=True, 
-            vigente=True
-        ).select_related('materia').order_by('materia__nombre_materia', 'llamado')
-        
-        # Personalizar cómo se muestran las opciones
-        choices = [('', 'Seleccione una mesa final')]
-        for mesa in self.fields['llamado'].queryset:
-            fecha_str = mesa.llamado.strftime('%d/%m/%Y %H:%M')
-            choice_text = f"{mesa.materia.nombre_materia} - {fecha_str}"
-            choices.append((mesa.pk, choice_text))
-        
-        self.fields['llamado'].choices = choices
 
 class FiltroInscripcionForm(forms.Form):
     estudiante = forms.CharField(required=False)
