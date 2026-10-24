@@ -414,7 +414,7 @@ class usuarios_materia(models.Model):
         help_text=(
             'Se renueva cada vez que el alumno vuelve a cursar después de quedar '
             'en RECURSA o ABANDONO. Los finales rendidos antes de esta fecha no '
-            'cuentan para el tope de 3 oportunidades (ver correlativas.MAX_OPORTUNIDADES_FINAL).'
+            'cuentan para el tope de oportunidades (ver correlativas.MAX_OPORTUNIDADES_FINAL).'
         ),
     )
 
@@ -444,7 +444,7 @@ class usuarios_materia(models.Model):
         Marca cuándo empezó el ciclo de cursada actual. Primera vez: ahora.
         Si ya existía y la fila venía de RECURSA/ABANDONO y le están cargando
         una nota_cursada distinta, es que el alumno volvió a cursar: eso
-        arranca un ciclo nuevo y 'reinicia' el tope de 3 oportunidades de
+        arranca un ciclo nuevo y 'reinicia' el tope de oportunidades de
         final (los intentos de antes quedan fuera del conteo).
         """
         if not self.pk:
@@ -488,6 +488,12 @@ class MesaFinal(models.Model):
     # igual inscribir a un alumno, siempre que falten al menos esta cantidad
     # de días para el examen.
     LIMITE_DIAS_EXCEPCION = 2
+
+    # Toda mesa dura lo mismo (confirmado con el instituto): no hay un campo
+    # de hora de fin en la base, se calcula sumando esto a `llamado`. Se usa
+    # para detectar si dos mesas en la misma aula se superponen en el tiempo
+    # (ver MesaFinalForm.clean en forms.py).
+    DURACION = timedelta(hours=2)
 
     SEDE_CHOICES = (
         ('SEDE LA PLATA', 'SEDE LA PLATA'),

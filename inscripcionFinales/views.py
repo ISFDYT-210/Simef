@@ -12,7 +12,7 @@ from django.views.generic import CreateView,TemplateView,ListView,UpdateView,Del
 from django.core.mail import send_mail
 from django.contrib.auth import *
 from django.contrib import messages
-from django.db.models import Q,Prefetch,OuterRef,F
+from django.db.models import Q,Prefetch,OuterRef,F,Count
 from django import forms
 from datetime import datetime   
 from django.http import HttpResponse,JsonResponse
@@ -45,7 +45,7 @@ from django.shortcuts import render, redirect
 
 # Agregar estos imports específicos para el primer login
 from django.contrib.auth.forms import SetPasswordForm, PasswordResetForm  # ← Nuevo
-from django.contrib.auth import login    
+from django.contrib.auth import update_session_auth_hash
 
 #from weasyprint import HTML, CSS
 from django.utils.timezone import now
@@ -577,10 +577,14 @@ def lista_finales_inscriptos_user(request):
     return render(request, 'finales/lista_finales_inscriptos_user.html', {'finales': finales_inscriptos})
 
 def _finales_inscriptos_visibles(usuario):
-    """Inscripciones a final pendientes que este usuario tiene permitido ver."""
-    qs = InscripcionFinal.objects.filter(
-        Q(aprobada=False) | Q(aprobada__isnull=True)
-    ).select_related('llamado__materia', 'usuario')
+    """
+    Inscripciones a final que este usuario tiene permitido ver. Issue #175:
+    antes filtraba aprobada=False | aprobada__isnull=True ("solo pendientes"),
+    así que apenas se cargaba una nota aprobatoria la fila desaparecía del
+    listado sin dejar forma de volver a encontrarla. Ahora trae todas; el
+    estado (pendiente/aprobada/desaprobada/ausente) se ve con el badge.
+    """
+    qs = InscripcionFinal.objects.select_related('llamado__materia', 'usuario')
     if usuario.es_profesor() and not usuario.is_superuser:
         # El profesor solo ve a sus propios alumnos, no los de toda la escuela
         qs = qs.filter(llamado__materia__profesor=usuario)
@@ -660,7 +664,10 @@ def inscripcionMesa(request):
         form = InscripcionFinalForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('finales/inscripcion_final.html')  # Redirige a la página de éxito de inscripción
+            # Antes: redirect('finales/inscripcion_final.html'), una ruta de
+            # template (no un nombre de URL) - Django la toma como URL
+            # literal y nunca resuelve a nada real (404 tras un alta exitosa).
+            return redirect('exito_inscripcion_final')
     else:
         form = InscripcionFinalForm()
     return render(request, 'finales/inscripcion_final.html', {'form': form})
@@ -751,18 +758,23 @@ def obtener_materias_estudiante(request):
 @capacidad_requerida('abrir_inscripciones')
 def inscripcionMateria(request):
     if request.method == 'POST':
-        inscripcion_usuario=request.POST['usuario']
-        inscripcion_materia=request.POST['materia']
+        inscripcion_usuario = request.POST['usuario']
+        inscripcion_materia = request.POST['materia']
         form = InscripcionMateriaForm(request.POST)
         if form.is_valid():
-            if usuarios_materia.objects.filter(usuario=inscripcion_usuario, materia=inscripcion_materia).count()<1:
+            # Issue #174: este chequeo contaba CUALQUIER registro histórico
+            # (count() < 1), así que un alumno en RECURSA o ABANDONO -que sí
+            # puede volver a inscribirse- quedaba bloqueado como "ya
+            # inscripto" sin tener ninguna inscripción activa. Mismo criterio
+            # que ya usa inscripcionMateriaEst (autoinscripción del alumno).
+            if not correlativas.tiene_inscripcion_activa(inscripcion_usuario, inscripcion_materia):
                 form.save()
                 return redirect('exito_inscripcion_mesa')  # Redirige a pagina de exito de alta de mesa
             else:
-                return redirect('error_inscripcion_adm')             
+                return redirect('error_inscripcion_adm')
     else:
         form = InscripcionMateriaForm()
-    return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form}) 
+    return render(request, 'materias/inscripcion_materia_adm.html',  {'form': form})
 
 @require_http_methods(['POST'])
 @capacidad_requerida('inscribirse')
@@ -1658,18 +1670,29 @@ def acta_volante(request, final_id):
     tribunal_activo = final.tribunal.filter(activo=True).select_related('docente')
     presidente = tribunal_activo.filter(rol=TribunalMesa.PRESIDENTE).first()
     vocales = list(tribunal_activo.filter(rol=TribunalMesa.VOCAL))
-    if finales_inscriptos.count() <= 25:
+    cant_inscriptos = finales_inscriptos.count()
+    # Issue #201: totales de la nómina completa de la mesa (no por página),
+    # igual que cant_inscriptos. Una inscripción sin nota ni ausente cargados
+    # todavía (recién inscripto, acta sin cerrar) no cuenta en ninguno de los
+    # tres: resumen() solo refleja resultados ya cargados.
+    resumen = finales_inscriptos.aggregate(
+        aprobados=Count('id', filter=Q(ausente=False, aprobada=True)),
+        aplazados=Count('id', filter=Q(ausente=False, aprobada=False)),
+        ausentes=Count('id', filter=Q(ausente=True)),
+    )
+    if cant_inscriptos <= 25:
         context = {
             'finales_inscriptos': finales_inscriptos,
             'final': final,
-            'cant_inscriptos': finales_inscriptos.count(),
+            'cant_inscriptos': cant_inscriptos,
+            'resumen': resumen,
             'piso': 0,
             'presidente': presidente,
             'vocales': vocales,
         }
         return render(request, 'finales/acta_volante.html', context)
     else:
-        for i in range(1, ceil(finales_inscriptos.count() / 25) + 1):
+        for i in range(1, ceil(cant_inscriptos / 25) + 1):
             inscriptos = []
             for inscripto in range(25 * (i - 1), 25 * (i - 1) + 25):
                 try:
@@ -1679,7 +1702,8 @@ def acta_volante(request, final_id):
             context = {
                 'finales_inscriptos': inscriptos,
                 'final': final,
-                'cant_inscriptos': finales_inscriptos.count(),
+                'cant_inscriptos': cant_inscriptos,
+                'resumen': resumen,
                 'piso': 25 * (i - 1),
                 'presidente': presidente,
                 'vocales': vocales,
@@ -1728,26 +1752,49 @@ def inscribir_usuario(usuario, materia):
         inscripcion.Fecha_Inscripcion = timezone.now()
         inscripcion.save()
 
-@capacidad_requerida('cargar_notas')
+@capacidad_requerida('cargar_notas', 'gestionar_mesas')
 def cargar_nota_final(request, inscripcion_id):
     """Carga el resultado de un llamado a final: lo que el preceptor transcribe
     del acta en papel que firmó el tribunal (nota o ausente), junto con el
     número de acta y folio de esa mesa. El preceptor transcribe; no decide
-    la nota, eso ya lo hizo el tribunal fuera del sistema."""
+    la nota, eso ya lo hizo el tribunal fuera del sistema.
+
+    El decorador deja pasar a cualquiera de los dos grupos (cargar_notas:
+    Preceptor/Profesor, o gestionar_mesas: Directivo/Secretario/Preceptor)
+    porque esta vista sirve tanto para la carga original como para
+    corregirla después (issue #204); el permiso exacto según cuál de las
+    dos cosas sea se resuelve abajo, por `es_correccion`."""
     inscripcion = get_object_or_404(InscripcionFinal, id=inscripcion_id)
     usuario_materia = get_object_or_404(usuarios_materia, usuario=inscripcion.usuario, materia=inscripcion.llamado.materia)
     mesa = inscripcion.llamado
 
-    if not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
+    # Issue #204 (P-05): si ya había un resultado cargado, esto es una
+    # corrección de un error de tipeo, no la carga original, y tiene su
+    # propio permiso: solo quien administra (Directivo/Secretario/
+    # Preceptor), ni siquiera el profesor de la materia que sí puede hacer
+    # la carga original. La carga original sigue usando el permiso de
+    # siempre (puede_cargar_notas_de).
+    es_correccion = inscripcion.ausente or inscripcion.aprobada is not None
+    if es_correccion:
+        if not request.user.puede_administrar():
+            return render(request, '403_forbidden.html', status=403)
+    elif not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
         return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
-       form = NotaFinalForm(request.POST)
+       form = NotaFinalForm(request.POST, es_correccion=es_correccion)
        if form.is_valid():
             nota_final = form.cleaned_data['nota_final']
             ausente = form.cleaned_data['ausente']
             numero_acta = form.cleaned_data['numero_acta']
             folio = form.cleaned_data['folio']
+            motivo_correccion = form.cleaned_data['motivo_correccion']
+
+            valor_anterior = (
+                'ausente' if inscripcion.ausente
+                else f'nota {inscripcion.nota}' if inscripcion.nota is not None
+                else 'sin cargar'
+            )
 
             inscripcion.ausente = ausente
             if ausente:
@@ -1770,20 +1817,34 @@ def cargar_nota_final(request, inscripcion_id):
             if numero_acta or folio:
                 mesa.save()
 
-            registrar_auditoria(
-                request, f'Cargó resultado ({detalle}) a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}, acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}',
-                'InscripcionFinal', inscripcion.pk
+            if es_correccion:
+                accion = (
+                    f'Corrigió el resultado de {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia} '
+                    f'({valor_anterior} → {detalle}), acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}. '
+                    f'Motivo: {motivo_correccion}'
+                )
+            else:
+                accion = (
+                    f'Cargó resultado ({detalle}) a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}, '
+                    f'acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}'
+                )
+            registrar_auditoria(request, accion, 'InscripcionFinal', inscripcion.pk)
+            messages.success(
+                request,
+                f'Resultado {"corregido" if es_correccion else "cargado"} correctamente: {detalle}'
             )
-            messages.success(request, f'Resultado cargado correctamente: {detalle}')
             return redirect('/listaFinalesAdm')  # Ajusta esto a tu URL de redirección
     else:
-        form = NotaFinalForm(initial={'numero_acta': mesa.numero_acta, 'folio': mesa.folio})
+        form = NotaFinalForm(
+            initial={'numero_acta': mesa.numero_acta, 'folio': mesa.folio}, es_correccion=es_correccion
+        )
 
     context = {
         'form': form,
         'inscripcion': inscripcion,
         'usuario_materia': usuario_materia,
         'mesa': mesa,
+        'es_correccion': es_correccion,
     }
     return render(request, 'finales/cargar_nota.html', context)
 
@@ -2057,8 +2118,10 @@ class FirstLoginPasswordChangeView(LoginRequiredMixin, FormView):
         self.request.user.first_login = False
         self.request.user.save()
         
-        # Mantener la sesión activa después del cambio
-        login(self.request, self.request.user)
+        # Mantener la sesión activa después del cambio (no re-loguear con
+        # login(): con AXES_... + ModelBackend hay dos backends configurados,
+        # y el user de la sesión no trae `.backend` seteado -> ValueError).
+        update_session_auth_hash(self.request, self.request.user)
         
         messages.success(self.request, 'Contraseña cambiada exitosamente. Ya puedes usar el sistema normalmente.')
         return super().form_valid(form)
