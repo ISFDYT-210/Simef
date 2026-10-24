@@ -88,26 +88,19 @@
     <table>
         <thead>
             <tr>
-                <th rowspan="2"style='width: 15px;'>Nº DE ORDEN</th>
-                <th rowspan="2">D.N.I.</th>
-                <th rowspan="2">APELLIDO y NOMBRE</th>
-                <th colspan="3">CALIFICACIONES</th>
-            </tr>
-            <tr>
-                <th>Esc.</th>
-                <th>Oral</th>
-                <th>Prom.</th>
+                <th style='width: 15px;'>Nº DE ORDEN</th>
+                <th>D.N.I.</th>
+                <th>APELLIDO y NOMBRE</th>
+                <th>CALIFICACIÓN</th>
             </tr>
         </thead>
-        <tbody id="tablaBody">   
+        <tbody id="tablaBody">
             {% for inscripcion in finales_inscriptos %}
                 <tr id="inscripto{{ forloop.counter }}">
                     <td>{{ forloop.counter|add:piso }}</td>
                     <td>{{ inscripcion.usuario.dni }}</td>
                     <td>{{ inscripcion.usuario.nombre_completo }}</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    <td style='text-align:center'>{% if inscripcion.ausente %}ausente{% elif inscripcion.nota is not None %}{{ inscripcion.nota }}{% endif %}</td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -143,8 +136,6 @@
                     newRow.id = `inscripto${rowNumber}`;
                     newRow.innerHTML = `
                         <td>${rowNumber+{{piso}}}</td>
-                        <td></td>
-                        <td></td>
                         <td></td>
                         <td></td>
                         <td></td>
