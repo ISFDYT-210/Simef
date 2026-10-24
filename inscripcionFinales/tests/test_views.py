@@ -19,8 +19,8 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from inscripcionFinales.models import (
-    Carrera, EstadoCursada, InscripcionFinal, Materia, MesaFinal, RegistroAuditoria, TribunalMesa, Usuario,
-    usuarios_materia,
+    Carrera, EstadoCursada, InscripcionFinal, Materia, MateriaCorrelativa, MesaFinal, RegistroAuditoria,
+    TribunalMesa, Usuario, usuarios_materia,
 )
 
 
@@ -667,6 +667,82 @@ class AltaMesaFinalSinDuplicadosTest(TestCase):
         respuesta = self.client.post(f'/edit_mesa/{otra.id}', self.datos(self.llamado))
         otra.refresh_from_db()
         self.assertNotEqual(otra.llamado, self.llamado)
+
+
+class ListaMateriasUserViewTest(TestCase):
+    """
+    lista_materias_user (/inscripcionMateriaEst/): tabla con búsqueda, filtro
+    de carrera y el visor de correlativas pendientes por fila del rediseño.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.primero = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=1, inscripcionAbierta=True)
+        cls.segundo = Materia.objects.create(
+            nombre_materia='Programación II', carrera=cls.carrera, anio=2, inscripcionAbierta=True)
+        MateriaCorrelativa.objects.create(materia=cls.segundo, materia_correlativa=cls.primero)
+        cls.alumno = crear_usuario('alu_lista_mat@test.com', 'Estudiante', 'Alumno', 95)
+        cls.alumno.carrera.add(cls.carrera)  # bloque de ingresante: primero queda EN_CURSO
+
+    def test_la_pagina_renderiza_sin_errores(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_informa_las_correlativas_que_faltan_en_el_visor_de_la_fila(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        items = {i['materia']: i for i in respuesta.context['materias_con_requisitos']}
+        self.assertIn(self.primero, items[self.segundo]['correlativas_faltantes'])
+        self.assertContains(respuesta, 'Correlativas pendientes')
+        self.assertContains(respuesta, 'Programación I')
+
+    def test_la_carrera_del_alumno_aparece_como_opcion_del_filtro(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        self.assertContains(respuesta, 'Tecnicatura')
+
+    def test_la_materia_que_esta_cursando_no_aparece_en_la_tabla(self):
+        """Issue #191: esta tabla es solo bloqueadas + disponibles para inscribirse, no un listado de todas las materias de la carrera. Lo que ya cursa se ve en "Mis inscripciones"."""
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        items = {i['materia']: i for i in respuesta.context['materias_con_requisitos']}
+        self.assertNotIn(self.primero, items)
+
+
+class ListaMateriasUserBotonesPostTest(TestCase):
+    """
+    Issue #197: Regular/Libre en /inscripcionMateriaEst/ eran <a href> (GET)
+    contra una vista que solo acepta POST (ver InscripcionMateriaEstTest):
+    el click tiraba 405. La tabla tiene que enviar esos botones como POST.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Teoría de Prueba', carrera=carrera, anio=2,
+            dia='Viernes', inscripcionAbierta=True)
+        cls.alumno = crear_usuario('alu_botones@test.com', 'Estudiante', 'Alumno', 97)
+        cls.alumno.carrera.add(carrera)
+        # Simula que el alumno ya avanzó más allá de primer año, para que
+        # puede_cursar no lo bloquee con "completá primer año" y las
+        # acciones Regular/Libre aparezcan (lo único que importa acá).
+        otra = Materia.objects.create(
+            nombre_materia='Previa Aprobada', carrera=carrera, anio=2, dia='Lunes')
+        usuarios_materia.objects.create(
+            usuario=cls.alumno, materia=otra, modalidad='Regular', estado=EstadoCursada.APROBADO)
+
+    def test_regular_y_libre_son_formularios_post_no_links(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        contenido = respuesta.content.decode()
+        accion = f'/inscribirse_materia/{self.materia.id}/Regular'
+        self.assertNotIn(f'href="{accion}"', contenido)
+        self.assertIn(f'action="{accion}"', contenido)
+        self.assertIn('method="post"', contenido)
 
 
 class InscripcionMateriaEstTest(TestCase):

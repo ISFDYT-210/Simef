@@ -2,71 +2,115 @@
 {% block title %}Lista de materias{% endblock %}
 {% block encabezado %}Materias disponibles{% endblock %}
 {% block content %}
-<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white" x-data="{ soloDisponibles: false }">
-  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-    <h2 class="text-sm font-semibold text-tinta-900">Materias disponibles</h2>
+<div x-data="{ soloDisponibles: false, busqueda: '', carreraSeleccionada: '' }">
+
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-tinta-900">Materias disponibles</h1>
+    <p class="mt-1 text-sm text-slate-500">Consultá las materias de tu carrera y revisá el estado de cursada y correlativas.</p>
+  </div>
+
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div class="relative flex-1 min-w-[220px]">
+      <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+      <input type="text" x-model="busqueda" placeholder="Buscar materia..."
+             class="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+    </div>
+    <select x-model="carreraSeleccionada"
+            class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+      <option value="">Todas las carreras</option>
+      {% for carrera in request.user.carrera.all %}
+      <option value="{{ carrera.nombre_carrera }}">{{ carrera.nombre_carrera }}</option>
+      {% endfor %}
+    </select>
     <label class="inline-flex items-center gap-2 text-sm text-slate-600">
       <input type="checkbox" x-model="soloDisponibles" class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
       Mostrar solo las que puedo cursar
     </label>
   </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
-          <th class="px-5 py-3 font-semibold">Nombre</th>
-          <th class="px-5 py-3 font-semibold">Año</th>
-          <th class="px-5 py-3 font-semibold">Carrera</th>
-          <th class="px-5 py-3 font-semibold">Profesor</th>
-          <th class="px-5 py-3 font-semibold text-right">Acciones/Estado</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-100">
-        {% for item in materias_con_requisitos %}
-        {% with materia=item.materia %}
-        <tr class="hover:bg-slate-50"
-            x-data="{ abierto: false, disponible: {% if item.disponible %}true{% else %}false{% endif %} }"
-            x-show="!soloDisponibles || disponible"
-            data-practica="{% if materia.nombre_materia|lower|slice:':5' == 'pract' or materia.nombre_materia|lower|slice:':5' == 'práct' %}1{% else %}0{% endif %}">
-          <td class="px-5 py-3 font-medium text-tinta-900">{{ materia.nombre_materia }}</td>
-          <td class="px-5 py-3">{{ materia.anio }}</td>
-          <td class="px-5 py-3">{{ materia.carrera.nombre_carrera }}</td>
-          <td class="px-5 py-3">{{ materia.profesor.nombre_completo|default:"—" }}</td>
-          <td class="px-5 py-3">
-            {% if item.disponible %}
-            <div class="flex items-center justify-end gap-2">
-              <button type="button" x-show="!abierto" @click="abierto = true" class="rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Inscribirme</button>
-              <form x-show="abierto" x-cloak method="post" action="/inscribirse_materia/{{ materia.id }}/Regular">
-                {% csrf_token %}
-                <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Regular</button>
-              </form>
-              <form x-show="abierto && $el.closest('tr').dataset.practica === '0'" x-cloak method="post" action="/inscribirse_materia/{{ materia.id }}/Libre">
-                {% csrf_token %}
-                <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Libre</button>
-              </form>
-            </div>
-            {% elif "Cursando" in item.motivo %}
-            <div class="flex items-center justify-end" title="{{ item.motivo }}">
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                {{ item.motivo }}
-              </span>
-            </div>
-            {% else %}
-            <div class="flex items-center justify-end" title="{{ item.motivo }}">
-              <span class="inline-block rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                {{ item.motivo }}
-              </span>
-            </div>
-            {% endif %}
-          </td>
-        </tr>
-        {% endwith %}
-        {% empty %}
-        <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No hay materias disponibles.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="rounded-2xl border border-slate-200 bg-white">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-5 py-3 font-semibold">Materia</th>
+            <th class="px-5 py-3 font-semibold">Año</th>
+            <th class="px-5 py-3 font-semibold">Carrera</th>
+            <th class="px-5 py-3 font-semibold">Profesor</th>
+            <th class="px-5 py-3 font-semibold text-right">Estado / Correlativas</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in materias_con_requisitos %}
+          {% with materia=item.materia %}
+          <tr class="hover:bg-slate-50"
+              x-data="{ abierto: false, disponible: {% if item.disponible %}true{% else %}false{% endif %}, mostrarCorrelativas: false }"
+              x-show="(!soloDisponibles || disponible) && (!carreraSeleccionada || carreraSeleccionada === '{{ materia.carrera.nombre_carrera|default:""|escapejs }}') && (busqueda === '' || '{{ materia.nombre_materia|lower|escapejs }}'.includes(busqueda.toLowerCase()))"
+              data-practica="{% if materia.nombre_materia|lower|slice:':5' == 'pract' or materia.nombre_materia|lower|slice:':5' == 'práct' %}1{% else %}0{% endif %}">
+            <td class="px-5 py-3 font-medium text-tinta-900">
+              <span class="mr-2 inline-block h-3 w-3 shrink-0 rounded-full align-middle {% if item.disponible %}bg-celeste-500{% else %}bg-amber-500{% endif %}"></span>{{ materia.nombre_materia }}
+            </td>
+            <td class="px-5 py-3">{{ materia.anio }}</td>
+            <td class="px-5 py-3">{{ materia.carrera.nombre_carrera }}</td>
+            <td class="px-5 py-3">{{ materia.profesor.nombre_completo|default:"—" }}</td>
+            <td class="px-5 py-3">
+              {% if item.disponible %}
+              <div class="flex items-center justify-end gap-2">
+                <button type="button" x-show="!abierto" @click="abierto = true" class="rounded-lg bg-celeste-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-celeste-500">Inscribirme</button>
+                <form x-show="abierto" x-cloak method="post" action="/inscribirse_materia/{{ materia.id }}/Regular">
+                  {% csrf_token %}
+                  <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Regular</button>
+                </form>
+                <form x-show="abierto && $el.closest('tr').dataset.practica === '0'" x-cloak method="post" action="/inscribirse_materia/{{ materia.id }}/Libre">
+                  {% csrf_token %}
+                  <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Libre</button>
+                </form>
+              </div>
+              {% elif item.correlativas_faltantes %}
+              <div class="relative flex flex-col items-end gap-0.5">
+                <button type="button" @click="mostrarCorrelativas = !mostrarCorrelativas" @click.outside="mostrarCorrelativas = false"
+                        class="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3DB] px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100">
+                  <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 11v5M12 8h.01"/></svg>
+                  Bloqueada
+                </button>
+                <span class="text-xs text-slate-400">Correlativas</span>
+                <div x-show="mostrarCorrelativas" x-cloak
+                     class="absolute right-0 top-full z-10 mt-1 w-64 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-lg">
+                  <p class="text-xs font-semibold text-tinta-900">Correlativas pendientes</p>
+                  <ul class="mt-1.5 space-y-1">
+                    {% for c in item.correlativas_faltantes %}
+                    <li class="flex items-start gap-1.5 text-xs text-slate-600">
+                      <svg class="mt-0.5 h-3 w-3 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"/></svg>
+                      {{ c.nombre_materia }}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+              {% elif "Cursando" in item.motivo %}
+              <div class="flex flex-col items-end gap-0.5" title="{{ item.motivo }}">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 7v5l3 3"/></svg>
+                  Horario ocupado
+                </span>
+                <span class="text-xs text-slate-400">{{ item.motivo }}</span>
+              </div>
+              {% else %}
+              <div class="flex flex-col items-end gap-0.5" title="{{ item.motivo }}">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3DB] px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  Bloqueada
+                </span>
+                <span class="text-xs text-slate-400">{{ item.motivo }}</span>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No hay materias disponibles.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
+
 {% endblock %}

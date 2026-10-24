@@ -346,11 +346,30 @@ class MateriasConRequisitosTest(TestCase, EstudianteTestMixin):
         items = {i['materia']: i for i in correlativas.materias_con_requisitos(alumno)}
         self.assertFalse(items[self.segundo]['disponible'])
         self.assertIn('Programación I', items[self.segundo]['motivo'])
+        self.assertEqual(items[self.segundo]['correlativas_faltantes'], [self.primero])
+
+    def test_disponible_trae_la_lista_de_faltantes_vacia(self):
+        """correlativas_faltantes siempre está presente, vacía si no bloquea nada (para el panel de la UI)."""
+        alumno = self.estudiante(43)
+        alumno.carrera.add(self.carrera)
+        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(
+            nota_cursada=6, estado=EstadoCursada.REGULAR)
+        items = {i['materia']: i for i in correlativas.materias_con_requisitos(alumno)}
+        self.assertEqual(items[self.segundo]['correlativas_faltantes'], [])
 
     def test_materia_con_cursada_activa_no_aparece_en_el_desglose(self):
         """Ya la está cursando: no es candidata a "inscribirse", no tiene sentido listarla acá."""
         alumno = self.estudiante(42)
         alumno.carrera.add(self.carrera)  # la señal la inscribe en bloque (EN_CURSO)
+        materias = [i['materia'] for i in correlativas.materias_con_requisitos(alumno)]
+        self.assertNotIn(self.primero, materias)
+
+    def test_materia_ya_cursada_por_completo_no_aparece_en_el_desglose(self):
+        """Ya la cursó (no la está cursando ahora): no es candidata a nada de esto, no tiene sentido listarla."""
+        alumno = self.estudiante(45)
+        alumno.carrera.add(self.carrera)
+        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(
+            nota_cursada=8, estado=EstadoCursada.APROBADO)
         materias = [i['materia'] for i in correlativas.materias_con_requisitos(alumno)]
         self.assertNotIn(self.primero, materias)
 

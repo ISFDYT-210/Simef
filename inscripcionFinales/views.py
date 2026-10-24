@@ -467,7 +467,9 @@ class showUser(ListView):
 
 def lista_materias_user(request):
     materias_con_requisitos = correlativas.materias_con_requisitos(request.user)
-    return render(request, 'materias/lista_materias_disponibles_user.html', {'materias_con_requisitos': materias_con_requisitos})
+    return render(request, 'materias/lista_materias_disponibles_user.html', {
+        'materias_con_requisitos': materias_con_requisitos,
+    })
 
 def lista_materias_inscriptas_user(request):
     usuario = request.user.id
