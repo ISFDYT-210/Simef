@@ -445,11 +445,27 @@ class MesaFinalForm(forms.ModelForm):
         cleaned_data = super().clean()
         materia = cleaned_data.get('materia')
         llamado = cleaned_data.get('llamado')
+        aula = cleaned_data.get('aula')
+
         if materia and llamado:
             ya_existe = MesaFinal.objects.filter(materia=materia, llamado=llamado) \
                 .exclude(pk=self.instance.pk).exists()
             if ya_existe:
                 self.add_error('llamado', 'Ya existe una mesa de esta materia en ese mismo día y horario.')
+
+        if aula and llamado:
+            # Toda mesa dura MesaFinal.DURACION (misma para todas, no hay hora
+            # de fin en la base): dos mesas de `aula` se superponen si sus
+            # llamados quedan a menos de esa duración de distancia uno del
+            # otro, sea cual sea la materia.
+            ocupada = MesaFinal.objects.filter(
+                aula=aula, vigente=True,
+                llamado__gt=llamado - MesaFinal.DURACION,
+                llamado__lt=llamado + MesaFinal.DURACION,
+            ).exclude(pk=self.instance.pk).exists()
+            if ocupada:
+                self.add_error('aula', 'El aula seleccionada ya se encuentra ocupada en ese horario.')
+
         return cleaned_data
 
 class InscripcionFinalForm(forms.ModelForm):
