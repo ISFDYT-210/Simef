@@ -368,10 +368,8 @@ def finales_con_requisitos(usuario):
             resultado.append({'mesa': mesa, 'disponible': False, 'motivo': "No estás inscripto en esta materia"})
             continue
 
-        if inscripcion_materia.modalidad != 'Libre' and (
-            inscripcion_materia.nota_cursada is None or inscripcion_materia.nota_cursada < 7
-        ):
-            resultado.append({'mesa': mesa, 'disponible': False, 'motivo': "Necesitás nota de cursada ≥ 7 (o modalidad libre)"})
+        if not tiene_cursada_aprobada(inscripcion_materia):
+            resultado.append({'mesa': mesa, 'disponible': False, 'motivo': "Necesitás tener la cursada aprobada (o modalidad libre)"})
             continue
 
         if tiene_final_aprobado(inscripcion_materia):

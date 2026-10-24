@@ -49,6 +49,31 @@ class RecalcularEstadoTest(TestCase, EstudianteTestMixin):
         self.assertEqual(inscripcion.estado, EstadoCursada.REGULAR)
         self.assertIsNotNone(inscripcion.fecha_regularidad)
 
+    def test_nota_cursada_siete_o_mas_promociona(self):
+        """Regla confirmada con el instituto: >=7 promociona, aprueba toda la materia sin rendir final."""
+        inscripcion = usuarios_materia.objects.create(
+            usuario=self.estudiante(70), materia=self.materia, nota_cursada=7)
+        self.assertEqual(inscripcion.estado, EstadoCursada.PROMOCIONADO)
+
+    def test_nota_cursada_seis_no_promociona(self):
+        """Justo debajo del corte de promoción: cursada aprobada, pero sigue necesitando rendir final."""
+        inscripcion = usuarios_materia.objects.create(
+            usuario=self.estudiante(71), materia=self.materia, nota_cursada=6.99)
+        self.assertEqual(inscripcion.estado, EstadoCursada.REGULAR)
+
+    def test_promocionado_cuenta_como_final_aprobado_para_correlativas(self):
+        """PROMOCIONADO no necesita rendir el final: ya habilita a cursar/rendir la materia siguiente."""
+        inscripcion = usuarios_materia.objects.create(
+            usuario=self.estudiante(72), materia=self.materia, nota_cursada=8)
+        self.assertTrue(correlativas.tiene_final_aprobado(inscripcion))
+
+    def test_promocionado_no_puede_volver_a_rendir(self):
+        alumno = self.estudiante(73)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        puede, motivo = correlativas.puede_rendir(alumno.id, self.materia.id)
+        self.assertFalse(puede)
+        self.assertIn('ya tiene el final aprobado', motivo)
+
     def test_cursada_desaprobada_pasa_a_recursa(self):
         inscripcion = usuarios_materia.objects.create(
             usuario=self.estudiante(3), materia=self.materia, nota_cursada=2)
@@ -83,7 +108,7 @@ class RecalcularEstadoTest(TestCase, EstudianteTestMixin):
         self.assertEqual(inscripcion.estado, EstadoCursada.RECURSA)
         ciclo_original = inscripcion.ciclo_actual_desde
 
-        inscripcion.nota_cursada = 8  # recursó y ahora sí aprobó la cursada
+        inscripcion.nota_cursada = 6  # recursó y ahora sí aprobó la cursada
         inscripcion.save()
 
         self.assertEqual(inscripcion.estado, EstadoCursada.REGULAR)
@@ -226,7 +251,7 @@ class HorarioOcupadoTest(TestCase, EstudianteTestMixin):
     def test_cursada_ya_regular_no_ocupa_mas_el_horario(self):
         """Ya aprobó la cursada: dejó de asistir a esas clases, no bloquea un horario nuevo."""
         alumno = self.estudiante(29)
-        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12, nota_cursada=8)  # REGULAR
+        usuarios_materia.objects.create(usuario=alumno, materia=self.lunes_12, nota_cursada=6)  # REGULAR
         puede, _motivo = correlativas.puede_cursar(alumno.id, self.tambien_lunes_12.id)
         self.assertTrue(puede)
 
@@ -459,20 +484,37 @@ class FinalesConRequisitosTest(TestCase, EstudianteTestMixin):
         self.assertFalse(items[mesa]['disponible'])
         self.assertIn('No estás inscripto', items[mesa]['motivo'])
 
-    def test_sin_nota_de_cursada_suficiente(self):
+    def test_sin_cursada_aprobada_no_puede_inscribirse(self):
         alumno = self.estudiante(51)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(nota_cursada=5)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 2
+        cursada.save()  # RECURSA
         mesa = self.mesa(self.primero)
         items = {i['mesa']: i for i in correlativas.finales_con_requisitos(alumno)}
         self.assertFalse(items[mesa]['disponible'])
-        self.assertIn('≥ 7', items[mesa]['motivo'])
+        self.assertIn('cursada aprobada', items[mesa]['motivo'])
+
+    def test_con_cursada_regular_pero_no_promocionada_puede_rendir(self):
+        """nota_cursada 4-6 (REGULAR, no promociona): cursada aprobada, el final sigue siendo obligatorio."""
+        alumno = self.estudiante(57)
+        alumno.carrera.add(self.carrera)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 5
+        cursada.save()
+        mesa = self.mesa(self.primero)
+        items = {i['mesa']: i for i in correlativas.finales_con_requisitos(alumno)}
+        self.assertTrue(items[mesa]['disponible'])
+        self.assertIsNone(items[mesa]['motivo'])
 
     def test_correlativa_sin_final_aprobado(self):
+        """primero: cursada aprobada (REGULAR, nota 6) pero sin rendir su final todavía."""
         alumno = self.estudiante(52)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(nota_cursada=8)
-        usuarios_materia.objects.create(usuario=alumno, materia=self.segundo, nota_cursada=8)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 6
+        cursada.save()
+        usuarios_materia.objects.create(usuario=alumno, materia=self.segundo, nota_cursada=6)
         mesa = self.mesa(self.segundo)
         items = {i['mesa']: i for i in correlativas.finales_con_requisitos(alumno)}
         self.assertFalse(items[mesa]['disponible'])
@@ -481,7 +523,9 @@ class FinalesConRequisitosTest(TestCase, EstudianteTestMixin):
     def test_cumple_todo_queda_disponible(self):
         alumno = self.estudiante(53)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(nota_cursada=8)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 6
+        cursada.save()
         mesa = self.mesa(self.primero)
         items = {i['mesa']: i for i in correlativas.finales_con_requisitos(alumno)}
         self.assertTrue(items[mesa]['disponible'])
@@ -490,7 +534,9 @@ class FinalesConRequisitosTest(TestCase, EstudianteTestMixin):
     def test_mesa_sin_inscripcion_abierta(self):
         alumno = self.estudiante(54)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(nota_cursada=8)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 6
+        cursada.save()
         mesa = self.mesa(self.primero, inscripcion_abierta=False)
         items = {i['mesa']: i for i in correlativas.finales_con_requisitos(alumno)}
         self.assertFalse(items[mesa]['disponible'])
@@ -499,7 +545,9 @@ class FinalesConRequisitosTest(TestCase, EstudianteTestMixin):
     def test_ya_inscripto_en_una_mesa_de_la_materia(self):
         alumno = self.estudiante(55)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(nota_cursada=8)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 6
+        cursada.save()
         mesa_vieja = self.mesa(self.primero, dias=2)
         InscripcionFinal.objects.create(usuario=alumno, llamado=mesa_vieja)
         mesa_nueva = self.mesa(self.primero, dias=10)
@@ -517,7 +565,9 @@ class FinalesConRequisitosTest(TestCase, EstudianteTestMixin):
         """
         alumno = self.estudiante(56)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.primero).update(nota_cursada=8)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.primero)
+        cursada.nota_cursada = 6
+        cursada.save()
         mesa_rendida = self.mesa(self.primero, dias=-2)
         InscripcionFinal.objects.create(usuario=alumno, llamado=mesa_rendida, aprobada=False, nota=2)
         mesa_nueva = self.mesa(self.primero, dias=10)
@@ -538,25 +588,25 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
 
     def test_pendiente_sin_resultado_no_consume_oportunidad(self):
         alumno = self.estudiante(60)
-        um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=6)
         InscripcionFinal.objects.create(usuario=alumno, llamado=self.mesa(5))  # todavía sin rendir
         self.assertEqual(correlativas.intentos_consumidos(alumno.id, self.materia.id, um), 0)
 
     def test_ausente_consume_una_oportunidad(self):
         alumno = self.estudiante(61)
-        um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=6)
         InscripcionFinal.objects.create(usuario=alumno, llamado=self.mesa(1), aprobada=False, ausente=True)
         self.assertEqual(correlativas.intentos_consumidos(alumno.id, self.materia.id, um), 1)
 
     def test_nota_desaprobada_consume_una_oportunidad(self):
         alumno = self.estudiante(62)
-        um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        um = usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=6)
         InscripcionFinal.objects.create(usuario=alumno, llamado=self.mesa(1), aprobada=False, nota=3)
         self.assertEqual(correlativas.intentos_consumidos(alumno.id, self.materia.id, um), 1)
 
     def test_cuarto_intento_agotado_bloquea_el_quinto(self):
         alumno = self.estudiante(63)
-        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=6)
         for i in range(4):
             InscripcionFinal.objects.create(
                 usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
@@ -566,7 +616,7 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
 
     def test_con_dos_intentos_todavia_puede_rendir(self):
         alumno = self.estudiante(64)
-        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=6)
         for i in range(2):
             InscripcionFinal.objects.create(
                 usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
@@ -575,7 +625,7 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
 
     def test_con_tres_intentos_todavia_puede_rendir(self):
         alumno = self.estudiante(67)
-        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=alumno, materia=self.materia, nota_cursada=6)
         for i in range(3):
             InscripcionFinal.objects.create(
                 usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
@@ -585,7 +635,9 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
     def test_finales_con_requisitos_informa_oportunidades_agotadas(self):
         alumno = self.estudiante(65)
         alumno.carrera.add(self.carrera)
-        usuarios_materia.objects.filter(usuario=alumno, materia=self.materia).update(nota_cursada=8)
+        cursada = usuarios_materia.objects.get(usuario=alumno, materia=self.materia)
+        cursada.nota_cursada = 6
+        cursada.save()
         for i in range(4):
             InscripcionFinal.objects.create(
                 usuario=alumno, llamado=self.mesa(1 + i), aprobada=False, nota=2)
@@ -608,7 +660,7 @@ class OportunidadesFinalTest(TestCase, EstudianteTestMixin):
         puede, _motivo = correlativas.puede_rendir(alumno.id, self.materia.id)
         self.assertFalse(puede)  # agotado, y además sin cursada aprobada todavía
 
-        um.nota_cursada = 8  # recursó: nueva cursada, ahora aprobada
+        um.nota_cursada = 6  # recursó: nueva cursada, ahora aprobada
         um.save()
 
         puede, motivo = correlativas.puede_rendir(alumno.id, self.materia.id)

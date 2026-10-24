@@ -2025,16 +2025,8 @@ def inscribir_final(request):
                 'message': f'{usuario.nombre_completo} no está inscripto en {mesa_final.materia.nombre_materia}'
             })
         
-        # Verificar nota de cursada
-        if inscripcion_materia.modalidad != 'Libre':
-            if inscripcion_materia.nota_cursada is None or inscripcion_materia.nota_cursada < 7:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': f'{usuario.nombre_completo} no tiene la nota mínima de cursada (7)'
-                })
-        
-        # Verificar correlativas, cursada aprobada y tope de oportunidades
-        # (nota de cursada >= 7 ya se validó arriba; puede_rendir() cubre el resto).
+        # Verificar cursada aprobada, correlativas y tope de oportunidades
+        # (no reimplementar acá: puede_rendir() centraliza toda la regla).
         puede, motivo_rendir = correlativas.puede_rendir(usuario_id, mesa_final.materia.id)
         if not puede:
             return JsonResponse({
@@ -2086,15 +2078,9 @@ def validar_inscripcion_final(usuario_id, materia_id):
     except usuarios_materia.DoesNotExist:
         return False
 
-    # Nota mínima de cursada propia de la materia para rendir (regla del
-    # instituto, no es parte de correlativas): >= 7 o modalidad Libre.
-    if usuario_materia_instance.modalidad != 'Libre':
-        if (usuario_materia_instance.nota_cursada is None or
-                usuario_materia_instance.nota_cursada < 7):
-            return False
-
-    # Correlativas: cursada aprobada de esta materia + final aprobado de cada
-    # correlativa (ver inscripcionFinales/correlativas.py).
+    # Cursada aprobada de esta materia + final aprobado de cada correlativa
+    # (ver inscripcionFinales/correlativas.py). No reimplementar la regla acá:
+    # puede_rendir ya centraliza la nota mínima de cursada (>= 4, o Libre).
     puede, _motivo = correlativas.puede_rendir(usuario_id, materia_id)
     return puede
 
