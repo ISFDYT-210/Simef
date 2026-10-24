@@ -1750,26 +1750,49 @@ def inscribir_usuario(usuario, materia):
         inscripcion.Fecha_Inscripcion = timezone.now()
         inscripcion.save()
 
-@capacidad_requerida('cargar_notas')
+@capacidad_requerida('cargar_notas', 'gestionar_mesas')
 def cargar_nota_final(request, inscripcion_id):
     """Carga el resultado de un llamado a final: lo que el preceptor transcribe
     del acta en papel que firmó el tribunal (nota o ausente), junto con el
     número de acta y folio de esa mesa. El preceptor transcribe; no decide
-    la nota, eso ya lo hizo el tribunal fuera del sistema."""
+    la nota, eso ya lo hizo el tribunal fuera del sistema.
+
+    El decorador deja pasar a cualquiera de los dos grupos (cargar_notas:
+    Preceptor/Profesor, o gestionar_mesas: Directivo/Secretario/Preceptor)
+    porque esta vista sirve tanto para la carga original como para
+    corregirla después (issue #204); el permiso exacto según cuál de las
+    dos cosas sea se resuelve abajo, por `es_correccion`."""
     inscripcion = get_object_or_404(InscripcionFinal, id=inscripcion_id)
     usuario_materia = get_object_or_404(usuarios_materia, usuario=inscripcion.usuario, materia=inscripcion.llamado.materia)
     mesa = inscripcion.llamado
 
-    if not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
+    # Issue #204 (P-05): si ya había un resultado cargado, esto es una
+    # corrección de un error de tipeo, no la carga original, y tiene su
+    # propio permiso: solo quien administra (Directivo/Secretario/
+    # Preceptor), ni siquiera el profesor de la materia que sí puede hacer
+    # la carga original. La carga original sigue usando el permiso de
+    # siempre (puede_cargar_notas_de).
+    es_correccion = inscripcion.ausente or inscripcion.aprobada is not None
+    if es_correccion:
+        if not request.user.puede_administrar():
+            return render(request, '403_forbidden.html', status=403)
+    elif not request.user.puede_cargar_notas_de(inscripcion.llamado.materia):
         return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
-       form = NotaFinalForm(request.POST)
+       form = NotaFinalForm(request.POST, es_correccion=es_correccion)
        if form.is_valid():
             nota_final = form.cleaned_data['nota_final']
             ausente = form.cleaned_data['ausente']
             numero_acta = form.cleaned_data['numero_acta']
             folio = form.cleaned_data['folio']
+            motivo_correccion = form.cleaned_data['motivo_correccion']
+
+            valor_anterior = (
+                'ausente' if inscripcion.ausente
+                else f'nota {inscripcion.nota}' if inscripcion.nota is not None
+                else 'sin cargar'
+            )
 
             inscripcion.ausente = ausente
             if ausente:
@@ -1792,20 +1815,34 @@ def cargar_nota_final(request, inscripcion_id):
             if numero_acta or folio:
                 mesa.save()
 
-            registrar_auditoria(
-                request, f'Cargó resultado ({detalle}) a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}, acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}',
-                'InscripcionFinal', inscripcion.pk
+            if es_correccion:
+                accion = (
+                    f'Corrigió el resultado de {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia} '
+                    f'({valor_anterior} → {detalle}), acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}. '
+                    f'Motivo: {motivo_correccion}'
+                )
+            else:
+                accion = (
+                    f'Cargó resultado ({detalle}) a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}, '
+                    f'acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}'
+                )
+            registrar_auditoria(request, accion, 'InscripcionFinal', inscripcion.pk)
+            messages.success(
+                request,
+                f'Resultado {"corregido" if es_correccion else "cargado"} correctamente: {detalle}'
             )
-            messages.success(request, f'Resultado cargado correctamente: {detalle}')
             return redirect('/listaFinalesAdm')  # Ajusta esto a tu URL de redirección
     else:
-        form = NotaFinalForm(initial={'numero_acta': mesa.numero_acta, 'folio': mesa.folio})
+        form = NotaFinalForm(
+            initial={'numero_acta': mesa.numero_acta, 'folio': mesa.folio}, es_correccion=es_correccion
+        )
 
     context = {
         'form': form,
         'inscripcion': inscripcion,
         'usuario_materia': usuario_materia,
         'mesa': mesa,
+        'es_correccion': es_correccion,
     }
     return render(request, 'finales/cargar_nota.html', context)
 

@@ -599,6 +599,16 @@ class NotaFinalForm(forms.Form):
     ausente = forms.BooleanField(required=False)
     numero_acta = forms.CharField(max_length=50, required=False)
     folio = forms.CharField(max_length=50, required=False)
+    # Issue #204: solo se pide (y solo es obligatorio) cuando ya había un
+    # resultado cargado antes, es decir que esta carga es una corrección de
+    # un error de tipeo. Ver cargar_nota_final.
+    motivo_correccion = forms.CharField(max_length=255, required=False, widget=forms.Textarea(attrs={'rows': 2}))
+
+    def __init__(self, *args, es_correccion=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.es_correccion = es_correccion
+        if es_correccion:
+            self.fields['motivo_correccion'].required = True
 
     def clean(self):
         cleaned_data = super().clean()
