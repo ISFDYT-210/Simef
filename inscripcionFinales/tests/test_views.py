@@ -745,6 +745,39 @@ class InscripcionMesaRedirectTest(TestCase):
         self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
 
 
+class ListaMateriasUserBotonesPostTest(TestCase):
+    """
+    Issue #197: Regular/Libre en /inscripcionMateriaEst/ eran <a href> (GET)
+    contra una vista que solo acepta POST (ver InscripcionMateriaEstTest):
+    el click tiraba 405. La tabla tiene que enviar esos botones como POST.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Teoría de Prueba', carrera=carrera, anio=2,
+            dia='Viernes', inscripcionAbierta=True)
+        cls.alumno = crear_usuario('alu_botones@test.com', 'Estudiante', 'Alumno', 91)
+        cls.alumno.carrera.add(carrera)
+        # Simula que el alumno ya avanzó más allá de primer año, para que
+        # puede_cursar no lo bloquee con "completá primer año" y las
+        # acciones Regular/Libre aparezcan (lo único que importa acá).
+        otra = Materia.objects.create(
+            nombre_materia='Previa Aprobada', carrera=carrera, anio=2, dia='Lunes')
+        usuarios_materia.objects.create(
+            usuario=cls.alumno, materia=otra, modalidad='Regular', estado=EstadoCursada.APROBADO)
+
+    def test_regular_y_libre_son_formularios_post_no_links(self):
+        self.client.force_login(self.alumno)
+        respuesta = self.client.get('/inscripcionMateriaEst/')
+        contenido = respuesta.content.decode()
+        accion = f'/inscribirse_materia/{self.materia.id}/Regular'
+        self.assertNotIn(f'href="{accion}"', contenido)
+        self.assertIn(f'action="{accion}"', contenido)
+        self.assertIn('method="post"', contenido)
+
+
 class InscribirFinalReinscripcionTest(TestCase):
     """
     inscribir_final (vista admin): un resultado ya cargado (ausente o nota
