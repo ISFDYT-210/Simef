@@ -18,7 +18,7 @@
                     <h4 class="text-success mb-3">¡Usuarios cargados exitosamente!</h4>
                     
                     <div class="row">
-                        <div class="col-6">
+                        <div class="col-4">
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <h2 class="text-success mb-0">{{ usuarios_creados }}</h2>
@@ -26,7 +26,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-6">
+                        <div class="col-4">
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <h2 class="text-warning mb-0">{{ usuarios_duplicados|default:0 }}</h2>
@@ -34,15 +34,39 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h2 class="text-success mb-0">{{ notas_cargadas|default:0 }}</h2>
+                                    <small class="text-muted">Notas cargadas</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="mt-4">
                         <p class="text-muted">
-                            Los usuarios han sido creados con su DNI como contraseña inicial. 
-                            Se recomienda que cambien su contraseña en el primer acceso.
+                            Cada usuario se creó con una contraseña generada al azar y distinta.
+                            Se recomienda que la cambien en el primer acceso.
                         </p>
                     </div>
-                    
+
+                    {% if credenciales_generadas %}
+                    <div class="mt-4 text-start">
+                        <p class="fw-bold mb-2">Contraseñas generadas (anotalas ahora, no se van a volver a mostrar):</p>
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr><th>DNI (usuario)</th><th>Email</th><th>Contraseña</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for credencial in credenciales_generadas %}
+                                <tr><td>{{ credencial.dni }}</td><td>{{ credencial.email|default:"—" }}</td><td><code>{{ credencial.password }}</code></td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
                     <div class="mt-4">
                         <a href="{% url 'list_user' %}" class="btn btn-primary me-2">
                             <i class="fas fa-list me-1"></i>Ver Usuarios
