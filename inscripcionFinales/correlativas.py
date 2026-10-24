@@ -205,15 +205,11 @@ def _motivo_correlativas_faltantes(faltantes):
 def materias_con_requisitos(usuario):
     """
     Todas las materias con inscripción abierta de las carreras del alumno que
-    todavía no cursó, cada una con si puede inscribirse y el motivo puntual
-    si no puede. Pensado para el desglose de requisitos en la UI de
-    lista_materias_user, en vez de ocultar sin explicar.
-
-    Las que está cursando ahora mismo (EN_CURSO) también aparecen, marcadas
-    con 'cursando': True, para que la tabla las muestre con su propio estado
-    en vez de que el alumno las "pierda de vista". Las que ya cursó por
-    completo (REGULAR/APROBADO/PROMOCIONADO) no son candidatas a nada de
-    esto y quedan afuera.
+    todavía no cursó ni está cursando, cada una con si puede inscribirse y el
+    motivo puntual si no puede. Pensado para el desglose de requisitos en la
+    UI de lista_materias_user (inscripción a materias): solo tiene que
+    mostrar bloqueadas y disponibles para inscribirse, no las que ya tiene
+    en curso (esas se ven en "Mis inscripciones").
 
     Trae todo en bloque (inscripciones propias, correlativas, estado de
     ingresante por carrera) para no repetir el N+1 que ya daba timeout contra
@@ -252,19 +248,11 @@ def materias_con_requisitos(usuario):
     resultado = []
     for materia in materias:
         if materia.id in materias_con_inscripcion_activa:
-            inscripcion = inscripciones_usuario.get(materia.id)
-            if inscripcion and inscripcion.estado == EstadoCursada.EN_CURSO:
-                resultado.append({
-                    'materia': materia, 'disponible': False, 'motivo': 'Cursando',
-                    'correlativas_faltantes': [], 'cursando': True,
-                    'horario': f"{materia.dia} · {materia.Horario} hs" if materia.dia else f"{materia.Horario} hs",
-                })
-            continue  # ya cursada completa (REGULAR/APROBADO/PROMOCIONADO): no es candidata a nada de esto
+            continue  # cursada en curso o ya completa: no es candidata a "inscribirse"
 
         if materia.anio == 1 and ingresante_por_carrera.get(materia.carrera_id):
             resultado.append({
-                'materia': materia, 'disponible': True, 'motivo': None,
-                'correlativas_faltantes': [], 'cursando': False,
+                'materia': materia, 'disponible': True, 'motivo': None, 'correlativas_faltantes': [],
             })
             continue
 
@@ -277,7 +265,7 @@ def materias_con_requisitos(usuario):
             resultado.append({
                 'materia': materia, 'disponible': False,
                 'motivo': "Tenés que completar primer año antes de cursar materias de años superiores",
-                'correlativas_faltantes': [], 'cursando': False,
+                'correlativas_faltantes': [],
             })
             continue
 
@@ -288,7 +276,7 @@ def materias_con_requisitos(usuario):
         if faltantes:
             resultado.append({
                 'materia': materia, 'disponible': False, 'motivo': _motivo_correlativas_faltantes(faltantes),
-                'correlativas_faltantes': faltantes, 'cursando': False,
+                'correlativas_faltantes': faltantes,
             })
             continue
 
@@ -297,12 +285,11 @@ def materias_con_requisitos(usuario):
             resultado.append({
                 'materia': materia, 'disponible': False,
                 'motivo': f"Cursando los {materia.dia} a las {materia.Horario}",
-                'correlativas_faltantes': [], 'cursando': False,
+                'correlativas_faltantes': [],
             })
         else:
             resultado.append({
-                'materia': materia, 'disponible': True, 'motivo': None,
-                'correlativas_faltantes': [], 'cursando': False,
+                'materia': materia, 'disponible': True, 'motivo': None, 'correlativas_faltantes': [],
             })
 
     return resultado

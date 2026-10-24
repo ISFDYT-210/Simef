@@ -704,12 +704,12 @@ class ListaMateriasUserViewTest(TestCase):
         respuesta = self.client.get('/inscripcionMateriaEst/')
         self.assertContains(respuesta, 'Tecnicatura')
 
-    def test_la_materia_que_esta_cursando_se_muestra_con_badge_cursando(self):
+    def test_la_materia_que_esta_cursando_no_aparece_en_la_tabla(self):
+        """Issue #191: esta tabla es solo bloqueadas + disponibles para inscribirse, no un listado de todas las materias de la carrera. Lo que ya cursa se ve en "Mis inscripciones"."""
         self.client.force_login(self.alumno)
         respuesta = self.client.get('/inscripcionMateriaEst/')
-        contenido = respuesta.content.decode()
-        self.assertContains(respuesta, 'Cursando')
-        self.assertIn(f"{self.primero.dia} · {self.primero.Horario} hs", contenido)
+        items = {i['materia']: i for i in respuesta.context['materias_con_requisitos']}
+        self.assertNotIn(self.primero, items)
 
 
 class ListaMateriasUserBotonesPostTest(TestCase):
