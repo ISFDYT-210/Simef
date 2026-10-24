@@ -381,7 +381,10 @@ class EstadoCursada(models.TextChoices):
 ESTADOS_CURSADA_APROBADA = {EstadoCursada.REGULAR, EstadoCursada.PROMOCIONADO, EstadoCursada.APROBADO}
 # Estados que habilitan a rendir la correlativa siguiente.
 ESTADOS_FINAL_APROBADO = {EstadoCursada.PROMOCIONADO, EstadoCursada.APROBADO}
-# Estados que son decisión manual (no se recalculan a partir de las notas).
+# Estados protegidos: una vez alcanzados (a mano, o PROMOCIONADO también se
+# alcanza solo con nota_cursada >= 7, ver recalcular_estado) no se vuelven a
+# recalcular a partir de las notas - una corrección posterior de la nota de
+# cursada no los pisa.
 ESTADOS_CURSADA_MANUALES = {EstadoCursada.PROMOCIONADO, EstadoCursada.ABANDONO}
 
 # Vencimiento de la regularidad: el instituto confirmó que aplica, pero por
@@ -463,9 +466,17 @@ class usuarios_materia(models.Model):
     def recalcular_estado(self):
         """
         Deriva `estado` a partir de nota_cursada/nota_final/modalidad.
-        No pisa PROMOCIONADO ni ABANDONO: esos son decisión manual.
-        Se llama sola desde save(), así que cualquier lugar que cargue una
-        nota (vista, admin, script, test) la tiene siempre sincronizada.
+        No pisa ABANDONO ni un PROMOCIONADO ya alcanzado: esos quedan
+        protegidos (ver ESTADOS_CURSADA_MANUALES). Se llama sola desde
+        save(), así que cualquier lugar que cargue una nota (vista, admin,
+        script, test) la tiene siempre sincronizada.
+
+        Regla de parcial/cursada confirmada con el instituto:
+        - nota_cursada >= 7: promociona (aprueba toda la materia, sin
+          necesidad de rendir final).
+        - nota_cursada >= 4 y < 7: cursada aprobada, pero el final sigue
+          siendo obligatorio (REGULAR).
+        - nota_cursada < 4: desaprueba (RECURSA).
         """
         if self.estado in ESTADOS_CURSADA_MANUALES:
             return
@@ -475,7 +486,9 @@ class usuarios_materia(models.Model):
         if self.modalidad == 'Libre':
             return
         if self.nota_cursada is not None:
-            if self.nota_cursada >= 4:
+            if self.nota_cursada >= 7:
+                self.estado = EstadoCursada.PROMOCIONADO
+            elif self.nota_cursada >= 4:
                 self.estado = EstadoCursada.REGULAR
                 if self.fecha_regularidad is None:
                     self.fecha_regularidad = timezone.now().date()

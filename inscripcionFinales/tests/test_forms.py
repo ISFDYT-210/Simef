@@ -50,7 +50,7 @@ class ValidarInscripcionFinalTest(TestCase):
     def test_con_cursada_suficiente_puede(self):
         alumno = self.estudiante(202)
         usuarios_materia.objects.create(
-            usuario=alumno, materia=self.materia, nota_cursada=7)
+            usuario=alumno, materia=self.materia, nota_cursada=6)
         self.assertTrue(validar_inscripcion_final(alumno.id, self.materia.id))
 
     def test_modalidad_libre_no_necesita_nota_de_cursada(self):
@@ -70,7 +70,7 @@ class ValidarInscripcionFinalTest(TestCase):
         """La versión borrada bloqueaba con cualquier nota, incluso un 2."""
         alumno = self.estudiante(205)
         usuarios_materia.objects.create(
-            usuario=alumno, materia=self.materia, nota_cursada=8, nota_final=2)
+            usuario=alumno, materia=self.materia, nota_cursada=6, nota_final=2)
         self.assertTrue(validar_inscripcion_final(alumno.id, self.materia.id))
 
     def test_correlativa_sin_aprobar_bloquea(self):
@@ -78,9 +78,9 @@ class ValidarInscripcionFinalTest(TestCase):
         MateriaCorrelativa.objects.create(
             materia=self.materia, materia_correlativa=self.correlativa)
         usuarios_materia.objects.create(
-            usuario=alumno, materia=self.materia, nota_cursada=8)
+            usuario=alumno, materia=self.materia, nota_cursada=6)
         usuarios_materia.objects.create(
-            usuario=alumno, materia=self.correlativa, nota_cursada=8, nota_final=2)
+            usuario=alumno, materia=self.correlativa, nota_cursada=6, nota_final=2)
 
         self.assertFalse(validar_inscripcion_final(alumno.id, self.materia.id))
 
@@ -89,7 +89,7 @@ class ValidarInscripcionFinalTest(TestCase):
         MateriaCorrelativa.objects.create(
             materia=self.materia, materia_correlativa=self.correlativa)
         usuarios_materia.objects.create(
-            usuario=alumno, materia=self.materia, nota_cursada=8)
+            usuario=alumno, materia=self.materia, nota_cursada=6)
         usuarios_materia.objects.create(
             usuario=alumno, materia=self.correlativa, nota_cursada=8, nota_final=6)
 
@@ -100,7 +100,7 @@ class ValidarInscripcionFinalTest(TestCase):
         MateriaCorrelativa.objects.create(
             materia=self.materia, materia_correlativa=self.correlativa)
         usuarios_materia.objects.create(
-            usuario=alumno, materia=self.materia, nota_cursada=8)
+            usuario=alumno, materia=self.materia, nota_cursada=6)
 
         self.assertFalse(validar_inscripcion_final(alumno.id, self.materia.id))
 

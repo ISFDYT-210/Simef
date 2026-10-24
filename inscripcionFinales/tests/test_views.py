@@ -383,7 +383,7 @@ class InscripcionExcepcionalMesaTest(TestCase):
         )
 
     def test_obtener_finales_marca_excepcional_si_cumple_academico_y_hay_margen(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         mesa = self.mesa_cerrada(dias=5)
         self.client.force_login(self.preceptor)
         datos = self.client.get(f'/obtener_finales_estudiante/?estudiante_id={self.alumno.id}').json()
@@ -393,21 +393,21 @@ class InscripcionExcepcionalMesaTest(TestCase):
         self.assertTrue(datos['finales'][0]['excepcional'])
 
     def test_obtener_finales_no_ofrece_excepcional_si_falta_poco_para_el_examen(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         self.mesa_cerrada(dias=1)
         self.client.force_login(self.preceptor)
         datos = self.client.get(f'/obtener_finales_estudiante/?estudiante_id={self.alumno.id}').json()
         self.assertEqual(datos['finales'], [])
 
     def test_obtener_finales_no_ofrece_excepcional_si_no_cumple_requisito_academico(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=2)  # < 4
         self.mesa_cerrada(dias=5)
         self.client.force_login(self.preceptor)
         datos = self.client.get(f'/obtener_finales_estudiante/?estudiante_id={self.alumno.id}').json()
         self.assertEqual(datos['finales'], [])
 
     def test_inscribir_excepcional_funciona_con_margen(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         mesa = self.mesa_cerrada(dias=5)
         self.client.force_login(self.preceptor)
         respuesta = self.client.post('/inscribir_final/', {
@@ -417,7 +417,7 @@ class InscripcionExcepcionalMesaTest(TestCase):
         self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa).exists())
 
     def test_inscribir_excepcional_falla_si_falta_poco_para_el_examen(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         mesa = self.mesa_cerrada(dias=1)
         self.client.force_login(self.preceptor)
         respuesta = self.client.post('/inscribir_final/', {
@@ -428,7 +428,7 @@ class InscripcionExcepcionalMesaTest(TestCase):
 
     def test_sin_excepcional_la_mesa_cerrada_sigue_rechazando(self):
         """excepcional=False (o ausente) respeta la regla normal, sin cambios de comportamiento."""
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         mesa = self.mesa_cerrada(dias=5)
         self.client.force_login(self.preceptor)
         respuesta = self.client.post('/inscribir_final/', {
@@ -463,7 +463,7 @@ class InscripcionFinalEstudianteTest(TestCase):
         cls.url = f'/inscribirse_final/{cls.mesa.id}'
 
     def test_alumno_que_cumple_los_requisitos_queda_inscripto(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         self.client.force_login(self.alumno)
         respuesta = self.client.post(self.url)
         self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
@@ -475,7 +475,7 @@ class InscripcionFinalEstudianteTest(TestCase):
         modelo deja de mandarla en el INSERT, la inscripción vuelve a fallar
         con IntegrityError.
         """
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         self.client.force_login(self.alumno)
         self.client.post(self.url)
         inscripcion = InscripcionFinal.objects.get(usuario=self.alumno, llamado=self.mesa)
@@ -483,21 +483,21 @@ class InscripcionFinalEstudianteTest(TestCase):
 
     def test_el_rechazo_dice_el_motivo_concreto(self):
         """El mismo motivo que muestra la lista de finales (#134, #103)."""
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=2)  # < 4
         self.client.force_login(self.alumno)
         respuesta = self.client.post(self.url, follow=True)
         mensajes = [str(m) for m in respuesta.context['messages']]
-        self.assertIn('No puedes inscribirte en este final: Necesitás nota de cursada ≥ 7 (o modalidad libre).',
+        self.assertIn('No puedes inscribirte en este final: Necesitás tener la cursada aprobada (o modalidad libre).',
                       mensajes)
 
     def test_un_get_responde_405_y_no_inscribe(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         self.client.force_login(self.alumno)
         self.assertEqual(self.client.get(self.url).status_code, 405)
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
 
     def test_alumno_que_no_cumple_los_requisitos_no_queda_inscripto(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=5)  # < 7
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=2)  # < 4
         self.client.force_login(self.alumno)
         respuesta = self.client.post(self.url)
         self.assertRedirects(respuesta, '/inscripcionFinalEst/', fetch_redirect_response=False)
@@ -847,7 +847,7 @@ class InscripcionMesaRedirectTest(TestCase):
         cls.alumno = crear_usuario('alu_inscmesa_redir@test.com', 'Estudiante', 'Alumno', 94)
         # Cursada aprobada: InscripcionFinalForm valida puede_rendir, que la exige.
         usuarios_materia.objects.create(
-            usuario=cls.alumno, materia=materia, nota_cursada=7, estado=EstadoCursada.REGULAR)
+            usuario=cls.alumno, materia=materia, nota_cursada=6, estado=EstadoCursada.REGULAR)
         cls.mesa = MesaFinal.objects.create(
             materia=materia, llamado=timezone.now() + timedelta(days=5), inscripcionAbierta=True)
 
@@ -915,7 +915,7 @@ class InscribirFinalReinscripcionTest(TestCase):
 
     def setUp(self):
         self.client.force_login(self.preceptor)
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
 
     def test_con_un_intento_desaprobado_puede_anotarse_de_nuevo(self):
         mesa_vieja = self.mesa_abierta()
@@ -979,7 +979,7 @@ class InscripcionMesaFormValidaReglasTest(TestCase):
         self.client.force_login(self.preceptor)
 
     def test_con_el_tope_de_oportunidades_agotado_no_se_puede_inscribir(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         for _ in range(4):
             InscripcionFinal.objects.create(
                 usuario=self.alumno, llamado=self.mesa_abierta(), aprobada=False, nota=2)
@@ -998,7 +998,7 @@ class InscripcionMesaFormValidaReglasTest(TestCase):
         self.assertFalse(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=mesa_nueva).exists())
 
     def test_con_cursada_aprobada_y_oportunidades_disponibles_se_puede_inscribir(self):
-        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=8)
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia, nota_cursada=6)
         mesa_nueva = self.mesa_abierta()
 
         respuesta = self.client.post('/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': mesa_nueva.id})
@@ -1369,7 +1369,7 @@ class CargarUsuariosConNotaTest(TestCase):
         self.assertIn(self.carrera, nuevo.carrera.all())
         inscripcion = usuarios_materia.objects.get(usuario=nuevo, materia=self.materia)
         self.assertEqual(inscripcion.nota_cursada, 9)
-        self.assertEqual(inscripcion.estado, EstadoCursada.REGULAR)
+        self.assertEqual(inscripcion.estado, EstadoCursada.PROMOCIONADO)
 
     def test_usuario_existente_no_se_duplica_pero_se_le_carga_la_nota(self):
         alumno = crear_usuario('existe@test.com', 'Estudiante', 'Alumno Existente', 555)

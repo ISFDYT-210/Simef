@@ -65,7 +65,7 @@ ESTUDIANTES = [
     ('Ana Ingresante', 'Recién inscripta: cursa primer año, todavía sin notas.',
      {}, []),
     ('Bruno Habilitado', 'Cursada de Programación I aprobada: puede rendir el final.',
-     {'prog1': 7}, []),
+     {'prog1': 6}, []),
     ('Carla Ultima', 'Programación I: un ausente y dos desaprobados, le queda una oportunidad.',
      {'prog1': 6}, [('prog1', 0, 'ausente'), ('prog1', 1, 2), ('prog1', 2, 3)]),
     ('Diego Agotado', 'Programación I: cuatro oportunidades usadas, ya no puede inscribirse.',
@@ -75,6 +75,9 @@ ESTUDIANTES = [
      {'prog1': 8, 'mate1': 2}, [('prog1', 1, 8)]),
     ('Facundo Recursa', 'Cursada de Programación I desaprobada: no puede rendir.',
      {'prog1': 2}, []),
+    ('Gabriela Promocionada', 'Nota de cursada de Programación I >= 7: promocionó la materia '
+     'entera, no rinde final.',
+     {'prog1': 8}, []),
 ]
 
 

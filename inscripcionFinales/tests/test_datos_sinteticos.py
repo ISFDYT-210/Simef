@@ -11,7 +11,7 @@ from django.core.management import CommandError, call_command
 from django.test import TestCase
 
 from inscripcionFinales.correlativas import intentos_consumidos, puede_cursar, puede_rendir
-from inscripcionFinales.models import Materia, MesaFinal, Usuario
+from inscripcionFinales.models import EstadoCursada, Materia, MesaFinal, Usuario, usuarios_materia
 
 
 class DatosSinteticosTest(TestCase):
@@ -63,6 +63,14 @@ class DatosSinteticosTest(TestCase):
         puede, motivo = puede_rendir(self.estudiante('Facundo Recursa').pk, self.prog1.pk)
         self.assertFalse(puede)
         self.assertIn('cursada aprobada', motivo)
+
+    def test_gabriela_promociono_y_no_rinde_final(self):
+        gabriela = self.estudiante('Gabriela Promocionada')
+        cursada = usuarios_materia.objects.get(usuario=gabriela, materia=self.prog1)
+        self.assertEqual(cursada.estado, EstadoCursada.PROMOCIONADO)
+        puede, motivo = puede_rendir(gabriela.pk, self.prog1.pk)
+        self.assertFalse(puede)
+        self.assertIn('final aprobado', motivo)
 
     def test_las_mesas_pasadas_tienen_acta_y_folio(self):
         for mesa in MesaFinal.objects.filter(vigente=False):
