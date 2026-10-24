@@ -630,6 +630,88 @@ class InscripcionMateriaEstTest(TestCase):
         self.assertTrue(usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).exists())
 
 
+class InscripcionMateriaAdmTest(TestCase):
+    """
+    Issue #174: inscripcionMateria (Preceptor/Directivo inscribe a un alumno
+    a mano desde /inscripcionMateria/) contaba CUALQUIER usuarios_materia
+    histórico (count() < 1) como "ya inscripto", sin excluir RECURSA/
+    ABANDONO. Un alumno que recursa -sin ninguna inscripción activa- quedaba
+    bloqueado como falso positivo. Mismo criterio que ya usa
+    inscripcionMateriaEst (tiene_inscripcion_activa).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        cls.materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=cls.carrera, anio=1, inscripcionAbierta=True)
+        cls.preceptor = crear_usuario('prec_inscmat@test.com', 'Preceptor', 'Preceptora', 91)
+        cls.alumno = crear_usuario('alu_inscmat@test.com', 'Estudiante', 'Alumno', 92)
+
+    def setUp(self):
+        self.client.force_login(self.preceptor)
+
+    def datos(self, **overrides):
+        datos = {'usuario': self.alumno.id, 'materia': self.materia.id, 'modalidad': 'Regular'}
+        datos.update(overrides)
+        return datos
+
+    def test_alumno_que_recursa_no_es_falso_positivo(self):
+        """El alumno tiene un registro RECURSA (sin inscripción activa): tiene que poder inscribirse."""
+        usuarios_materia.objects.create(
+            usuario=self.alumno, materia=self.materia, nota_cursada=2)  # RECURSA
+
+        respuesta = self.client.post('/inscripcionMateria/', self.datos())
+
+        self.assertRedirects(respuesta, '/exito_inscripcion_mesa/', fetch_redirect_response=False)
+        self.assertEqual(
+            usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).count(), 2)
+
+    def test_alumno_con_inscripcion_activa_se_rechaza(self):
+        usuarios_materia.objects.create(usuario=self.alumno, materia=self.materia)  # EN_CURSO
+
+        respuesta = self.client.post('/inscripcionMateria/', self.datos())
+
+        self.assertRedirects(respuesta, '/error_inscripcion_adm/', fetch_redirect_response=False)
+        self.assertEqual(
+            usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).count(), 1)
+
+    def test_alumno_sin_ninguna_inscripcion_previa_se_puede_inscribir(self):
+        respuesta = self.client.post('/inscripcionMateria/', self.datos())
+
+        self.assertRedirects(respuesta, '/exito_inscripcion_mesa/', fetch_redirect_response=False)
+        self.assertTrue(usuarios_materia.objects.filter(usuario=self.alumno, materia=self.materia).exists())
+
+
+class InscripcionMesaRedirectTest(TestCase):
+    """
+    inscripcionMesa redirigía con redirect('finales/inscripcion_final.html'):
+    una ruta de template, no un nombre de URL. Django la toma como URL
+    literal, así que un alta exitosa terminaba en una página que no existe.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        carrera = Carrera.objects.create(nombre_carrera='Tecnicatura')
+        materia = Materia.objects.create(
+            nombre_materia='Programación I', carrera=carrera, anio=1, inscripcionAbierta=True)
+        cls.preceptor = crear_usuario('prec_inscmesa_redir@test.com', 'Preceptor', 'Preceptora', 93)
+        cls.alumno = crear_usuario('alu_inscmesa_redir@test.com', 'Estudiante', 'Alumno', 94)
+        # Cursada aprobada: InscripcionFinalForm valida puede_rendir, que la exige.
+        usuarios_materia.objects.create(
+            usuario=cls.alumno, materia=materia, nota_cursada=7, estado=EstadoCursada.REGULAR)
+        cls.mesa = MesaFinal.objects.create(
+            materia=materia, llamado=timezone.now() + timedelta(days=5), inscripcionAbierta=True)
+
+    def test_alta_exitosa_redirige_a_una_url_real(self):
+        self.client.force_login(self.preceptor)
+        respuesta = self.client.post(
+            '/inscripcionMesa/', {'usuario': self.alumno.id, 'llamado': self.mesa.id})
+
+        self.assertRedirects(respuesta, '/exito-inscripcion/', fetch_redirect_response=False)
+        self.assertTrue(InscripcionFinal.objects.filter(usuario=self.alumno, llamado=self.mesa).exists())
+
+
 class InscribirFinalReinscripcionTest(TestCase):
     """
     inscribir_final (vista admin): un resultado ya cargado (ausente o nota
