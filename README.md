@@ -37,7 +37,8 @@ ve solo lo que le corresponde:
 - correlativas y nota mínima de cursada;
 - plazo de inscripción de cada mesa;
 - una sola inscripción por mesa, sin cancelación por parte del estudiante;
-- un **máximo de tres oportunidades** por materia, en las que Ausente cuenta como una;
+- un **máximo de cuatro oportunidades** por materia, en las que Ausente cuenta como una;
+- promoción sin final con nota de cursada 7 o más;
 - superposición de horarios al cursar.
 
 ## En números
@@ -46,10 +47,10 @@ Cifras medidas sobre `develop`, no objetivos:
 
 | | |
 |---|---|
-| Tests automatizados | **172**, con PostgreSQL en cada PR |
+| Tests automatizados | **249**, con PostgreSQL en cada PR |
 | Dependencias con vulnerabilidades conocidas | **0** (`pip-audit` frena el PR si aparece una) |
 | Avisos de `manage.py check --deploy` | **0** con `DEBUG=False` |
-| Controles obligatorios para llegar a `main` | **4**: lint, tests, checklist de despliegue y build de Docker |
+| Controles obligatorios para llegar a `main` | **4**: lint, tests, checklist de despliegue y build de Docker (`develop` suma `pip-audit`) |
 | Dependencia de servicios externos para los PDF | **ninguna**: la constancia y el listado de mesas se generan dentro del sistema |
 
 ## Cómo funciona
