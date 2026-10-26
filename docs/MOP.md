@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Estado | **Borrador.** Faltan los responsables de la sección 2 (pendiente P-04 del decision log) y la comprobación de QA de la sección 8. |
-| Versión del documento | 0.3 · 18/10/2026 |
+| Versión del documento | 0.4 · 26/10/2026 |
 | Coordina | Backend, con Frontend y el responsable del entorno |
 | Comprueba | QA, ejecutando cada procedimiento (sección 8) |
 | Revisa los límites | Análisis Funcional (sección 7) |
@@ -356,12 +356,29 @@ Personales.
 no se hacen con datos reales de estudiantes.
 **Ejecuta:** responsable de la base. **Valida:** QA.
 
-1. En la consola de Neon, crear una rama nueva **sin datos**: la opción *Schema only*
-   copia la estructura de producción sin ninguna fila. Nunca sobre `main` ni sobre
-   `preview`.
-2. Copiar su cadena de conexión a una variable solo para esta terminal, sin
-   guardarla en el `.env` ni en el repositorio.
-3. Cargar el instituto ficticio:
+1. En la consola de Neon, crear una rama nueva con la opción *Branch schema only*,
+   a partir de la rama de producción. Copia la estructura sin ninguna fila. En
+   *Auto-delete* elegir **Never**, para que dure todo el período de pruebas.
+2. Guardar su cadena de conexión en el `.env` local, que no se sube, como
+   `QA_DATABASE_URL`. Para los comandos de abajo, exportarla en la terminal como
+   `DATABASE_URL`. Nunca usar la de producción ni la de `preview`.
+3. **Anotar las migraciones que la rama ya tiene.** *Schema only* copia las tablas,
+   pero tampoco copia las filas de `django_migrations`, así que Django cree que no hay
+   ninguna aplicada. Hay que anotar sin ejecutarlas (`--fake`) las mismas que tiene
+   producción. Para verlas: `select app, name from django_migrations` sobre la base
+   de producción, en solo lectura. Por ejemplo, si producción llega a la 0015:
+
+   ```bash
+   for app in contenttypes auth admin sessions "inscripcionFinales 0015"; do
+     docker run --rm -v "$PWD":/app:ro -w /app -e DEBUG=True -e DATABASE_URL \
+       --entrypoint python simef-web manage.py migrate --fake $app
+   done
+   ```
+
+4. **Aplicar las que faltan**, revisando antes el plan con `migrate --plan`, igual
+   que en OP-03. Es el mismo plan que va a necesitar producción en la próxima
+   publicación, así que sirve de ensayo.
+5. Cargar el instituto ficticio:
 
    ```bash
    docker run --rm -v "$PWD":/app:ro -w /app -e DEBUG=True -e DATABASE_URL \
@@ -370,7 +387,7 @@ no se hacen con datos reales de estudiantes.
 
    El comando se niega a correr si la base ya tiene usuarios. Así nunca se mezcla
    con datos reales.
-4. Guardar las contraseñas que muestra al final en el gestor de contraseñas del
+6. Guardar las contraseñas que muestra al final en el gestor de contraseñas del
    equipo. No se vuelven a mostrar y no van en tarjetas ni en el chat.
 
 **Qué trae:**
@@ -461,7 +478,7 @@ comprobación registrada.*
 | OP-08 Habilitar el admin | | | | |
 | OP-09 Desbloquear o blanquear | | | | |
 | OP-12 Usuario de la app (`preview`) | 18/10/2026 | Backend | rama `preview` | Usuario creado: lee, escribe sesiones, intentos de axes y usuarios dentro de una transacción revertida, y no puede crear tablas. Falta producción y el cambio en Vercel. |
-| OP-11 Datos sintéticos | 18/10/2026 | Backend | base de tests | Comando probado con tests automáticos; se niega sobre una base con usuarios. Falta cargar la rama de Neon y la comprobación de QA. |
+| OP-11 Datos sintéticos | 26/10/2026 | Backend | rama `qa` de Neon | Rama creada sin datos; migraciones de producción anotadas y las 18 que faltaban (django-axes y de la 0016 a la 0023) aplicadas sin errores; instituto ficticio cargado. Los siete casos de estudiantes dan lo esperado. Falta la comprobación de QA. |
 
 ## 9. Historial
 
@@ -470,3 +487,4 @@ comprobación registrada.*
 | 0.1 | 14/10/2026 | Primera versión: destino, configuración, controles y procedimientos OP-01 a OP-10. Faltan los responsables y la comprobación de QA. |
 | 0.2 | 18/10/2026 | OP-11: base de prueba con datos sintéticos. |
 | 0.3 | 18/10/2026 | OP-12: usuario de base acotado para la app. |
+| 0.4 | 26/10/2026 | OP-11: anotar y aplicar migraciones en una rama *schema only* antes de cargar los datos. |
