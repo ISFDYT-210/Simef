@@ -86,6 +86,13 @@ correr() {
 }
 
 echo "==> Destino: $DESTINO (endpoint de Neon: $ENDPOINT)"
+echo "==> Esquema de la base contra el código (no escribe nada):"
+ESQUEMA=$(correr verificar_esquema 2>&1) || {
+  echo "$ESQUEMA" | sed 's/^/    /'
+  echo "ERROR: la base tiene cambios que el repo no conoce. No se migra hasta aclararlo (MOP OP-03)." >&2
+  exit 1
+}
+echo "$ESQUEMA" | sed 's/^/    /'
 echo "==> Plan (no escribe nada):"
 PLAN=$(correr migrate --plan 2>&1) || {
   echo "$PLAN" | tail -3 | sed 's/^/    /'
@@ -115,3 +122,10 @@ echo "==> Aplicando:"
 correr migrate --noinput 2>&1 | sed 's/^/    /'
 echo "==> Plan después (tiene que estar vacío):"
 correr migrate --plan 2>&1 | tail -1 | sed 's/^/    /'
+echo "==> Esquema después (tiene que coincidir, sin pendientes):"
+ESQUEMA=$(correr verificar_esquema --sin-pendientes 2>&1) || {
+  echo "$ESQUEMA" | sed 's/^/    /'
+  echo "ERROR: después de migrar, el esquema no coincide con el código. Revisar antes de publicar." >&2
+  exit 1
+}
+echo "$ESQUEMA" | sed 's/^/    /'

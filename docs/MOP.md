@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Estado | **Borrador.** Faltan los responsables de la sección 2 (pendiente P-04 del decision log) y la comprobación de QA de la sección 8. |
-| Versión del documento | 0.6 · 26/10/2026 |
+| Versión del documento | 0.7 · 26/10/2026 |
 | Coordina | Backend, con Frontend y el responsable del entorno |
 | Comprueba | QA, ejecutando cada procedimiento (sección 8) |
 | Revisa los límites | Análisis Funcional (sección 7) |
@@ -193,12 +193,18 @@ Las anteriores se borran, con el ok del responsable de publicación.
 ```
 
 El script lee la cadena del `.env` sin mostrarla y se niega a seguir si no es de
-Neon, o si la de `preview` resulta ser la de producción. Después muestra el plan sin
+Neon, o si la de `preview` resulta ser la de producción. Antes de nada compara el
+esquema de la base con el código (`manage.py verificar_esquema`). Si la base tiene
+una migración que el repo no conoce, o una columna obligatoria que ningún modelo
+usa, como pasó con `ausente`, se detiene sin escribir. Después muestra el plan sin
 escribir nada. En producción, además, pide confirmar que ya existe la rama de
 respaldo de hoy (OP-02). Aplica las migraciones solo con una confirmación escrita, y
-al final vuelve a mostrar el plan.
+al final vuelve a mostrar el plan y a comparar el esquema, esta vez sin aceptar
+migraciones pendientes.
 
-**Cómo se verifica:** el plan final dice `No planned migration operations`.
+**Cómo se verifica:** el plan final dice `No planned migration operations` y la
+última línea dice `El esquema de la base coincide con el código.`. La migración
+suelta `0009_inscripcionfinal_ausente` aparece como aviso conocido, no como error.
 
 **Si falla:** **no reintentar a ciegas.** Copiar el error, sin cadenas de conexión, y
 avisar al responsable de publicación. Si la base quedó a medio migrar, se restaura
@@ -492,3 +498,4 @@ comprobación registrada.*
 | 0.4 | 26/10/2026 | OP-11: anotar y aplicar migraciones en una rama *schema only* antes de cargar los datos. |
 | 0.5 | 26/10/2026 | Registro de la prueba de restauración (OP-06). |
 | 0.6 | 26/10/2026 | OP-02: ventana de restauración de 6 horas y qué implica. |
+| 0.7 | 26/10/2026 | OP-03: control del esquema real antes y después de migrar (CICD-12). |
