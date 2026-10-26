@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Estado | **Borrador.** Faltan los responsables de la sección 2 (pendiente P-04 del decision log) y la comprobación de QA de la sección 8. |
-| Versión del documento | 0.5 · 26/10/2026 |
+| Versión del documento | 0.6 · 26/10/2026 |
 | Coordina | Backend, con Frontend y el responsable del entorno |
 | Comprueba | QA, ejecutando cada procedimiento (sección 8) |
 | Revisa los límites | Análisis Funcional (sección 7) |
@@ -168,10 +168,12 @@ inscripción.
    `backups/` (ignorada por git) y lo restaura en la base local para comprobar que
    sirve. El archivo tiene datos personales de estudiantes: no se sube a ningún lado,
    no se comparte y se borra cuando deja de hacer falta.
-3. **Ventana de restauración:** anotar en la sección 8 hasta cuándo hacia atrás
-   permite restaurar el plan de Neon (consola → configuración del proyecto). Ese
-   dato define cuánto tiempo hay para detectar un problema y volver a un punto
-   anterior sin depender de las ramas de respaldo.
+3. **Ventana de restauración:** hoy es de **6 horas**, el máximo del plan gratuito
+   de Neon. Se ve en la consola → **Backup & Restore** → *History window*; no se
+   cambia sin un cambio de plan. Neon puede volver la base a cualquier momento de
+   las últimas 6 horas, sin ramas de respaldo. Un problema que se detecte después
+   solo se recupera desde la rama de respaldo del paso 1: por eso esa rama es
+   obligatoria antes de cada publicación y no se borra durante la primera semana.
 
 **Cómo se verifica:** la rama aparece en la lista de Branches con la fecha de hoy, y
 la copia local tiene los mismos usuarios que producción.
@@ -469,7 +471,7 @@ comprobación registrada.*
 
 | Procedimiento | Fecha | Quién | Dónde | Resultado |
 |---|---|---|---|---|
-| OP-02 Respaldar (y ventana de restauración de Neon) | | | | |
+| OP-02 Respaldar (y ventana de restauración de Neon) | 26/10/2026 | Backend | consola de Neon | Ventana de restauración: 6 horas (plan gratuito). La rama de respaldo y la copia en archivo se prueban en la publicación. |
 | OP-03 Migrar (`preview`) | 14/10/2026 | Backend | rama `preview` | Script probado: sin pendientes termina sin escribir; se niega con una cadena de producción y con una que no es de Neon. Falta la comprobación de QA. |
 | OP-04 Comprobar | | | | |
 | OP-05 Volver atrás | | | | |
@@ -489,3 +491,4 @@ comprobación registrada.*
 | 0.3 | 18/10/2026 | OP-12: usuario de base acotado para la app. |
 | 0.4 | 26/10/2026 | OP-11: anotar y aplicar migraciones en una rama *schema only* antes de cargar los datos. |
 | 0.5 | 26/10/2026 | Registro de la prueba de restauración (OP-06). |
+| 0.6 | 26/10/2026 | OP-02: ventana de restauración de 6 horas y qué implica. |
