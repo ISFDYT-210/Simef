@@ -71,8 +71,9 @@ El sistema registra lo que el preceptor transcribe del acta firmada.
 </p>
 
 <p align="center">
-  <a href="https://claude.ai/artifact/Tb8GqrCirBLm1HSrvjpAaq"><b>Ver el diagrama interactivo →</b></a><br>
-  <sub>Cada componente enlaza a las líneas de código que lo respaldan. Tiene tema claro y oscuro, y se puede recorrer por ruta.</sub>
+  <a href="https://isfdyt-210.github.io/Simef/arquitectura?theme=dark&present=1"><img src="docs/img/arquitectura-interactiva.png" width="880" alt="Diagrama de arquitectura de SIMEF: los usuarios entran por HTTPS a Vercel; el pedido pasa por el middleware (CSRF y axes) y por el control de roles y capacidades hasta las vistas de Django, que usan las reglas académicas, arman los PDF en memoria, mandan mails por Gmail SMTP y guardan en Neon PostgreSQL. GitHub Actions controla la rama main, y cada merge a main se despliega en Vercel."></a><br>
+  <a href="https://isfdyt-210.github.io/Simef/arquitectura?theme=dark&present=1"><b>Abrir el diagrama interactivo ↗</b></a><br>
+  <sub>Cada componente enlaza a las líneas de código que lo respaldan. Se regenera con <code>scripts/diagrama_arquitectura.sh</code>.</sub>
 </p>
 
 | Pieza | Para qué |
