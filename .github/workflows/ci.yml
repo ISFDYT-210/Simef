@@ -107,6 +107,12 @@ jobs:
       - name: Aplicar migraciones
         run: python manage.py migrate --noinput
 
+      # CICD-12: el mismo control que corre migrar_neon.sh contra Neon. Acá
+      # la base sale de las migraciones del repo, así que tiene que coincidir;
+      # sirve para que el comando no se rompa sin que nadie lo note.
+      - name: Verificar el esquema de la base contra el código
+        run: python manage.py verificar_esquema --sin-pendientes
+
       - name: Correr tests con coverage
         run: |
           set -o pipefail
