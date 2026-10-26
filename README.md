@@ -70,6 +70,11 @@ El sistema registra lo que el preceptor transcribe del acta firmada.
   <img src="docs/img/arquitectura.gif" width="880" alt="Animación de la arquitectura: el navegador se conecta por HTTPS a Vercel, que corre Django 5.2 con WhiteNoise y usa la base PostgreSQL de Neon. Una versión nueva pasa por los controles obligatorios de GitHub Actions (lint, tests, checklist de despliegue, pip-audit y build de Docker), entra a la rama main protegida de GitHub y cada merge a main se publica en Vercel.">
 </p>
 
+<p align="center">
+  <a href="https://claude.ai/artifact/Tb8GqrCirBLm1HSrvjpAaq"><b>Ver el diagrama interactivo →</b></a><br>
+  <sub>Cada componente enlaza a las líneas de código que lo respaldan. Tiene tema claro y oscuro, y se puede recorrer por ruta.</sub>
+</p>
+
 | Pieza | Para qué |
 |---|---|
 | Django 5.2 LTS | Aplicación, reglas académicas y permisos por rol |
