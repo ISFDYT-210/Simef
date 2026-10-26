@@ -57,28 +57,18 @@ Cifras medidas sobre `develop`, no objetivos:
 
 El circuito de un final, de punta a punta:
 
-```mermaid
-flowchart LR
-    P1["Preceptor<br/>crea y habilita la mesa"] --> E["Estudiante<br/>se inscribe"]
-    E -->|"SIMEF valida correlativas,<br/>plazo y oportunidades"| N["Preceptor<br/>consulta la nómina"]
-    N --> A["Acta volante"]
-    A --> F["Presidente de mesa<br/>firma el acta en papel"]
-    F --> R["Preceptor<br/>transcribe los resultados"]
-    R --> H["SIMEF conserva el resultado<br/>y actualiza las oportunidades"]
-```
+<p align="center">
+  <img src="docs/img/circuito-de-un-final.gif" width="880" alt="Animación del circuito de un final, en siete pasos: el preceptor crea y habilita la mesa; el estudiante se inscribe, y SIMEF valida correlativas, plazo y oportunidades; el preceptor consulta la nómina de la mesa; se genera el acta volante; el presidente de mesa firma el acta en papel, fuera de SIMEF; el preceptor transcribe los resultados; y SIMEF conserva el resultado y actualiza las oportunidades.">
+</p>
 
 La firma del acta y el libro de actas son procedimientos en papel, fuera de SIMEF.
 El sistema registra lo que el preceptor transcribe del acta firmada.
 
 **Arquitectura:**
 
-```mermaid
-flowchart LR
-    U["Navegador"] -->|HTTPS| V["Vercel<br/>Django 5.2 + WhiteNoise"]
-    V --> N[("Neon<br/>PostgreSQL")]
-    G["GitHub<br/>main protegida"] -->|"cada merge a main"| V
-    CI["GitHub Actions<br/>lint · tests · checklist ·<br/>pip-audit · Docker"] -.->|"obligatorio antes del merge"| G
-```
+<p align="center">
+  <img src="docs/img/arquitectura.gif" width="880" alt="Animación de la arquitectura: el navegador se conecta por HTTPS a Vercel, que corre Django 5.2 con WhiteNoise y usa la base PostgreSQL de Neon. Una versión nueva pasa por los controles obligatorios de GitHub Actions (lint, tests, checklist de despliegue, pip-audit y build de Docker), entra a la rama main protegida de GitHub y cada merge a main se publica en Vercel.">
+</p>
 
 | Pieza | Para qué |
 |---|---|
