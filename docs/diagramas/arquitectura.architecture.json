@@ -1,0 +1,396 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura de SIMEF",
+    "output": "docs/diagramas/arquitectura.html",
+    "locale": "es",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ISFDYT-210/Simef.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "8fad56bccd56ae9405f84e73de6647ebb212a287"
+    }
+  },
+  "components": [
+    {
+      "id": "actions",
+      "type": "cloud",
+      "label": "GitHub Actions",
+      "sublabel": "controles del CI",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "line": 1,
+          "end_line": 24
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "line": 183,
+          "end_line": 200
+        }
+      ]
+    },
+    {
+      "id": "github",
+      "type": "cloud",
+      "label": "Rama main",
+      "sublabel": "GitHub",
+      "pos": [
+        240,
+        60
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": ".github/workflows/deploy-vercel.yml",
+          "line": 20,
+          "end_line": 28
+        }
+      ]
+    },
+    {
+      "id": "usuarios",
+      "type": "external",
+      "label": "Usuarios",
+      "sublabel": "alumnos y personal",
+      "pos": [
+        40,
+        220
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "inscripcionFinales/models.py",
+          "line": 112,
+          "end_line": 123
+        }
+      ]
+    },
+    {
+      "id": "vercel",
+      "type": "cloud",
+      "label": "Vercel",
+      "sublabel": "Python · wsgi.py",
+      "pos": [
+        240,
+        220
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "vercel.json",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "gestionInstituto/wsgi.py",
+          "line": 1,
+          "end_line": 13
+        }
+      ]
+    },
+    {
+      "id": "middleware",
+      "type": "security",
+      "label": "Middleware",
+      "sublabel": "CSRF · axes",
+      "pos": [
+        440,
+        220
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "gestionInstituto/settings.py",
+          "line": 134,
+          "end_line": 157
+        },
+        {
+          "path": "inscripcionFinales/middleware.py",
+          "line": 3,
+          "end_line": 34
+        }
+      ]
+    },
+    {
+      "id": "permisos",
+      "type": "security",
+      "label": "Roles y capacidades",
+      "sublabel": "permissions.py",
+      "pos": [
+        640,
+        220
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "inscripcionFinales/permissions.py",
+          "line": 1,
+          "end_line": 37
+        }
+      ]
+    },
+    {
+      "id": "vistas",
+      "type": "backend",
+      "label": "Vistas Django",
+      "sublabel": "inscripciones · actas",
+      "pos": [
+        840,
+        220
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "inscripcionFinales/views.py",
+          "line": 711,
+          "end_line": 731
+        },
+        {
+          "path": "inscripcionFinales/views.py",
+          "line": 1964,
+          "end_line": 2058
+        }
+      ]
+    },
+    {
+      "id": "neon",
+      "type": "database",
+      "label": "Neon PostgreSQL",
+      "sublabel": "DATABASE_URL",
+      "pos": [
+        1050,
+        220
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "gestionInstituto/settings.py",
+          "line": 199,
+          "end_line": 225
+        },
+        {
+          "path": "inscripcionFinales/audit.py",
+          "line": 10,
+          "end_line": 24
+        }
+      ]
+    },
+    {
+      "id": "gmail",
+      "type": "external",
+      "label": "Gmail SMTP",
+      "sublabel": "mails de acceso",
+      "pos": [
+        840,
+        60
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "gestionInstituto/settings.py",
+          "line": 308,
+          "end_line": 313
+        },
+        {
+          "path": "inscripcionFinales/forms.py",
+          "line": 229,
+          "end_line": 236
+        },
+        {
+          "path": "inscripcionFinales/views.py",
+          "line": 2472,
+          "end_line": 2495
+        }
+      ]
+    },
+    {
+      "id": "reglas",
+      "type": "backend",
+      "label": "Reglas académicas",
+      "sublabel": "correlativas.py",
+      "pos": [
+        640,
+        400
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "inscripcionFinales/correlativas.py",
+          "line": 172,
+          "end_line": 195
+        }
+      ]
+    },
+    {
+      "id": "pdf",
+      "type": "backend",
+      "label": "PDF en memoria",
+      "sublabel": "ReportLab",
+      "pos": [
+        840,
+        400
+      ],
+      "size": [
+        130,
+        62
+      ],
+      "sources": [
+        {
+          "path": "inscripcionFinales/views.py",
+          "line": 2118,
+          "end_line": 2130
+        },
+        {
+          "path": "inscripcionFinales/constancia_pdf.py",
+          "line": 92,
+          "end_line": 155
+        },
+        {
+          "path": "inscripcionFinales/views.py",
+          "line": 2371,
+          "end_line": 2390
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Vercel · Django 5.2",
+      "wraps": [
+        "vercel",
+        "middleware",
+        "permisos",
+        "vistas",
+        "reglas",
+        "pdf"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "usuarios",
+      "to": "vercel",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "vercel",
+      "to": "middleware",
+      "label": "WSGI",
+      "variant": "emphasis"
+    },
+    {
+      "from": "middleware",
+      "to": "permisos",
+      "label": "sesión",
+      "variant": "security"
+    },
+    {
+      "from": "permisos",
+      "to": "vistas",
+      "label": "permitido",
+      "variant": "emphasis"
+    },
+    {
+      "from": "vistas",
+      "to": "neon",
+      "label": "ORM / SQL",
+      "variant": "emphasis"
+    },
+    {
+      "from": "vistas",
+      "to": "reglas",
+      "label": "puede_rendir()"
+    },
+    {
+      "from": "vistas",
+      "to": "pdf",
+      "label": "actas y constancias"
+    },
+    {
+      "from": "vistas",
+      "to": "gmail",
+      "label": "SMTP TLS",
+      "variant": "dashed"
+    },
+    {
+      "from": "actions",
+      "to": "github",
+      "label": "checks"
+    },
+    {
+      "from": "github",
+      "to": "vercel",
+      "label": "deploy al mergear",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Una inscripción a final",
+      "items": [
+        "El estudiante se inscribe con un POST con CSRF",
+        "puede_rendir() exige cursada aprobada, correlativas y oportunidades disponibles",
+        "La inscripción se guarda en Neon y queda en la auditoría"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Seguridad",
+      "items": [
+        "axes bloquea el login tras 5 intentos fallidos",
+        "El primer ingreso obliga a cambiar la contraseña",
+        "Cada vista exige un rol o una capacidad"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Despliegue",
+      "items": [
+        "Vercel publica cada merge a main y cada PR tiene su vista previa",
+        "main exige que pasen los controles de GitHub Actions",
+        "Los PDF se arman en el servidor: los datos no salen a otro servicio"
+      ]
+    }
+  ]
+}
