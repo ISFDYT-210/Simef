@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Estado | **Borrador.** Faltan los responsables de la sección 2 (pendiente P-04 del decision log) y la comprobación de QA de la sección 8. |
-| Versión del documento | 0.4 · 26/10/2026 |
+| Versión del documento | 0.5 · 26/10/2026 |
 | Coordina | Backend, con Frontend y el responsable del entorno |
 | Comprueba | QA, ejecutando cada procedimiento (sección 8) |
 | Revisa los límites | Análisis Funcional (sección 7) |
@@ -473,7 +473,7 @@ comprobación registrada.*
 | OP-03 Migrar (`preview`) | 14/10/2026 | Backend | rama `preview` | Script probado: sin pendientes termina sin escribir; se niega con una cadena de producción y con una que no es de Neon. Falta la comprobación de QA. |
 | OP-04 Comprobar | | | | |
 | OP-05 Volver atrás | | | | |
-| OP-06 Restaurar (prueba sobre una rama de prueba) | | | | |
+| OP-06 Restaurar (prueba sobre una rama de prueba) | 26/10/2026 | Backend | rama `restore-test` de Neon | Rama creada desde producción en un momento de una hora antes. Comparada en solo lectura: 28 tablas y 903 filas en las dos, ninguna tabla con diferencias, mismos 35 registros de migraciones y mismo último registro de auditoría. Falta la comprobación de QA. |
 | OP-07 Rotar | | | | |
 | OP-08 Habilitar el admin | | | | |
 | OP-09 Desbloquear o blanquear | | | | |
@@ -488,3 +488,4 @@ comprobación registrada.*
 | 0.2 | 18/10/2026 | OP-11: base de prueba con datos sintéticos. |
 | 0.3 | 18/10/2026 | OP-12: usuario de base acotado para la app. |
 | 0.4 | 26/10/2026 | OP-11: anotar y aplicar migraciones en una rama *schema only* antes de cargar los datos. |
+| 0.5 | 26/10/2026 | Registro de la prueba de restauración (OP-06). |
