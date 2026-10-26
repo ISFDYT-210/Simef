@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="inscripcionFinales/static/imagenes/SIMEF.png" alt="SIMEF" width="140">
+<img src="docs/img/presentacion.gif" alt="SIMEF: inscripción a mesas de examen final del ISFDyT N.º 210" width="720">
 
 # SIMEF
 
