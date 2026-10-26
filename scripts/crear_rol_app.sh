@@ -144,5 +144,12 @@ open('.env', 'w', encoding='utf-8').write('\n'.join(lineas) + '\n')
 EOF
 
 echo "==> Listo. La cadena quedó en el .env como $VAR_APP (no se muestra)."
-echo "    Copiarla en Vercel a la variable DATABASE_URL del entorno $1, como Sensitive,"
-echo "    y volver a desplegar. Las migraciones siguen usando $VAR_DUENO (el dueño)."
+if [ "$1" = produccion ]; then
+  echo "    NO la cargues todavía en Vercel si producción tiene migraciones pendientes:"
+  echo "    primero ./scripts/migrar_neon.sh produccion, y recién después ponerla en"
+  echo "    DATABASE_URL de Production, como Sensitive, y redeployar (MOP OP-01 y OP-12)."
+else
+  echo "    Copiarla en Vercel a la variable DATABASE_URL del entorno Preview, como"
+  echo "    Sensitive, y volver a desplegar."
+fi
+echo "    Las migraciones siguen usando $VAR_DUENO (el dueño)."
