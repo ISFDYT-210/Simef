@@ -9,7 +9,7 @@
 Inscripciones a cursadas y finales, actas, notas y constancias, con las reglas
 académicas del instituto aplicadas en el servidor.
 
-[![CI](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml)
+[![CI - SIMEF](https://img.shields.io/github/check-runs/ISFDYT-210/Simef/develop?label=CI%20-%20SIMEF&logo=github)](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml?query=branch%3Adevelop)
 ![Django 5.2 LTS](https://img.shields.io/badge/Django-5.2_LTS-0C4B33?logo=django&logoColor=white)
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
