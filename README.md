@@ -147,8 +147,10 @@ Protección de Datos Personales. Por eso:
   incluyan.
 - **No se usan datos reales fuera de producción,** salvo en la copia local de
   desarrollo, que no se comparte.
-- **Si encontrás una vulnerabilidad, no abras un issue público:** avisale en privado
-  a un integrante del equipo, para que se corrija antes de que se conozca.
+- **Si encontrás una vulnerabilidad, no abras un issue público:** reportala en
+  privado desde [Security → Report a vulnerability](https://github.com/ISFDYT-210/Simef/security/advisories/new),
+  para que se corrija antes de que se conozca. La [política de seguridad](SECURITY.md)
+  explica qué incluir, qué esperar y cómo probar sin tocar datos de otras personas.
 
 ---
 
