@@ -12,24 +12,107 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 
 from pathlib import Path
 from django.contrib.messages import constants as message_constants
+from django.core.exceptions import ImproperlyConfigured
+from urllib.parse import urlparse, parse_qs
 import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Carga variables de entorno desde .env cuando se corre fuera de docker
+# (docker-compose ya las inyecta via env_file, pero manage.py/runserver
+# en venv local no las carga automáticamente).
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-utp902oup=*=ltlzswjy)s5l-ko5c)ju@c2sx(5n6#&(d0(2)@'
+def _falta_en_produccion(nombre):
+    raise ImproperlyConfigured(
+        f'Falta la variable de entorno {nombre}. Con DEBUG=False es '
+        'obligatoria: ver docs/PRODUCCION_VERCEL.md. Para desarrollar, '
+        'crear el .env a partir de .env.example, que trae DEBUG=True.'
+    )
+
+
+def _env_bool(nombre, por_defecto):
+    valor = os.environ.get(nombre)
+    if valor is None:
+        return por_defecto
+    return valor.strip().lower() in ('1', 'true', 'yes', 'si', 'on')
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+# Apagado salvo que se pida explicitamente con DEBUG=True (exacto): si falta la
+# variable, como puede pasar en un entorno de produccion recien armado, la app
+# no muestra errores con codigo y configuracion. Desarrollo lo prende en su
+# .env (ver .env.example) y docker-compose.override.yml. Lo controla
+# inscripcionFinales/tests/test_settings.py.
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['.vercel.app', 'pulqui-simef210.com.ar', 'www.pulqui-simef210.com.ar', 'localhost', '127.0.0.1']
+# SECURITY WARNING: keep the secret key used in production secret!
+# La clave de respaldo es publica (esta en el repo): solo sirve para desarrollo.
+# Con DEBUG apagado la app se niega a arrancar sin una SECRET_KEY propia, en vez
+# de firmar sesiones y tokens con una clave que cualquiera puede leer.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if not DEBUG:
+        _falta_en_produccion('SECRET_KEY')
+    SECRET_KEY = 'django-insecure-utp902oup=*=ltlzswjy)s5l-ko5c)ju@c2sx(5n6#&(d0(2)@'
 
+ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h]
+# Con DEBUG apagado y la lista vacia, Django rechaza todas las visitas con un
+# 400 que no explica nada. Mejor que el deploy falle diciendo que falta.
+if not DEBUG and not ALLOWED_HOSTS:
+    _falta_en_produccion('ALLOWED_HOSTS')
 
+# Panel de administracion de Django (/admin/). Ninguna pantalla de SIMEF lo usa,
+# y en produccion es una puerta de entrada a todos los datos para cualquier cuenta
+# con permisos de staff. Por defecto queda solo en desarrollo: con DEBUG apagado,
+# /admin/ redirige al inicio. Para una correccion puntual en produccion, definir
+# ADMIN_HABILITADO=True en Vercel, redeployar y despues quitarla.
+ADMIN_HABILITADO = _env_bool('ADMIN_HABILITADO', DEBUG)
+
+# Origenes HTTPS desde los que se aceptan formularios POST, separados por coma.
+# Hace falta cuando la app se abre detras de un proxy con otro esquema, como la
+# URL reenviada de un Codespace (https://*.app.github.dev): sin esto, Django
+# rechaza el login con 403 por CSRF.
+CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o]
+
+# HTTPS (manage.py check --deploy: W004, W008, W012, W016). Se activa solo con
+# DEBUG apagado, para que el desarrollo por http://localhost siga andando. Cada
+# ajuste se puede pisar desde el entorno.
+#
+# SECURE_PROXY_SSL_HEADER: en Vercel el HTTPS termina en el borde y Django recibe
+# el pedido por detras, con la cabecera X-Forwarded-Proto. Sin esto Django cree
+# que el pedido llego por http y SECURE_SSL_REDIRECT entra en un bucle. Es seguro
+# solo detras de un proxy que pise esa cabecera, como hace Vercel.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', not DEBUG)
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', not DEBUG)
+
+# HSTS: el navegador recuerda que el sitio va solo por HTTPS durante estos
+# segundos y no se puede deshacer antes de que venzan. Arranca en una hora;
+# subirlo (por ejemplo a 31536000, un año) desde el entorno cuando produccion
+# este probada por HTTPS.
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0' if DEBUG else '3600'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', False)
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', False)
+
+# Con HSTS activo, check --deploy sugiere tambien estas dos. Quedan apagadas a
+# proposito y por eso se silencian sus avisos:
+# - W005 (INCLUDE_SUBDOMAINS) obliga a HTTPS a TODOS los subdominios del dominio.
+#   Activarla recien cuando se haya verificado que ninguno se sirve por http.
+# - W021 (PRELOAD) inscribe el dominio en la lista que traen los navegadores; en
+#   la practica no se puede deshacer.
+# - axes.W006 sugiere sumar ip_address a AXES_LOCKOUT_PARAMETERS. A proposito
+#   se bloquea solo por username: varios alumnos entran desde el wifi del
+#   instituto (misma IP/NAT) y bloquear por IP los trabaria a todos juntos.
+SILENCED_SYSTEM_CHECKS = ['security.W005', 'security.W021', 'axes.W006']
 
 
 # Application definition
@@ -43,8 +126,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'inscripcionFinales',
     'django_extensions',
+    'axes',
     'gestionInstituto',
-    
+
 ]
 
 MIDDLEWARE = [
@@ -57,7 +141,33 @@ MIDDLEWARE = [
     'inscripcionFinales.middleware.FirstLoginMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Tiene que ir al final: intercepta el login para contar intentos
+    # fallidos antes de que llegue a la vista (ver AXES_* más abajo).
+    'axes.middleware.AxesMiddleware',
 ]
+
+# django-axes: bloquea el login tras varios intentos fallidos seguidos
+# (SEC: "límite de intentos" pendiente de la auditoría de seguridad).
+AUTHENTICATION_BACKENDS = [
+    # Tiene que ir primero: si no, el ModelBackend autentica antes de que
+    # axes pueda contar el intento fallido.
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+AXES_FAILURE_LIMIT = 5
+# Progresivo: 10 minutos el primer bloqueo de una cuenta, +10 cada vez que
+# vuelve a bloquearse (10, 20, 30, ... hasta un tope). Ver
+# inscripcionFinales.models.duracion_bloqueo_login.
+AXES_COOLOFF_TIME = 'inscripcionFinales.models.duracion_bloqueo_login'
+AXES_LOCKOUT_PARAMETERS = ['username']  # bloquea por usuario, no por IP (varios alumnos detrás del mismo NAT del instituto)
+# Por defecto axes busca la credencial bajo la clave de Usuario.USERNAME_FIELD
+# ('email' acá), pero AuthenticationForm siempre manda la credencial con la
+# clave literal 'username' (aunque el campo real del modelo sea otro). Sin
+# esto, axes nunca encuentra el username en los intentos fallidos y no
+# bloquea nada.
+AXES_USERNAME_FORM_FIELD = 'username'
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = 'registration/bloqueado_por_intentos.html'
 
 ROOT_URLCONF = 'gestionInstituto.urls'
 
@@ -84,12 +194,35 @@ WSGI_APPLICATION = 'gestionInstituto.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+
+
+_database_url = os.environ.get('DATABASE_URL')
+
+# El SQLite de respaldo es solo para desarrollo. En produccion, caer ahi en
+# silencio significa una base vacia (y en Vercel, ademas, de solo lectura).
+if not _database_url and not DEBUG:
+    _falta_en_produccion('DATABASE_URL')
+
+if _database_url:
+    _parsed = urlparse(_database_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _parsed.path.lstrip('/'),
+            'USER': _parsed.username,
+            'PASSWORD': _parsed.password,
+            'HOST': _parsed.hostname,
+            'PORT': _parsed.port or '',
+            'OPTIONS': {k: v[0] for k, v in parse_qs(_parsed.query).items()},
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -114,13 +247,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-ar'
 
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True
 
 USE_TZ = True
 
@@ -128,9 +260,25 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
+
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Estaticos con nombre con hash y comprimidos (WhiteNoise): el navegador no se
+# queda con versiones viejas despues de un deploy. Con DEBUG apagado, cada
+# {% static %} tiene que estar en staticfiles/staticfiles.json: si falta, la
+# pagina da 500. En Vercel no corre collectstatic (vercel.json usa `builds`), asi
+# que staticfiles/ se sirve tal como esta commiteada. Despues de tocar un
+# estatico: `python manage.py collectstatic --noinput --clear` y commitear
+# staticfiles/. El CI falla si no coincide (.github/scripts/verificar_staticfiles.py).
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
+
+# Archivos de medios (imágenes subidas por usuarios, ej. fotos de perfil)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Mensajes estandar (constantes)
@@ -157,9 +305,9 @@ AUTH_USER_MODEL='inscripcionFinales.Usuario'
 LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'inicio'
 
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 25
-EMAIL_HOST_USER = 'proyec.i210@gmail.com'
-EMAIL_HOST_PASSWORD = 'ocqr hryj waft gofb'
-EMAIL_USE_TLS = True
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

@@ -1,4 +1,7 @@
 import csv
+import logging
+
+from . import correlativas
 from django.shortcuts import render
 from django.http import HttpResponse
 from django import forms
@@ -8,6 +11,8 @@ from django.core.validators import RegexValidator
 #from django.forms import ModelForm, CustomPasswordChangeForm
 from .models import *
 from django.utils.crypto import get_random_string
+
+logger = logging.getLogger(__name__)
 
 validador= RegexValidator(r'^[0-9]*$','Solo se permiten números')
 
@@ -27,7 +32,7 @@ class institutoForms(forms.ModelForm):
 
 class carreraForm(forms.ModelForm):
       nombre_carrera = forms.CharField( max_length=100)
-      num_resolucion = forms.CharField(max_length=100)
+      num_resolucion = forms.CharField(max_length=100, required=False)
       class Meta:
         model = Carrera
         fields =(
@@ -74,8 +79,8 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 class registri_user_form(UserCreationForm):
-    email = forms.EmailField(required=True)
-    dni = forms.CharField(max_length=15, validators=[validador])
+    email = forms.EmailField(required=False, label="Email")
+    dni = forms.CharField(max_length=15, required=True, validators=[validador], label="DNI")
     
     password1 = None
     password2 = None
@@ -97,14 +102,14 @@ class registri_user_form(UserCreationForm):
     
     # Teléfonos
     telefono_1 = forms.CharField(
-        max_length=15, 
-        validators=[validador], 
+        max_length=10,
+        validators=[validador_telefono],
         required=False,
         label="Teléfono"
     )
     telefono_2 = forms.CharField(
-        max_length=15, 
-        validators=[validador], 
+        max_length=10,
+        validators=[validador_telefono],
         required=False,
         label="Celular"
     )
@@ -132,6 +137,19 @@ class registri_user_form(UserCreationForm):
     cargo = forms.CharField(max_length=100, required=False)
     area = forms.CharField(max_length=100, required=False)
 
+    # Contraseña opcional: si se deja vacía, se genera una aleatoria distinta
+    # para esta cuenta (ver generar_password_aleatoria en models.py).
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=True, attrs={
+            'class': 'form-control',
+            'style': 'width:100%; padding:6px; box-sizing:border-box;',
+            'placeholder': 'Dejar vacío para generar una automáticamente'
+        }),
+        label="Contraseña",
+        help_text="Opcional. Si la dejás vacía, se genera una contraseña aleatoria para esta cuenta."
+    )
+
     class Meta:
         model = Usuario
         fields = [
@@ -143,18 +161,35 @@ class registri_user_form(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Generar el password al inicializar el formulario
-        self.password_generado = get_random_string(
-            length=10, 
-            allowed_chars='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-        )
+        # Contraseña aleatoria antes del primer login, salvo que el admin elija otra
+        self.password_generado = generar_password_aleatoria()
+
+        # Estilo del selector de rol (para que se vea la caja)
+        if 'rol' in self.fields:
+            self.fields['rol'].widget.attrs.update({
+                'class': 'form-control',
+                'style': 'width:100%; padding:6px; box-sizing:border-box;'
+            })
 
     def clean(self):
         cleaned_data = super().clean()
-        # Usar el password generado
-        cleaned_data['password1'] = self.password_generado
-        cleaned_data['password2'] = self.password_generado
+        # Si el admin escribió una contraseña, se usa esa; si no, la autogenerada
+        password_elegido = cleaned_data.get('password')
+        if password_elegido:
+            self.password_generado = password_elegido
+        # NO tocamos password1/password2 (no existen en este form)
         return cleaned_data
+
+    def clean_email(self):
+        # El email es opcional y el campo del modelo es null=True (no solo
+        # blank=True) para que varias cuentas sin email no choquen contra el
+        # unique: '' sí chocaría, None no.
+        return self.cleaned_data.get('email') or None
+
+    def _post_clean(self):
+        # Evitamos la validación de password1/password2 de UserCreationForm,
+        # porque este formulario usa un solo campo 'password'.
+        super(forms.ModelForm, self)._post_clean()
 
     def enviar_credenciales_email(self, usuario, password):
         """Envía las credenciales por email al usuario registrado"""
@@ -200,133 +235,44 @@ Sistema Educativo
                 fail_silently=False,
             )
             
-            print(f"✅ Credenciales enviadas exitosamente a {usuario.email}")
-            print(f"   📧 Email: {usuario.email}")
-            print(f"   🔑 Password: {password}")
+            logger.info('Credenciales enviadas por email a la cuenta %s', usuario.pk)
             return True
-            
-        except Exception as e:
-            print(f"❌ Error enviando email a {usuario.email}: {str(e)}")
-            # Mostrar las credenciales en consola como fallback
-            print(f"   📧 Email: {usuario.email}")
-            print(f"   🔑 Password: {password}")
+
+        except Exception:
+            # Nunca registrar la contraseña ni el email: los logs del servidor
+            # los ve cualquiera con acceso al panel. La contraseña ya se le
+            # mostró a quien dio de alta la cuenta.
+            logger.exception('No se pudo enviar el email de credenciales a la cuenta %s', usuario.pk)
             return False
 
     def save(self, commit=True):
-        usuario = super().save(commit=False)
-        rol = self.cleaned_data.get('rol', '').lower()
-        
-        # 🔑 CAMBIO PRINCIPAL: Usar el password generado, no el DNI
-        print(f"DNI del usuario: {usuario.dni}")
-        print(f"Password generado: {self.password_generado}")
-        usuario.set_password(self.password_generado)  # ← Usar password generado
-        
-        # Asignar todos los campos adicionales
+        # Creamos el Usuario directamente, sin el save() de UserCreationForm
+        # (que espera password1/password2, campos que este formulario no tiene).
+        usuario = forms.ModelForm.save(self, commit=False)
+        usuario.set_password(self.password_generado)
+
         usuario.username = self.cleaned_data.get('username', '')
         usuario.fecha_nac = self.cleaned_data.get('fecha_nac')
         usuario.direccion = self.cleaned_data.get('direccion', '')
         usuario.localidad = self.cleaned_data.get('localidad', '')
         usuario.ciudad = self.cleaned_data.get('ciudad', '')
         usuario.nacionalidad = self.cleaned_data.get('nacionalidad', '')
-        usuario.telefono_1 = self.cleaned_data.get('telefono_1', '')
-        usuario.telefono_2 = self.cleaned_data.get('telefono_2', '')
+        usuario.telefono_1 = self.cleaned_data.get('telefono_1') or None
+        usuario.telefono_2 = self.cleaned_data.get('telefono_2') or None
         usuario.estado_civil = self.cleaned_data.get('estado_civil', '')
         usuario.sexo = self.cleaned_data.get('sexo', '')
-        
-        if rol == 'estudiante':
-            estudiante = Estudiante.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                matricula=get_random_string(length=8, allowed_chars='0123456789')
-            )
-            estudiante.set_password(self.password_generado)  # ← También para estudiante
-            if self.cleaned_data.get('carrera'):
-                estudiante.carrera.set([self.cleaned_data['carrera']])
-            usuario = estudiante
-            
-        elif rol == 'profesor':
-            usuario = Profesor.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                especialidad=self.cleaned_data.get('especialidad', '')
-            )
-            usuario.set_password(self.password_generado)  # ← También para profesor
-            
-        elif rol == 'directivo':
-            usuario = Directivo.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                cargo=self.cleaned_data.get('cargo', '')
-            )
-            usuario.set_password(self.password_generado)  # ← También para directivo
-            
-        elif rol == 'preceptor':
-            usuario = Preceptor.objects.create(
-                username=usuario.username,
-                email=usuario.email,
-                nombre_completo=usuario.nombre_completo,
-                dni=usuario.dni,
-                fecha_nac=usuario.fecha_nac,
-                direccion=usuario.direccion,
-                localidad=usuario.localidad,
-                ciudad=usuario.ciudad,
-                nacionalidad=usuario.nacionalidad,
-                telefono_1=usuario.telefono_1,
-                telefono_2=usuario.telefono_2,
-                estado_civil=usuario.estado_civil,
-                sexo=usuario.sexo,
-                rol=usuario.rol,
-                area=self.cleaned_data.get('area', '')
-            )
-            usuario.set_password(self.password_generado)  # ← También para preceptor
 
-        usuario.save()
-        
-        # 📧 Enviar email con las credenciales después de guardar
         if commit:
-            self.enviar_credenciales_email(usuario, self.password_generado)
-        
+            usuario.save()
+            if self.cleaned_data.get('carrera'):
+                usuario.carrera.set([self.cleaned_data['carrera']])
+            if usuario.email:
+                self.enviar_credenciales_email(usuario, self.password_generado)
+
         return usuario
 
 
-# Tu formulario de perfil se mantiene igual
-class profile_students_form(forms.ModelForm):   
+class profile_students_form(forms.ModelForm):
     class Meta:
         model = Usuario
         fields = (
@@ -334,6 +280,7 @@ class profile_students_form(forms.ModelForm):
             'nombre_completo',
             'fecha_nac',
             'dni',
+            'email',
             'direccion',
             'localidad',
             'ciudad',
@@ -343,13 +290,30 @@ class profile_students_form(forms.ModelForm):
             'estado_civil',
             'sexo',
         )
-    
-    dni = forms.CharField(max_length=15, validators=[validador])
-    telefono_1 = forms.CharField(max_length=15, validators=[validador])
-    telefono_2 = forms.CharField(max_length=15, validators=[validador])
-  
-    
-class mesa_form(forms.ModelForm):   
+
+    # El DNI es el identificador de login: no se puede modificar una vez
+    # creada la cuenta. disabled=True hace que Django ignore lo que venga en
+    # el POST y use siempre el valor actual de la instancia.
+    dni = forms.CharField(max_length=15, disabled=True, required=True, label="DNI",
+                           help_text="No se puede modificar.")
+    email = forms.EmailField(required=False, label="Email")
+    telefono_1 = forms.CharField(max_length=10, validators=[validador_telefono], required=False)
+    telefono_2 = forms.CharField(max_length=10, validators=[validador_telefono], required=False)
+
+    def clean_email(self):
+        # Opcional: '' chocaría contra el unique del modelo (el campo es
+        # null=True justamente para permitir varias cuentas sin email).
+        return self.cleaned_data.get('email') or None
+
+    def __init__(self, *args, puede_editar_rol=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if puede_editar_rol:
+            self.fields['rol'] = forms.ChoiceField(choices=Usuario.ROL_CHOICES, label='Rol')
+            if self.instance and self.instance.pk:
+                self.initial['rol'] = self.instance.rol
+
+
+class mesa_form(forms.ModelForm):
   class Meta:
     model = MesaFinal
     fields = (
@@ -377,27 +341,6 @@ class edit_profile_form(forms.ModelForm):
       
 
     )
-
-class EstudianteForm(forms.ModelForm):
-    class Meta:
-        model = Estudiante
-        fields = '__all__'
-
-class ProfesorForm(forms.ModelForm):
-    class Meta: 
-        model = Profesor
-        fields = '__all__' 
-
-class PreceptorForm(forms.ModelForm):
-    class Meta:
-        model = Preceptor
-        fields = '__all__'
-        
-class DirectivoForm(forms.ModelForm):
-    class Meta:
-        model = Directivo 
-        fields = '__all__'
-
 
 ############################################################
 class MateriaForm(forms.ModelForm):
@@ -440,10 +383,30 @@ class MateriaForm(forms.ModelForm):
            'inscripcionAbierta': 'Inscripción abierta',
         }
 
+class MateriaConFiltroSelect(forms.Select):
+    """
+    Select de materias que agrega data-carrera/data-anio a cada <option>.
+    Permite que el filtro visual de carrera/año en alta_mesa_final.html
+    muestre u oculte opciones en el cliente sin volver a consultar la DB.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.materias_info = {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        clave = value.value if hasattr(value, 'value') else value
+        info = self.materias_info.get(clave)
+        if info:
+            option['attrs']['data-carrera'] = info[0] or ''
+            option['attrs']['data-anio'] = info[1]
+        return option
+
+
 class MesaFinalForm(forms.ModelForm):
     class Meta:
         model = MesaFinal
-        fields = ['materia', 'llamado', 'inscripcionAbierta']
+        fields = ['materia', 'llamado', 'aula', 'sede', 'inscripcionAbierta']
         widgets = {
             'llamado': forms.DateTimeInput(
                 attrs={
@@ -452,23 +415,60 @@ class MesaFinalForm(forms.ModelForm):
                 },
                 format='%Y-%m-%dT%H:%M'
             ),
+            'aula': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Aula 3'}),
+            'sede': forms.Select(attrs={'class': 'form-control'}),
             'inscripcionAbierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'materia': forms.Select(attrs={'class': 'form-control'})
+            'materia': MateriaConFiltroSelect(attrs={'class': 'form-control'})
         }
         labels = {
             'materia': 'Materia',
             'llamado': 'Fecha y Hora del Llamado',
+            'aula': 'Aula',
+            'sede': 'Sede',
             'inscripcionAbierta': 'Inscripción Abierta'
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Configurar el campo llamado para usar datetime-local
         self.fields['llamado'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
-        
+
+        # Una sola query para poblar el data-carrera/data-anio de cada <option> (evita N+1)
+        self.fields['materia'].widget.materias_info = {
+            id_: (carrera_id, anio)
+            for id_, carrera_id, anio in Materia.objects.values_list('id', 'carrera_id', 'anio')
+        }
+
         # Hacer que la materia sea de solo lectura en edición
         if self.instance and self.instance.pk:
             self.fields['materia'].disabled = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        materia = cleaned_data.get('materia')
+        llamado = cleaned_data.get('llamado')
+        aula = cleaned_data.get('aula')
+
+        if materia and llamado:
+            ya_existe = MesaFinal.objects.filter(materia=materia, llamado=llamado) \
+                .exclude(pk=self.instance.pk).exists()
+            if ya_existe:
+                self.add_error('llamado', 'Ya existe una mesa de esta materia en ese mismo día y horario.')
+
+        if aula and llamado:
+            # Toda mesa dura MesaFinal.DURACION (misma para todas, no hay hora
+            # de fin en la base): dos mesas de `aula` se superponen si sus
+            # llamados quedan a menos de esa duración de distancia uno del
+            # otro, sea cual sea la materia.
+            ocupada = MesaFinal.objects.filter(
+                aula=aula, vigente=True,
+                llamado__gt=llamado - MesaFinal.DURACION,
+                llamado__lt=llamado + MesaFinal.DURACION,
+            ).exclude(pk=self.instance.pk).exists()
+            if ocupada:
+                self.add_error('aula', 'El aula seleccionada ya se encuentra ocupada en ese horario.')
+
+        return cleaned_data
 
 class InscripcionFinalForm(forms.ModelForm):
     class Meta:
@@ -482,36 +482,43 @@ class InscripcionFinalForm(forms.ModelForm):
             'usuario': 'Estudiante',
             'llamado': 'Mesa Final'
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Filtrar solo usuarios con rol 'Estudiante'
         self.fields['usuario'].queryset = Usuario.objects.filter(rol='Estudiante').order_by('nombre_completo')
-        
+        self.fields['usuario'].empty_label = "Seleccione un estudiante"
+
         # Filtrar solo mesas con inscripción abierta y vigentes
         self.fields['llamado'].queryset = MesaFinal.objects.filter(
             inscripcionAbierta=True,
             vigente=True
         ).select_related('materia').order_by('materia__nombre_materia', 'llamado')
-        
-        # Configurar etiquetas para mostrar información útil
-        self.fields['usuario'].empty_label = "Seleccione un estudiante"
         self.fields['llamado'].empty_label = "Seleccione una mesa final"
-    
+        # "Materia - dd/mm/aaaa HH:MM" en vez del __str__ crudo de MesaFinal.
+        self.fields['llamado'].label_from_instance = (
+            lambda mesa: f"{mesa.materia.nombre_materia} - {mesa.llamado.strftime('%d/%m/%Y %H:%M')}"
+        )
+
     def clean(self):
         cleaned_data = super().clean()
         usuario = cleaned_data.get('usuario')
         llamado = cleaned_data.get('llamado')
-        
+
         if usuario and llamado:
-            # Verificar que el usuario sea estudiante
             if usuario.rol != 'Estudiante':
                 raise forms.ValidationError("Solo los estudiantes pueden inscribirse a mesas finales.")
-            
-            # Verificar duplicados
-            if InscripcionFinal.objects.filter(usuario=usuario, llamado__materia=llamado.materia).exists():
-                raise forms.ValidationError(f"El estudiante ya está inscripto a una mesa de {llamado.materia.nombre_materia}")
-        
+
+            # Misma regla que usa el alumno al inscribirse solo (ver
+            # inscripcionFinalEst): correlativas, cursada aprobada, final no
+            # aprobado todavía, y el tope de MAX_OPORTUNIDADES_FINAL. Esta
+            # vista es la que un Preceptor/Directivo usa para inscribir a un
+            # alumno a mano, así que tiene que pasar por la misma validación
+            # (antes este form no chequeaba nada de esto).
+            puede, motivo = correlativas.puede_rendir(usuario.id, llamado.materia_id)
+            if not puede:
+                raise forms.ValidationError(motivo or "El estudiante no cumple los requisitos para rendir este final.")
+
         return cleaned_data
 
 
@@ -586,7 +593,32 @@ class InscripcionMateriaForm(forms.ModelForm):
         return cleaned_data
 
 class NotaFinalForm(forms.Form):
-    nota_final = forms.DecimalField(max_digits=4, decimal_places=2, min_value=0, max_value=10)
+    """Carga del resultado de un llamado a final: lo que el preceptor transcribe
+    del acta en papel. O hay nota, o el alumno estuvo ausente; no ambas cosas."""
+    nota_final = forms.DecimalField(max_digits=4, decimal_places=2, min_value=0, max_value=10, required=False)
+    ausente = forms.BooleanField(required=False)
+    numero_acta = forms.CharField(max_length=50, required=False)
+    folio = forms.CharField(max_length=50, required=False)
+    # Issue #204: solo se pide (y solo es obligatorio) cuando ya había un
+    # resultado cargado antes, es decir que esta carga es una corrección de
+    # un error de tipeo. Ver cargar_nota_final.
+    motivo_correccion = forms.CharField(max_length=255, required=False, widget=forms.Textarea(attrs={'rows': 2}))
+
+    def __init__(self, *args, es_correccion=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.es_correccion = es_correccion
+        if es_correccion:
+            self.fields['motivo_correccion'].required = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        nota_final = cleaned_data.get('nota_final')
+        ausente = cleaned_data.get('ausente')
+        if ausente and nota_final is not None:
+            raise forms.ValidationError('Un alumno ausente no puede tener nota: elegí una de las dos opciones.')
+        if not ausente and nota_final is None:
+            raise forms.ValidationError('Ingresá una nota o marcá al alumno como ausente.')
+        return cleaned_data
 
 class NotaCursadaForm(forms.ModelForm):
     class Meta:
@@ -615,83 +647,19 @@ class NotaCursadaForm(forms.ModelForm):
         cleaned_data = super().clean()
         nota_cursada = cleaned_data.get('nota_cursada')
         nota_final = cleaned_data.get('nota_final')
-        
-        # Obtener la modalidad del objeto actual si existe
+
         if self.instance and hasattr(self.instance, 'modalidad'):
             modalidad = self.instance.modalidad
-            
-            print(f"DEBUG - Modalidad encontrada: '{modalidad}'")
-            
-            # Para modalidad "Regular" o "Itinerante" validar la regla
-            # Verificar tanto el valor como el código numérico si existe
-            modalidades_con_restriccion = ['Regular', 'Itinerante', '02', '03', 2, 3]  # Agregar posibles códigos
-            
-            if modalidad in modalidades_con_restriccion:
-                # Obtener el valor actual de nota_cursada: del formulario o de la BD
+            if modalidad in ('Regular', 'Itinerante'):
                 nota_cursada_final = nota_cursada if nota_cursada is not None else getattr(self.instance, 'nota_cursada', None)
-                
-                print(f"DEBUG - Modalidad requiere validación: {modalidad}")
-                print(f"DEBUG - Nota cursada final considerada: {nota_cursada_final}")
-                print(f"DEBUG - ¿Se está intentando cargar nota final? {nota_final is not None}")
-                print(f"DEBUG - ¿Hay nota cursada? {nota_cursada_final is not None}")
-                
-                # Si se está intentando cargar nota final pero no hay nota cursada
                 if nota_final is not None and nota_cursada_final is None:
-                    print("DEBUG - DISPARANDO VALIDACIÓN")
-                    # Mostrar el nombre legible de la modalidad
-                    nombre_modalidad = "Regular/Itinerante" if str(modalidad) in ['02', '03', '2', '3'] else modalidad
                     raise forms.ValidationError(
-                        f'Para la modalidad "{nombre_modalidad}" debe cargar primero la nota de cursada antes de la nota final.'
+                        f'Para la modalidad "{modalidad}" debe cargar primero la nota de cursada antes de la nota final.'
                     )
-        
+
         return cleaned_data
     
     
-
-class InscripcionFinalForm(forms.ModelForm):
-    # Filtrar solo usuarios con rol de estudiante
-    usuario = forms.ModelChoiceField(
-        queryset=Usuario.objects.filter(rol='Estudiante').order_by('nombre_completo'),
-        empty_label="Seleccione un estudiante",
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label='Estudiante'
-    )
-    
-    # Filtrar solo mesas finales con inscripción abierta
-    llamado = forms.ModelChoiceField(
-        queryset=MesaFinal.objects.filter(inscripcionAbierta=True, vigente=True).order_by('materia__nombre_materia', 'llamado'),
-        empty_label="Seleccione una mesa final",
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label='Mesa Final'
-    )
-    
-    class Meta:
-        model = InscripcionFinal
-        fields = ['usuario', 'llamado']
-        widgets = {
-            'aprobada': forms.HiddenInput(),  # Ocultar el campo aprobada
-        }
-        labels = {
-            'usuario': 'Estudiante',
-            'llamado': 'Mesa Final'
-        }
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Personalizar la representación de las opciones de llamado
-        self.fields['llamado'].queryset = MesaFinal.objects.filter(
-            inscripcionAbierta=True, 
-            vigente=True
-        ).select_related('materia').order_by('materia__nombre_materia', 'llamado')
-        
-        # Personalizar cómo se muestran las opciones
-        choices = [('', 'Seleccione una mesa final')]
-        for mesa in self.fields['llamado'].queryset:
-            fecha_str = mesa.llamado.strftime('%d/%m/%Y %H:%M')
-            choice_text = f"{mesa.materia.nombre_materia} - {fecha_str}"
-            choices.append((mesa.pk, choice_text))
-        
-        self.fields['llamado'].choices = choices
 
 class FiltroInscripcionForm(forms.Form):
     estudiante = forms.CharField(required=False)

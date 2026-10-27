@@ -1,330 +1,276 @@
 {% extends 'base/base.html' %}
+{% comment %}
+  Búsqueda por nombre, DNI o email, filtrando en el servidor (ver
+  api_lista_usuarios). Las filas NO vienen renderizadas desde el servidor:
+  las pide el navegador a la API, igual que list_mesa.html.
+{% endcomment %}
 
-{% block title %}Registro de usuario{% endblock %}
+{% block title %}Registro de usuarios{% endblock %}
+{% block encabezado %}Registro de usuarios{% endblock %}
 
 {% block content %}
+{% if request.user.puede_gestionar_usuarios %}
 
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
+<div x-data="listaUsuarios()" x-init="init()">
 
-    <div id="alertaNoDNI"class="alert alert-warning alert-dismissible fade show fs-6 z-n1" hidden=true role="alert" style="position: fixed; top: 0; right: 0">
-      <strong>Debe ingresar un DNI para hacer la busqueda</strong>
-      <button type="button" class="btn-close" onclick="ocultarAlerta1()" ></button>
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+
+    <!-- Encabezado + acciones -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+      <div>
+        <h2 class="text-sm font-semibold text-tinta-900">Usuarios registrados</h2>
+        <p class="text-xs text-slate-500"><span x-text="contador"></span> seleccionado(s)</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="text" x-model="busqueda" placeholder="Buscar por nombre, DNI o email…"
+               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+
+        <button @click="pedirEliminar()" title="Eliminar seleccionados"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg>
+          Eliminar
+        </button>
+      </div>
     </div>
-    <div id="errorDNI"class="alert alert-danger alert-dismissible fade show fs-6" hidden=true role="alert" style="position: fixed; top: 0; right: 0">
-      <strong>DNI no registrado</strong>
-      <button type="button" class="btn-close" onclick="ocultarAlerta2()" ></button>
+
+    <!-- Cargando -->
+    <div x-show="cargando" class="flex items-center justify-center gap-2 px-5 py-16 text-sm text-slate-500">
+      <svg class="h-5 w-5 animate-spin text-celeste-600" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path>
+      </svg>
+      Cargando usuarios…
     </div>
 
-    <div class="card" style="margin-top: 0px;">
-      <div class="card-header rounded-top" style="background-color: #3A4481; color: #ffffff;">
-        <h3 style="text-align: center">Registro de Usuarios</h3>
+    <!-- Error -->
+    <div x-show="!cargando && error" x-cloak class="px-5 py-16 text-center text-sm text-red-600">
+      No se pudieron cargar los usuarios.
+      <button @click="cargar()" class="font-semibold underline">Reintentar</button>
     </div>
-    
-        
-        <div class="card-body">
-          <div class="table-responsive">
-            <div class="d-flex align-items-center mb-2">
-              <a href="#" id="eliminarSeleccionados" style="width: 40px;" class="btn btn-danger me-3"><i class="fas fa-trash-alt"></i></a>
-              <div class="ms-auto">
-                  <form class="d-flex" role="search">
-                      <input class="form-control me-2" type="text" style="width: 150px; margin-top: 0;" placeholder="DNI" id="busquedaDni" aria-label="Buscar">
-                      <a class="btn btn-primary" id="buscar" onclick="busqueda()" style="margin-top: 0;"><img src="/static/imagenes/Lupita.png" height="20px" width="20px"></a>
-                  </form>
-              </div>
-          </div>
-          <form id="formEliminarTodo" method="post" action="{% url 'eliminar_usuarios_seleccionados' %}">
-            {% csrf_token %}
-              <table class="table table-striped table-bordered table-hover table-selected" id="myTable">
-                {% load static %}
-                <thead class="text-center">
-                    <tr>
-                        <th><input class="form-check-input" type="checkbox" id="checkTodos" title="Seleccionar todo" style="transform: scale(1.5);"></th>
-                        <th class="h5">Email</th>
-                        <th class="h5">Nombre completo</th>
-                        <th class="h5">DNI</th>
-                        <th class="h5">Rol</th>
-                        <th class="h5">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for usuarios in object_list %}
-                    <tr class="usuario text-center"hidden=True>
-                        <td><input type="checkbox" name="usuarios_ids" value="{{ usuarios.id }}"></td>
-                        <td class="h6" id='{{usuarios.dni}}'hidden>{{usuarios.id}}</td>
-                        <td class="h6">{{usuarios.email}}</td>
-                        <td class="h6">{{usuarios.nombre_completo}}</td>
-                        <td class="h6">{{usuarios.dni}}</td>
-                        <td class="h6">{{usuarios.get_rol_display}}</td>
-                        <td>
-                          <a title= "Ver" class="btn btn-primary" href="/show_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/view.png" height="20px" width="20px"></img></a>
-                          <a title= "Editar" class="btn btn-primary" href="/edit_user/{{ usuarios.id }}" role="button"><img src="/static/imagenes/edit.png" height="20px" width="20px"></img></a> 
-                          
-                          <!-- CONDICIÓN PARA MOSTRAR REPORTE SOLO A ESTUDIANTES -->
-                          {% if usuarios.rol == 'Estudiante' %}
-                            <a title="Ver Reporte" class="btn btn-primary" href="/reporte_html/{{ usuarios.id }}" role="button"><img src="/static/imagenes/imprimir.png" height="20px" width="20px"></img></a>
-                          {% else %}
-                            <a title="Reportes solo disponibles para estudiantes" class="btn btn-secondary" onclick="mostrarAlertaReporte('{{ usuarios.get_rol_display }}')" style="cursor: pointer;">
-                              <img src="/static/imagenes/imprimir.png" height="20px" width="20px" style="opacity: 0.5;"></img>
-                            </a>
-                          {% endif %}
-                        </td>
 
-                         <!-- Modal de confirmación -->
-                         <div class="modal fade" id="confirmarEliminar" tabindex="-1" aria-labelledby="confirmarEliminarLabel" aria-hidden="true">
-                          <div class="modal-dialog">
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <h5 class="modal-title" id="modalTitulo"></h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body text-center" id="modalMensaje"></div>
-                              <div class="modal-footer">
-                                <button type="submit" class="btn btn-danger" form="formEliminarTodo">Eliminar</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>   
+    <!-- Tabla -->
+    <form id="formEliminarTodo" method="post" action="{% url 'eliminar_usuarios_seleccionados' %}" x-ref="formEliminar"
+          x-show="!cargando && !error && filas.length > 0" x-cloak>
+      {% csrf_token %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+              <th class="px-5 py-3">
+                <input type="checkbox" @change="toggleTodos($event)" x-ref="checkTodos"
+                       title="Seleccionar todo"
+                       class="h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+              </th>
+              <th class="px-5 py-3 font-semibold">Email</th>
+              <th class="px-5 py-3 font-semibold">Nombre completo</th>
+              <th class="px-5 py-3 font-semibold">DNI</th>
+              <th class="px-5 py-3 font-semibold">Rol</th>
+              <th class="px-5 py-3 font-semibold text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100" x-ref="cuerpo">
+            <template x-for="usuario in filas" :key="usuario.id">
+              <tr class="fila-usuario hover:bg-slate-50">
+                <td class="px-5 py-3">
+                  <input type="checkbox" name="usuarios_ids" :value="usuario.id"
+                         @change="sincronizar()"
+                         class="usuario-check h-4 w-4 rounded border-slate-300 text-celeste-600 focus:ring-celeste-500">
+                </td>
+                <td class="px-5 py-3 font-medium text-tinta-900" x-text="usuario.email || '—'"></td>
+                <td class="px-5 py-3" x-text="usuario.nombre_completo || '—'"></td>
+                <td class="px-5 py-3" x-text="usuario.dni || '—'"></td>
+                <td class="px-5 py-3">
+                  <span class="rounded-full bg-tinta-50 px-2.5 py-1 text-xs font-semibold text-tinta-700" x-text="usuario.rol_display"></span>
+                </td>
+                <td class="px-5 py-3">
+                  <div class="flex items-center justify-end gap-2">
+                    <a :href="'/show_user/' + usuario.id" title="Ver"
+                       class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </a>
+                    <a :href="'/edit_user/' + usuario.id" title="Editar"
+                       class="grid h-8 w-8 place-items-center rounded-lg bg-celeste-600 text-white hover:bg-celeste-500">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Zm10.5-13 3 3"/></svg>
+                    </a>
+                    {% if request.user.es_directivo or request.user.es_secretario or request.user.is_superuser %}
+                    <a :href="'/blanquear_password/' + usuario.id + '/'" title="Blanquear contraseña"
+                       class="grid h-8 w-8 place-items-center rounded-lg bg-amber-500 text-white hover:bg-amber-600">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm10-10V7a4 4 0 1 0-8 0v2"/></svg>
+                    </a>
+                    {% endif %}
+                    <a x-show="usuario.rol === 'Estudiante'" :href="'/reporte_html/' + usuario.id" title="Ver reporte" target="_blank"
+                       class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
+                    </a>
+                    <button x-show="usuario.rol !== 'Estudiante'" type="button" @click="avisoReporte(usuario.rol_display)"
+                            title="Reportes solo disponibles para estudiantes"
+                            class="grid h-8 w-8 place-items-center rounded-lg bg-slate-200 text-slate-400 hover:bg-slate-300">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1M7 15h10v6H7v-6Z"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </form>
 
-                        <!-- Advertencia de selección -->
-                        <div class="modal fade" id="modalSeleccionar" tabindex="-1" aria-labelledby="modalSeleccionarLabel" aria-hidden="true">
-                          <div class="modal-dialog">
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <h5 class="modal-title">Advertencia</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body text-center">
-                                <h6>Debe seleccionar al menos un usuario para eliminar.</h6>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal"> Cerrar</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Modal de advertencia para reportes -->
-                        <div class="modal fade" id="modalReporteNoPermitido" tabindex="-1" aria-labelledby="modalReporteNoPermitidoLabel" aria-hidden="true">
-                          <div class="modal-dialog">
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <h5 class="modal-title">Reporte no disponible</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body text-center">
-                                <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 2rem;"></i>
-                                <h6>Los reportes de constancia académica solo están disponibles para usuarios con rol de <strong>Estudiante</strong>.</h6>
-                                <p class="mt-2 text-muted">Este usuario tiene el rol: <strong id="rolUsuarioModal"></strong></p>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-          </form>
-        </div>
-
-          <nav aria-label="..." class="d-flex justify-content-center">
-            <ul class="pagination">
-              <li class="page-item" id='btnAnt'>
-              <button class="page-link" title="Anterior" id='btnAnt_' style="cursor: pointer;"onclick="paginaAnt()">←</button>
-              </li>
-              <li class="page-item" id='btnSig'>
-              <button class="page-link" title="Siguiente" id='btnSig_' onclick="paginaSig()">→</button>
-              </li>
-            </ul>
-          </nav>
+    <!-- Estado vacío al filtrar -->
+    <div x-show="!cargando && !error && filas.length === 0" x-cloak class="px-5 py-16 text-center">
+      <p class="text-sm font-medium text-tinta-900">No se encontraron usuarios</p>
+      <p class="mt-1 text-sm text-slate-500">Probá con otro nombre, DNI o email.</p>
     </div>
-      
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+    <!-- Paginación (la resuelve el servidor) -->
+    <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-sm"
+         x-show="!cargando && !error && numPaginas > 1" x-cloak>
+      <p class="text-slate-500">
+        Página <span x-text="pagina"></span> de <span x-text="numPaginas"></span>
+        (<span x-text="total"></span> en total)
+      </p>
+      <div class="flex gap-1">
+        <button @click="irA(pagina - 1)" :disabled="pagina === 1"
+                class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">←</button>
+        <button @click="irA(pagina + 1)" :disabled="pagina === numPaginas"
+                class="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent">→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal confirmar eliminación ══ -->
+  <div x-show="modalEliminar" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modalEliminar = false" x-transition.opacity>
+    <div class="w-full max-w-md rounded-2xl bg-white shadow-xl" @keydown.escape.window="modalEliminar = false">
+      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <h3 class="text-sm font-semibold text-tinta-900">Advertencia</h3>
+        <button @click="modalEliminar = false" class="text-slate-400 hover:text-slate-600" aria-label="Cerrar">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="px-5 py-6 text-center text-sm text-slate-700" x-text="mensajeEliminar"></p>
+      <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+        <button @click="modalEliminar = false" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button @click="$refs.formEliminar.submit()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal "seleccioná al menos uno" ══ -->
+  <div x-show="modalVacio" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modalVacio = false" x-transition.opacity>
+    <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+      <h3 class="text-sm font-semibold text-tinta-900">Advertencia</h3>
+      <p class="mt-2 text-sm text-slate-600">Debés seleccionar al menos un usuario para eliminar.</p>
+      <button @click="modalVacio = false" class="mt-4 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- ══ Modal reporte no disponible ══ -->
+  <div x-show="modalReporte" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+       @click.self="modalReporte = false" x-transition.opacity>
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
+      <div class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-500">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      </div>
+      <h3 class="mt-3 text-sm font-semibold text-tinta-900">Reporte no disponible</h3>
+      <p class="mt-2 text-sm text-slate-600">Los reportes de constancia académica solo están disponibles para usuarios con rol de <strong>Estudiante</strong>.</p>
+      <p class="mt-1 text-sm text-slate-500">Este usuario tiene el rol: <strong x-text="rolReporte"></strong></p>
+      <button @click="modalReporte = false" class="mt-4 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Entendido</button>
+    </div>
+  </div>
+
+</div>
 
 <script>
-  $(document).ready(function() {
-    // Seleccionar/deseleccionar todos
-    $("#checkTodos").change(function() {
-        var isChecked = $(this).prop("checked");
-        $("input[name='usuarios_ids']").each(function() {
-            $(this).prop("checked", isChecked);
+  function listaUsuarios() {
+    return {
+      cargando: true, error: false,
+      filas: [], pagina: 1, numPaginas: 1, total: 0,
+      busqueda: '', esperaBusqueda: null,
+      contador: 0,
+      modalEliminar: false, modalVacio: false, modalReporte: false,
+      mensajeEliminar: '', rolReporte: '',
+
+      init() {
+        this.cargar();
+        this.$watch('busqueda', () => {
+          clearTimeout(this.esperaBusqueda);
+          this.esperaBusqueda = setTimeout(() => { this.pagina = 1; this.cargar(); }, 300);
         });
-    });
-  });
-  
-  // Modal de confirmación de eliminación
-  $("#eliminarSeleccionados").click(function() {
-    var checkedBoxes = $("input[name='usuarios_ids']:checked");
-    if (checkedBoxes.length > 0) {
-        if (checkedBoxes.length === 1) {
-            var nombreUsuario = checkedBoxes.closest('tr').find('.h6:nth-child(5)').text().trim();
-            $("#modalTitulo").text("Advertencia");
-            $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar al usuario "${nombreUsuario}"?</h6>`);
+      },
+
+      async cargar() {
+        this.cargando = true;
+        this.error = false;
+        try {
+          const params = new URLSearchParams({ page: this.pagina, q: this.busqueda });
+          const resp = await fetch(`{% url 'api_lista_usuarios' %}?${params}`);
+          if (!resp.ok) throw new Error('status ' + resp.status);
+          const data = await resp.json();
+          this.filas = data.results;
+          this.pagina = data.page;
+          this.numPaginas = data.num_pages;
+          this.total = data.count;
+        } catch (e) {
+          this.error = true;
+        } finally {
+          this.cargando = false;
+          this.contador = 0;
+          this.$nextTick(() => {
+            if (this.$refs.checkTodos) this.$refs.checkTodos.checked = false;
+          });
+        }
+      },
+
+      irA(pagina) {
+        if (pagina < 1 || pagina > this.numPaginas) return;
+        this.pagina = pagina;
+        this.cargar();
+      },
+
+      checks() {
+        return this.$refs.cuerpo ? Array.from(this.$refs.cuerpo.querySelectorAll('.usuario-check')) : [];
+      },
+      seleccionados() { return this.checks().filter(c => c.checked); },
+      toggleTodos(e) {
+        this.checks().forEach(c => { c.checked = e.target.checked; });
+        this.contador = this.seleccionados().length;
+      },
+      sincronizar() {
+        const cks = this.checks();
+        if (this.$refs.checkTodos) {
+          this.$refs.checkTodos.checked = cks.length > 0 && cks.every(c => c.checked);
+        }
+        this.contador = this.seleccionados().length;
+      },
+
+      pedirEliminar() {
+        const sel = this.seleccionados();
+        if (sel.length === 0) { this.modalVacio = true; return; }
+        if (sel.length === 1) {
+          const nombre = sel[0].closest('tr').children[2].textContent.trim();
+          this.mensajeEliminar = `¿Está seguro que desea eliminar al usuario "${nombre}"?`;
         } else {
-            $("#modalTitulo").text("Advertencia");
-            $("#modalMensaje").html(`<h6>¿Está seguro que desea eliminar a los ${checkedBoxes.length} usuarios seleccionados?</h6>`);
+          this.mensajeEliminar = `¿Está seguro que desea eliminar a los ${sel.length} usuarios seleccionados?`;
         }
-        $("#confirmarEliminar").modal("show");
-    } else {
-        $("#modalSeleccionar").modal("show");
-    }
-});
+        this.modalEliminar = true;
+      },
 
-  var pagina = 1
-  if (pagina = 1)
-  {
-    document.getElementById("btnAnt").className="page.item disabled"
+      avisoReporte(rolDisplay) { this.rolReporte = rolDisplay; this.modalReporte = true; },
+    };
   }
-  let elementos = document.querySelectorAll('.usuario');
-  if (elementos.length<=10)
-  {
-    document.getElementById("btnSig").className="page.item disabled"
-  }
-  for (let i = 0; i <= pagina*10-1; i++) {
-    try{elementos[i].hidden=false}
-    catch(e){console.log("Tenes que cerrar el estadio")}
-    }
-  function paginaSig()
-  {
-    let elementos = document.querySelectorAll('.usuario');
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=true}
-      catch(e){console.log("Anda, todo pelota.")}
-      }  
-    pagina=pagina+1
-    if (pagina>1)
-    {
-      document.getElementById("btnAnt").className="page-item active"
-    }
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=false}
-      catch(e){console.log("No hay mas usuarios")
-      document.getElementById("btnSig").className="page.item disabled"
-      }
-      }
-  } 
-  function paginaAnt()
-  {
-    document.getElementById("btnSig").className="page.item active"    
-    let elementos = document.querySelectorAll('.usuario');
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=true}
-      catch(e){console.log("Parmisano no mires esto")}
-      }
-    pagina=pagina-1
-    if (pagina>1)
-    {
-      document.getElementById("btnAnt").className="page-item active"
-    }
-    else{document.getElementById("btnAnt").className="page-item disabled"}
-    for (let i = pagina*10-10; i <= pagina*10-1; i++) {
-      try{elementos[i].hidden=false} 
-      catch(e){console.log("Mission Accomplished")}
-      }
-    }   
+</script>
 
-    function ocultarAlerta1()
-    {document.getElementById("alertaNoDNI").hidden=true}
-    function ocultarAlerta2()
-    {document.getElementById("errorDNI").hidden=true}
-    function busqueda()
-    {
-      if(document.getElementById("busquedaDni").value && document.getElementById("busquedaDni").value != 'None' )
-      {
-        var dni_usuario = document.getElementById("busquedaDni").value
-        if(document.getElementById(dni_usuario))
-        {
-          var id_usuario = document.getElementById(dni_usuario).innerHTML
-          location.href ="/show_user/"+id_usuario;
-        }
-        else{console.log("DNI no registrado");
-        document.getElementById("errorDNI").hidden=false;}
-      }
-      else{console.log("Ingrese un DNI");
-      document.getElementById("alertaNoDNI").hidden=false;
-    }
-    }
-    document.addEventListener('DOMContentLoaded', () => {
-      // Para los campos de texto
-      document.querySelectorAll('input[type=text]').forEach(node => 
-          node.addEventListener('keydown', e => {
-              if (e.key === 'Enter') {
-                  e.preventDefault();
-                  document.getElementById("buscar").click();
-              }
-          })
-      );
-  
-      // Para los botones
-      document.querySelectorAll('button').forEach(node => 
-          node.addEventListener('keydown', e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-              }
-          })
-      );
-  });  
-$(document).ready(function() {
-    // Selecciona todos los elementos y recórrelos
-    $('*').each(function() {
-        // Verifica si el innerHTML es exactamente "None"
-        if ($(this).html().trim() === "None") {
-            $(this).html("-");
-        }
-    });
-});
-
-function descargarPDF(usuarioId) {
-    // Método 1: Usar fetch para forzar descarga
-    fetch(`/reporte/${usuarioId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Error al descargar el archivo');
-            }
-            return response.blob();
-        })
-        .then(blob => {
-            // Crear URL temporal del blob
-            const url = window.URL.createObjectURL(blob);
-            
-            // Crear enlace temporal
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `constancia_usuario_${usuarioId}.pdf`;
-            
-            // Agregar al DOM temporalmente
-            document.body.appendChild(link);
-            
-            // Hacer click para descargar
-            link.click();
-            
-            // Limpiar
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Fallback: abrir en nueva ventana
-            window.open(`/reporte/${usuarioId}`, '_blank');
-        });
-}
-
-function mostrarAlertaReporte(rolUsuario) {
-    document.getElementById('rolUsuarioModal').textContent = rolUsuario;
-    $('#modalReporteNoPermitido').modal('show');
-}
-</script>  
 {% else %}
 
-<div class="text-center">
-    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
+<div class="grid min-h-[60vh] place-items-center text-center">
+  <div>
+    <p class="mt-4 text-base font-medium text-tinta-900">No deberías estar acá.</p>
+    <a href="/" class="mt-3 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver al inicio</a>
+  </div>
 </div>
 
 {% endif %}
-
-
 {% endblock %}

@@ -1,5 +1,4 @@
 {% block content %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -24,13 +23,41 @@
             margin-top: 10px;
         }
         p {
-            font-size: 13px; 
+            font-size: 13px;
         }
 
+        .no-print {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+
+        .no-print button {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background-color: #0f172a;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .no-print button:hover {
+            background-color: #1e293b;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
 
     </style>
 </head>
 <body>
+    <div class="no-print">
+        <button type="button" onclick="window.print()">Imprimir</button>
+    </div>
     <div class="header">
         <h3>ACTA VOLANTE DE EXAMENES</h3>
         <h6>I.S.F.D. y T. Nº 210</h6>
@@ -40,6 +67,12 @@
     <p id='mesa'>Exámenes de alumnos:</p>
     <p id='carrera'>Carrera: {{final.materia.carrera}}</p>
     <p id="asignatura">ASIGNATURA: {{final.materia}}</p>
+    {% if final.aula or final.sede %}
+    <p id="aula-sede">
+        {% if final.sede %}SEDE: {{ final.sede }}{% endif %}
+        {% if final.aula %}{% if final.sede %} &nbsp;&nbsp; {% endif %}AULA: {{ final.aula }}{% endif %}
+    </p>
+    {% endif %}
 
     <div style="text-align: right;">
         FECHA
@@ -55,26 +88,19 @@
     <table>
         <thead>
             <tr>
-                <th rowspan="2"style='width: 15px;'>Nº DE ORDEN</th>
-                <th rowspan="2">D.N.I.</th>
-                <th rowspan="2">APELLIDO y NOMBRE</th>
-                <th colspan="3">CALIFICACIONES</th>
-            </tr>
-            <tr>
-                <th>Esc.</th>
-                <th>Oral</th>
-                <th>Prom.</th>
+                <th style='width: 15px;'>Nº DE ORDEN</th>
+                <th>D.N.I.</th>
+                <th>APELLIDO y NOMBRE</th>
+                <th>CALIFICACIÓN</th>
             </tr>
         </thead>
-        <tbody id="tablaBody">   
+        <tbody id="tablaBody">
             {% for inscripcion in finales_inscriptos %}
                 <tr id="inscripto{{ forloop.counter }}">
                     <td>{{ forloop.counter|add:piso }}</td>
                     <td>{{ inscripcion.usuario.dni }}</td>
                     <td>{{ inscripcion.usuario.nombre_completo }}</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    <td style='text-align:center'>{% if inscripcion.ausente %}ausente{% elif inscripcion.nota is not None %}{{ inscripcion.nota }}{% endif %}</td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -113,8 +139,6 @@
                         <td></td>
                         <td></td>
                         <td></td>
-                        <td></td>
-                        <td></td>
                     `;
                     return newRow;
                 }
@@ -129,8 +153,12 @@
     </table>
 
     <div class="footer">
-        <p>Presidente: </p>
-        <p>Vocal:............................ Vocal:............................</p>
+        <p>Presidente: {% if presidente %}{{ presidente.docente.nombre_completo }}{% else %}...........................{% endif %}</p>
+        <p>
+            Vocal: {% if vocales.0 %}{{ vocales.0.docente.nombre_completo }}{% else %}............................{% endif %}
+            &nbsp;&nbsp;&nbsp;
+            Vocal: {% if vocales.1 %}{{ vocales.1.docente.nombre_completo }}{% else %}............................{% endif %}
+        </p>
 
         <table style="width: 450px; float: right;">
             <tr>
@@ -142,15 +170,15 @@
             </tr>
             <tr>
                 <td>Aprobados</td>
-                <td></td>
+                <td style='text-align:center'>{{ resumen.aprobados }}</td>
             </tr>
             <tr>
                 <td>Aplazados</td>
-                <td></td>
+                <td style='text-align:center'>{{ resumen.aplazados }}</td>
             </tr>
             <tr>
                 <td>Ausentes</td>
-                <td></td>
+                <td style='text-align:center'>{{ resumen.ausentes }}</td>
             </tr>
         </table>
 
@@ -187,14 +215,4 @@ if (mesElement.textContent == "1") {
 }
 </script>
 </html>
-
-
-
-{% else %}
-
-<div class="text-center">
-    <img src="/static/imagenes/error403.jpg" class="rounded"></img>
-  <h3>No deberías estar acá. Para volver, <a href="/">hace click acá</a></h3>
-</div>
-{% endif %}
 {% endblock %}

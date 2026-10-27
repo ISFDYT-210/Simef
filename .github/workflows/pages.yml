@@ -1,0 +1,50 @@
+# .github/workflows/pages.yml
+#
+# Publica los diagramas interactivos (docs/diagramas/) en GitHub Pages:
+#   https://isfdyt-210.github.io/Simef/arquitectura
+#
+# Solo sube esa carpeta: el resto de docs/ queda en el repo, no en el sitio.
+# Corre en cada push a main que toque docs/diagramas/, o a mano desde Actions.
+# Para regenerar el diagrama: scripts/diagrama_arquitectura.sh.
+name: Diagramas en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/diagramas/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un solo deploy a la vez; no se corta uno en curso.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publicar diagramas
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v6
+
+      - name: Subir docs/diagramas
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/diagramas
+
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v5
