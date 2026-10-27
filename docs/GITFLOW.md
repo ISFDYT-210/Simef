@@ -194,7 +194,7 @@ vulnerabilidad en una dependencia que usa SIMEF, dependabot abre solo un PR con
 la versión corregida. A diferencia de las actualizaciones semanales, que van a
 `develop` (`target-branch` en `.github/dependabot.yml`), **estos PRs van siempre
 contra `main`**, la rama por defecto: GitHub no deja cambiarlo. Se los reconoce
-porque traen la etiqueta `security` y enlazan la alerta.
+porque apuntan a `main` y enlazan la alerta de seguridad que resuelven.
 
 Se tratan como un arreglo urgente, sin esperar el próximo pasaje de `develop`:
 
