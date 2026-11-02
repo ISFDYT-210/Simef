@@ -1,5 +1,5 @@
 # Dependencias solo para desarrollo / CI (no se instalan en la imagen de produccion)
 -r requirements.txt
 
-flake8==7.1.1
+flake8==7.5.0
 coverage==7.17.0
