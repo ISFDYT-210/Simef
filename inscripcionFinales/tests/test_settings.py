@@ -24,6 +24,9 @@ CARGAR_SETTINGS = textwrap.dedent("""
     print(json.dumps({
         'DEBUG': settings.DEBUG,
         'ENGINE': settings.DATABASES['default']['ENGINE'],
+        'EMAIL_PORT': settings.EMAIL_PORT,
+        'DEFAULT_FROM_EMAIL': settings.DEFAULT_FROM_EMAIL,
+        'LOGGING': settings.LOGGING,
     }))
 """)
 
@@ -85,6 +88,38 @@ class VariablesObligatoriasEnProduccionTest(SimpleTestCase):
         proceso = cargar_settings(DEBUG='True')
         self.assertEqual(proceso.returncode, 0, proceso.stderr)
         self.assertEqual(resultado(proceso)['ENGINE'], 'django.db.backends.sqlite3')
+
+
+class CorreoEnProduccionTest(SimpleTestCase):
+    """El correo de recuperar contraseña no llegaba y el error no quedaba en ningún log (#274)."""
+
+    CORREO = {'EMAIL_HOST_USER': 'simef@ejemplo.edu.ar', 'EMAIL_HOST_PASSWORD': 'clave-de-aplicacion'}
+
+    def test_sin_email_port_usa_el_587_de_gmail_con_tls(self):
+        proceso = cargar_settings(**PRODUCCION, **self.CORREO)
+        self.assertEqual(proceso.returncode, 0, proceso.stderr)
+        self.assertEqual(resultado(proceso)['EMAIL_PORT'], 587)
+
+    def test_el_remitente_es_la_cuenta_configurada_con_nombre(self):
+        proceso = cargar_settings(**PRODUCCION, **self.CORREO)
+        self.assertEqual(resultado(proceso)['DEFAULT_FROM_EMAIL'], 'SIMEF · ISFDyT N.º 210 <simef@ejemplo.edu.ar>')
+
+    def test_avisa_al_arrancar_si_faltan_las_credenciales(self):
+        proceso = cargar_settings(**PRODUCCION)
+        self.assertEqual(proceso.returncode, 0, proceso.stderr)
+        self.assertIn('AVISO: faltan EMAIL_HOST_USER o EMAIL_HOST_PASSWORD', proceso.stderr)
+
+    def test_no_avisa_con_las_credenciales_ni_en_desarrollo(self):
+        for variables in ({**PRODUCCION, **self.CORREO}, {'DEBUG': 'True'}):
+            with self.subTest(variables=sorted(variables)):
+                proceso = cargar_settings(**variables)
+                self.assertNotIn('AVISO: faltan EMAIL', proceso.stderr)
+
+    def test_en_produccion_los_errores_de_django_van_a_la_consola(self):
+        """El handler por defecto de Django solo imprime con DEBUG=True."""
+        logging = resultado(cargar_settings(**PRODUCCION, **self.CORREO))['LOGGING']
+        self.assertIn('consola', logging['loggers']['django']['handlers'])
+        self.assertNotIn('filters', logging['handlers']['consola'])
 
 
 RESOLVER_ADMIN = textwrap.dedent("""

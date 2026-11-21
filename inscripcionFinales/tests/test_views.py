@@ -14,7 +14,7 @@ from datetime import timedelta
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
@@ -1659,3 +1659,26 @@ class RecuperarPasswordPorDniTest(TestCase):
         self.client.post('/recuperar_pass/', {'dni': '70'})
         cuerpo = mail.outbox[0].body
         self.assertIn('/reset/', cuerpo)
+
+    @override_settings(EMAIL_BACKEND='inscripcionFinales.tests.test_views.CorreoQueFalla')
+    def test_si_el_envio_falla_se_ve_igual_pero_queda_en_el_log(self):
+        """
+        Django 5.2 atrapa el error de envío para no revelar qué cuentas existen:
+        quien pide la recuperación ve la misma pantalla, y el error solo va al
+        log de django.contrib.auth. Por eso settings.LOGGING lo saca a la
+        consola también con DEBUG apagado (#274).
+        """
+        with self.assertLogs('django.contrib.auth', level='ERROR') as registro:
+            respuesta = self.client.post('/recuperar_pass/', {'dni': '70'})
+        self.assertRedirects(respuesta, '/password_reset/done/')
+        self.assertIn('Failed to send password reset email', registro.output[0])
+
+
+class CorreoQueFalla:
+    """Backend de correo que falla como un SMTP inaccesible o con credenciales rechazadas."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def send_messages(self, mensajes):
+        raise ConnectionRefusedError('SMTP inaccesible')

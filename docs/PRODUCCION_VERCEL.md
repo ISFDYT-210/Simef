@@ -64,7 +64,20 @@ sube.
 | `CSRF_TRUSTED_ORIGINS` | `https://www.pulqui-simef210.com.ar,https://pulqui-simef210.com.ar` | Con esquema. |
 | `DATABASE_URL` | Cadena de conexión de Neon con `?sslmode=require` | **Obligatoria:** con `DEBUG=False` la app no arranca sin ella, en vez de caer a un SQLite vacío. Ver [DESPLIEGUE.md §3.1](DESPLIEGUE.md) para obtenerla. |
 | `ADMIN_HABILITADO` | **No definirla** | Sin la variable, con `DEBUG=False` el panel `/admin/` de Django no existe: la ruta redirige al inicio. Solo para una corrección puntual: `True`, redeploy, y después quitarla y redeployar de nuevo. |
-| `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` y el resto de `EMAIL_*` | Cuenta de correo del instituto | Para recuperar la contraseña y avisos. |
+| `EMAIL_HOST_USER` | Cuenta de Gmail del instituto | Para recuperar la contraseña y mandar credenciales. Si falta (o falta la contraseña), la app arranca igual pero **no sale ningún correo**, y lo avisa en Vercel → Logs en cada arranque. |
+| `EMAIL_HOST_PASSWORD` | Contraseña de aplicación de esa cuenta (16 letras, sin espacios) | No es la contraseña normal de Gmail: se genera en la cuenta de Google → Seguridad → Contraseñas de aplicaciones. |
+| `EMAIL_HOST` | `smtp.gmail.com` | Es el valor por defecto; se puede omitir. |
+| `EMAIL_PORT` | `587` | Es el valor por defecto. **No usar 25**: en Vercel está bloqueado. |
+| `EMAIL_USE_TLS` | `True` | Es el valor por defecto. |
+| `DEFAULT_FROM_EMAIL` | Opcional | Remitente que ve quien recibe el correo. Si falta: `SIMEF · ISFDyT N.º 210 <EMAIL_HOST_USER>`. |
+
+**Si no llega el correo de recuperar contraseña:** la pantalla muestra éxito igual,
+a propósito (Django no revela qué cuentas existen). Ver Vercel → Logs: un envío
+que falló aparece como `Failed to send password reset email to <id>` con el
+motivo (credenciales rechazadas, puerto bloqueado, etc.). Si no aparece nada, el
+correo salió: revisar spam, y que la cuenta tenga un email cargado y esté activa.
+Después de cambiar una variable hay que **redeployar**: Vercel no la toma hasta el
+próximo deploy.
 
 ### HTTPS
 

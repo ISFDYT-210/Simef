@@ -15,6 +15,7 @@ from django.contrib.messages import constants as message_constants
 from django.core.exceptions import ImproperlyConfigured
 from urllib.parse import urlparse, parse_qs
 import os
+import sys
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -306,8 +307,44 @@ LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'inicio'
 
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
+# Gmail con TLS usa el 587. El 25 (el valor por defecto de antes) suele estar
+# bloqueado en Vercel/AWS: si faltaba EMAIL_PORT, ningún correo salía.
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Sin límite, un servidor SMTP que no responde deja colgada la función hasta el
+# timeout de Vercel.
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', 15))
+# Sin esto Django manda como webmaster@localhost, que los filtros de spam miran mal.
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or (
+    f'SIMEF · ISFDyT N.º 210 <{EMAIL_HOST_USER}>' if EMAIL_HOST_USER else 'webmaster@localhost'
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Recuperar la contraseña y mandar credenciales dependen del correo. No frena el
+# arranque como las variables obligatorias (el resto del sistema anda igual),
+# pero queda escrito en Vercel → Logs en cada arranque.
+if not DEBUG and not (EMAIL_HOST_USER and EMAIL_HOST_PASSWORD):
+    print(
+        'AVISO: faltan EMAIL_HOST_USER o EMAIL_HOST_PASSWORD. No se van a poder mandar '
+        'correos (recuperar contraseña, credenciales). Ver docs/PRODUCCION_VERCEL.md.',
+        file=sys.stderr,
+    )
+
+# Sin esto, Django solo imprime sus mensajes con DEBUG=True. En producción, un
+# error al mandar el correo de recuperar contraseña no quedaba en ningún lado:
+# Django lo atrapa para no revelar qué cuentas existen y solo lo manda al log.
+# Así va a la salida estándar, que Vercel muestra en Logs.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'consola': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'django': {'handlers': ['consola'], 'level': 'INFO' if DEBUG else 'WARNING'},
+        'inscripcionFinales': {'handlers': ['consola'], 'level': 'INFO'},
+    },
+}
