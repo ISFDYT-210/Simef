@@ -15,7 +15,7 @@ from django.contrib import messages
 from django.db.models import Q,Prefetch,OuterRef,F,Count
 from django import forms
 from datetime import datetime   
-from django.http import HttpResponse,JsonResponse
+from django.http import HttpResponse,JsonResponse, HttpResponseRedirect
 import csv
 from django.contrib.auth.models import User
 from django.urls import reverse_lazy
@@ -71,7 +71,7 @@ from reportlab.pdfgen import canvas
 import io
 from django.utils.timezone import now
 from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
-from .audit import registrar_auditoria
+from .audit import registrar_auditoria, resumen_borrado
 
 logger = logging.getLogger(__name__)
 
@@ -249,19 +249,33 @@ class profileviews(TemplateView):
     model = Usuario 
   
 
-class deleteUser(CapacidadRequeridaMixin, DeleteView):
+class AuditarBorradoMixin:
+    """Una DeleteView que deja en la auditoría qué borró y qué arrastró en cascada (#271)."""
+
+    def form_valid(self, form):
+        objeto = self.get_object()
+        descripcion = f'{objeto._meta.verbose_name} {objeto} (id {objeto.pk})'
+        resultado = objeto.delete()
+        registrar_auditoria(
+            self.request, f'Eliminó {descripcion}', objeto.__class__.__name__, objeto.pk,
+            valor_anterior=resumen_borrado(resultado),
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class deleteUser(CapacidadRequeridaMixin, AuditarBorradoMixin, DeleteView):
     capacidades_requeridas = ('gestionar_usuarios',)
     model = Usuario
     template_name ='registration/delete_user.html'
     success_url = '/user_list'
     
-class deleteInscripcion(CapacidadRequeridaMixin, DeleteView):
+class deleteInscripcion(CapacidadRequeridaMixin, AuditarBorradoMixin, DeleteView):
     capacidades_requeridas = ('gestionar_mesas',)
     model = InscripcionFinal
     template_name ='registration/delete_inscripcion.html'
     success_url = '/inscripcion_finales_lista'
 
-class deleteMesa(CapacidadRequeridaMixin, DeleteView):
+class deleteMesa(CapacidadRequeridaMixin, AuditarBorradoMixin, DeleteView):
     capacidades_requeridas = ('gestionar_mesas',)
     model = MesaFinal
     template_name ='registration/delete_mesa.html'
@@ -358,20 +372,21 @@ class listAuditoria(CapacidadRequeridaMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        queryset = RegistroAuditoria.objects.select_related('usuario').filter(
-            usuario__rol__in=ROLES_AUDITABLES
-        )
+        # Se filtra por el autor guardado en el registro, no por el usuario: si
+        # la cuenta se borró, sus acciones siguen apareciendo (#271).
+        queryset = RegistroAuditoria.objects.filter(autor_rol__in=ROLES_AUDITABLES)
 
         rol_filter = self.request.GET.get('rol')
         if rol_filter in ROLES_AUDITABLES:
-            queryset = queryset.filter(usuario__rol=rol_filter)
+            queryset = queryset.filter(autor_rol=rol_filter)
 
         search = self.request.GET.get('search')
         if search:
             queryset = queryset.filter(
-                Q(usuario__nombre_completo__icontains=search) |
-                Q(usuario__email__icontains=search) |
-                Q(accion__icontains=search)
+                Q(autor_nombre__icontains=search) |
+                Q(autor_dni__icontains=search) |
+                Q(accion__icontains=search) |
+                Q(motivo__icontains=search)
             )
 
         return queryset
@@ -827,7 +842,16 @@ def error_inscripcion_est5(request):#No aprobaste la correlativa
 def error_inscripcion_est6(request):#No cursaste la correlativa
     return render(request, 'finales/error_inscripcion_est6.html')
     
-def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
+def _describir_notas(notas):
+    """'nota de cursada 7, nota final sin cargar', para el valor anterior/nuevo de la auditoría."""
+    nombres = {'nota_cursada': 'nota de cursada', 'nota_final': 'nota final'}
+    return ', '.join(
+        f'{nombres.get(campo, campo)} {"sin cargar" if valor is None else valor}'
+        for campo, valor in notas.items()
+    )
+
+
+def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores, request=None):
     """
     Si la fila del CSV de carga masiva de usuarios trae columna 'Materia',
     busca (o crea) la inscripción de ese usuario a esa materia y le carga
@@ -860,6 +884,7 @@ def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
             inscripcion.modalidad = modalidad
 
     cargo_algo = False
+    cambios = []
     for columna, campo in (('Nota de cursada', 'nota_cursada'), ('Nota de final', 'nota_final')):
         valor = (fila.get(columna) or '').strip()
         if not valor:
@@ -871,12 +896,22 @@ def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
         except ValueError:
             errores.append(f'Fila {numero_fila}: {columna} inválida ({valor})')
             continue
+        anterior = getattr(inscripcion, campo)
         setattr(inscripcion, campo, nota)
         if campo == 'nota_final':
             inscripcion.aprobada = nota >= 4
         cargo_algo = True
+        if request is not None and anterior != nota:
+            # Antes la carga masiva cambiaba notas sin dejar rastro (#271).
+            cambios.append((campo, anterior, nota))
 
     inscripcion.save()
+    for campo, anterior, nota in cambios:
+        registrar_auditoria(
+            request, f'Cargó por CSV la {_describir_notas({campo: nota})} a {usuario.nombre_completo} en {materia}',
+            'usuarios_materia', inscripcion.pk,
+            valor_anterior=_describir_notas({campo: anterior}), valor_nuevo=_describir_notas({campo: nota}),
+        )
     return cargo_algo
 
 
@@ -978,7 +1013,8 @@ def cargar_usuarios(request):
                                 ).first()
                                 if carrera_para_notas and not usuario_existente.carrera.filter(id=carrera_para_notas.id).exists():
                                     usuario_existente.carrera.add(carrera_para_notas)
-                            if _cargar_nota_de_fila(usuario_existente, fila, carrera_para_notas, numero_fila, errores):
+                            if _cargar_nota_de_fila(usuario_existente, fila, carrera_para_notas, numero_fila, errores,
+                                                    request=request):
                                 notas_cargadas += 1
                             continue
 
@@ -1171,7 +1207,7 @@ def cargar_usuarios(request):
                         if carrera_obj:
                             usuario.carrera.add(carrera_obj)
 
-                        if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores):
+                        if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores, request=request):
                             notas_cargadas += 1
 
                         credenciales_generadas.append({'dni': dni, 'email': email, 'password': password})
@@ -1185,6 +1221,14 @@ def cargar_usuarios(request):
                     except Exception as e:
                         errores.append(f'Fila {numero_fila}: Error inesperado - {str(e)}')
                 
+                if usuarios_creados or notas_cargadas:
+                    registrar_auditoria(
+                        request,
+                        f'Carga masiva de usuarios ({archivo_csv.name}): {usuarios_creados} creado(s), '
+                        f'{usuarios_duplicados} ya existían, {notas_cargadas} fila(s) con notas, {len(errores)} error(es)',
+                        'Usuario',
+                    )
+
                 # Mostrar resultados
                 if errores:
                     partes = [f'{usuarios_creados} usuario(s) creado(s)']
@@ -1401,7 +1445,10 @@ def editar_materia(request, id):
 def eliminar_materia(request, id):
     materia = get_object_or_404(Materia, pk=id)
     if request.method == 'POST':
-        materia.delete()
+        descripcion = f'la materia {materia} (id {materia.pk})'
+        resultado = materia.delete()
+        registrar_auditoria(request, f'Eliminó {descripcion}', 'Materia', id,
+                            valor_anterior=resumen_borrado(resultado))
         return redirect('exito_materia_eliminada_adm')
     return render(request, 'materias/eliminar_materia.html', {'materia': materia})
 
@@ -1420,7 +1467,12 @@ def eliminar_inscripcion_final(request, id):
     if not request.user.tiene_capacidad('gestionar_mesas'):
         return render(request, '403_forbidden.html', status=403)
     if request.method == 'POST':
-        final.delete()
+        descripcion = (f'la inscripción de {final.usuario.nombre_completo} a la mesa de {final.llamado.materia} '
+                       f'del {final.llamado.llamado:%d/%m/%Y} (id {final.pk})')
+        resultado_previo = 'ausente' if final.ausente else f'nota {final.nota}' if final.nota is not None else 'sin resultado'
+        resultado = final.delete()
+        registrar_auditoria(request, f'Eliminó {descripcion}', 'InscripcionFinal', id,
+                            valor_anterior=f'{resultado_previo}. {resumen_borrado(resultado)}')
         return redirect('exito_final_eliminado_adm')
     return render(request, 'finales/eliminar_final_est.html', {'final': final})
 
@@ -1430,7 +1482,11 @@ def eliminar_materias_seleccionadas(request):
         materia_ids = request.POST.getlist('materia_ids')
         cantidad_eliminadas = len(materia_ids)
         if cantidad_eliminadas > 0:
-            Materia.objects.filter(id__in=materia_ids).delete()
+            materias_a_borrar = Materia.objects.filter(id__in=materia_ids)
+            nombres = ', '.join(str(m) for m in materias_a_borrar)
+            resultado = materias_a_borrar.delete()
+            registrar_auditoria(request, f'Eliminó {cantidad_eliminadas} materia(s): {nombres}', 'Materia',
+                                ','.join(materia_ids), valor_anterior=resumen_borrado(resultado))
         materias = Materia.objects.all()
         return render(request, 'materias/lista_materias_admin.html',
                       {'materias': materias, 'cantidad_eliminadas': cantidad_eliminadas})
@@ -1460,7 +1516,11 @@ def eliminar_mesas_seleccionadas(request):
     if request.method == 'POST':
         mesa_ids = request.POST.getlist('mesa_ids')
         if len(mesa_ids) > 0:
-            MesaFinal.objects.filter(id__in=mesa_ids).delete()
+            mesas_a_borrar = MesaFinal.objects.filter(id__in=mesa_ids).select_related('materia')
+            nombres = ', '.join(f'{m.materia} {m.llamado:%d/%m/%Y}' for m in mesas_a_borrar)
+            resultado = mesas_a_borrar.delete()
+            registrar_auditoria(request, f'Eliminó {len(mesa_ids)} mesa(s): {nombres}', 'MesaFinal',
+                                ','.join(mesa_ids), valor_anterior=resumen_borrado(resultado))
     return redirect('/mesas_lista')
 
 
@@ -1828,7 +1888,11 @@ def cargar_nota_final(request, inscripcion_id):
                     f'Cargó resultado ({detalle}) a {inscripcion.usuario.nombre_completo} en {inscripcion.llamado.materia}, '
                     f'acta {mesa.numero_acta or "s/n"} folio {mesa.folio or "s/n"}'
                 )
-            registrar_auditoria(request, accion, 'InscripcionFinal', inscripcion.pk)
+            registrar_auditoria(
+                request, accion, 'InscripcionFinal', inscripcion.pk,
+                valor_anterior=valor_anterior, valor_nuevo=detalle,
+                motivo=motivo_correccion if es_correccion else '',
+            )
             messages.success(
                 request,
                 f'Resultado {"corregido" if es_correccion else "cargado"} correctamente: {detalle}'
@@ -1859,12 +1923,15 @@ def cargar_nota_cursada(request, id):
         form = NotaCursadaForm(request.POST)
         if form.is_valid():
             nota_cursada = form.cleaned_data['nota_cursada']
+            anterior = usuario_materia.nota_cursada
             usuario_materia.nota_cursada = nota_cursada
             usuario_materia.save()
 
             registrar_auditoria(
                 request, f'Cargó nota de cursada {nota_cursada} a {usuario_materia.usuario.nombre_completo} en {usuario_materia.materia}',
-                'usuarios_materia', usuario_materia.pk
+                'usuarios_materia', usuario_materia.pk,
+                valor_anterior=_describir_notas({'nota_cursada': anterior}),
+                valor_nuevo=_describir_notas({'nota_cursada': nota_cursada}),
             )
             messages.success(request, f'Nota de cursada cargada correctamente: {nota_cursada}')
             return redirect('/listaMateriasAdm')  # Ajusta esto a tu URL de redirección
@@ -1885,12 +1952,15 @@ def editar_notas(request, id):
         return render(request, '403_forbidden.html', status=403)
 
     if request.method == 'POST':
+        anteriores = {campo: getattr(usuario_materia, campo) for campo in NotaCursadaForm.Meta.fields}
         form = NotaCursadaForm(request.POST, instance=usuario_materia)
         if form.is_valid():
             form.save()
+            nuevas = {campo: getattr(usuario_materia, campo) for campo in NotaCursadaForm.Meta.fields}
             registrar_auditoria(
                 request, f'Editó las notas de {usuario_materia.usuario.nombre_completo} en {usuario_materia.materia}',
-                'usuarios_materia', usuario_materia.pk
+                'usuarios_materia', usuario_materia.pk,
+                valor_anterior=_describir_notas(anteriores), valor_nuevo=_describir_notas(nuevas),
             )
             messages.success(request, 'Las notas han sido actualizadas correctamente.')
             return redirect('/listaMateriasAdm/')
@@ -1930,10 +2000,11 @@ def eliminar_usuarios(request):
             try:
                 # Eliminar los usuarios seleccionados
                 dnis = list(Usuario.objects.filter(id__in=usuarios_ids).values_list('dni', flat=True))
-                registrar_auditoria(request, f'Eliminó usuarios (DNI): {", ".join(dnis)}', 'Usuario', ",".join(usuarios_ids))
                 usuarios_eliminados = Usuario.objects.filter(id__in=usuarios_ids)
                 cantidad_eliminadas = usuarios_eliminados.count()
-                usuarios_eliminados.delete()
+                resultado = usuarios_eliminados.delete()
+                registrar_auditoria(request, f'Eliminó usuarios (DNI): {", ".join(dnis)}', 'Usuario',
+                                    ",".join(usuarios_ids), valor_anterior=resumen_borrado(resultado))
                 
                 messages.success(request, f'Se eliminaron {cantidad_eliminadas} usuarios correctamente.')
             except Exception as e:

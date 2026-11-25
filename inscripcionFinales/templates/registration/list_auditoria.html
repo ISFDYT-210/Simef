@@ -22,7 +22,7 @@
         {% endfor %}
       </select>
 
-      <input type="text" name="search" value="{{ search_actual }}" placeholder="Buscar por usuario o acción"
+      <input type="text" name="search" value="{{ search_actual }}" placeholder="Buscar por autor, DNI, acción o motivo"
              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
 
       <button type="submit"
@@ -44,6 +44,7 @@
           <th class="px-5 py-3 font-semibold">Usuario</th>
           <th class="px-5 py-3 font-semibold">Rol</th>
           <th class="px-5 py-3 font-semibold">Acción</th>
+          <th class="px-5 py-3 font-semibold">Cambio</th>
           <th class="px-5 py-3 font-semibold">Modelo afectado</th>
         </tr>
       </thead>
@@ -52,23 +53,33 @@
         <tr class="hover:bg-slate-50">
           <td class="whitespace-nowrap px-5 py-3 text-slate-500">{{ registro.fecha|date:"d/m/Y H:i" }}</td>
           <td class="px-5 py-3 font-medium text-tinta-900">
-            {{ registro.usuario.nombre_completo|default:registro.usuario.email|default:"Sistema" }}
+            {{ registro.autor_nombre|default:"Sistema" }}
+            {% if registro.autor_dni %}<span class="block text-xs font-normal text-slate-500">DNI {{ registro.autor_dni }}{% if not registro.usuario %} · cuenta dada de baja{% endif %}</span>{% endif %}
           </td>
           <td class="px-5 py-3">
-            {% if registro.usuario %}
-            <span class="rounded-full bg-tinta-50 px-2.5 py-1 text-xs font-semibold text-tinta-700">{{ registro.usuario.get_rol_display }}</span>
+            {% if registro.autor_rol %}
+            <span class="rounded-full bg-tinta-50 px-2.5 py-1 text-xs font-semibold text-tinta-700">{{ registro.autor_rol }}</span>
             {% else %}
             —
             {% endif %}
           </td>
-          <td class="px-5 py-3">{{ registro.accion }}</td>
+          <td class="px-5 py-3">
+            {{ registro.accion }}
+            {% if registro.motivo %}<span class="mt-1 block text-xs text-slate-500">Motivo: {{ registro.motivo }}</span>{% endif %}
+          </td>
+          <td class="px-5 py-3 text-xs text-slate-600">
+            {% if registro.valor_anterior or registro.valor_nuevo %}
+            {% if registro.valor_anterior %}<span class="block"><span class="font-semibold text-slate-500">Antes:</span> {{ registro.valor_anterior }}</span>{% endif %}
+            {% if registro.valor_nuevo %}<span class="block"><span class="font-semibold text-slate-500">Después:</span> {{ registro.valor_nuevo }}</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
           <td class="px-5 py-3 text-slate-500">
             {% if registro.modelo_afectado %}{{ registro.modelo_afectado }}{% if registro.objeto_id %} #{{ registro.objeto_id }}{% endif %}{% else %}—{% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5" class="px-5 py-16 text-center text-sm font-medium text-tinta-900">No hay registros de auditoría para mostrar</td>
+          <td colspan="6" class="px-5 py-16 text-center text-sm font-medium text-tinta-900">No hay registros de auditoría para mostrar</td>
         </tr>
         {% endfor %}
       </tbody>
