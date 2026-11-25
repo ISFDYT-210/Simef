@@ -2,7 +2,7 @@
 {% block title %}Editar inscripción{% endblock %}
 {% block encabezado %}Editar inscripción{% endblock %}
 {% block content %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+{% if request.user.puede_gestionar_mesas %}
 <div class="mx-auto max-w-md">
   <form method="POST" id="editInscrForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
     {% csrf_token %}
