@@ -234,7 +234,9 @@ def editMesa(request, pk):
     
     return render(request, 'registration/edit_mesa.html', {'form': form})
 
-class editInscr(UpdateView):
+class editInscr(CapacidadRequeridaMixin, UpdateView):
+    # Mismas reglas que el resto de la gestión de mesas (#278)
+    capacidades_requeridas = ('gestionar_mesas',)
     model = InscripcionFinal
     form_class = InscripcionFinalForm
     template_name = 'registration/edit_inscr.html'
