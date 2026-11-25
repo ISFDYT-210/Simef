@@ -5,8 +5,8 @@ Tests del registro de auditoría (#271).
 - Guarda valor anterior, valor nuevo y motivo, además del texto de la acción.
 - No se modifica ni se borra: lo impide el modelo y, en PostgreSQL, un trigger.
 - Ya no borra sola los registros de más de un año.
-- Las eliminaciones y las ediciones de notas dejan registro, con lo que arrastró
-  el borrado en cascada.
+- Las bajas y las ediciones de notas dejan registro. Desde la #270 nada se
+  borra: la baja guarda lo que la materia, mesa o usuario conserva (ver test_bajas.py).
 """
 from datetime import timedelta
 
@@ -129,7 +129,7 @@ class AutorConservadoTest(TestCase):
 
 
 class AccionesCriticasDejanRegistroTest(TestCase):
-    """Las eliminaciones y las ediciones de notas quedan en la auditoría, con qué arrastró el borrado."""
+    """Las bajas y las ediciones de notas quedan en la auditoría, con lo que se conserva (#270)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -144,54 +144,69 @@ class AccionesCriticasDejanRegistroTest(TestCase):
         self.cursada = usuarios_materia.objects.create(usuario=self.estudiante, materia=self.materia, nota_cursada=7)
         self.inscripcion = InscripcionFinal.objects.create(
             usuario=self.estudiante, llamado=self.mesa, nota=8, aprobada=True)
+        # Una mesa futura sin resultados, que sí se puede dar de baja
+        self.mesa_futura = MesaFinal.objects.create(materia=self.materia, llamado=timezone.now() + timedelta(days=9))
+        self.pendiente = InscripcionFinal.objects.create(usuario=self.estudiante, llamado=self.mesa_futura)
 
     def ultimo(self):
         return RegistroAuditoria.objects.latest('fecha')
 
-    def test_eliminar_una_materia_registra_lo_que_arrastro(self):
+    def test_dar_de_baja_una_materia_registra_lo_que_conserva(self):
         self.client.force_login(self.directivo)
         self.client.post(f'/eliminar_materia/{self.materia.pk}/')
         registro = self.ultimo()
-        self.assertIn('Eliminó la materia Base de Datos', registro.accion)
-        self.assertIn('InscripcionFinal', registro.valor_anterior)
-        self.assertIn('MesaFinal', registro.valor_anterior)
+        self.assertEqual(registro.accion, f'Dio de baja la materia Base de Datos (id {self.materia.pk})')
+        self.assertEqual(registro.objeto_id, str(self.materia.pk))
+        self.assertEqual(registro.valor_anterior, 'De alta')
+        self.assertIn('1 cursada', registro.valor_nuevo)
+        self.assertIn('2 mesas de final', registro.valor_nuevo)
+        self.assertIn('1 resultado de final', registro.valor_nuevo)
         self.assertEqual(registro.autor_dni, '30666777')
 
-    def test_eliminar_materias_seleccionadas_deja_registro(self):
+    def test_dar_de_baja_materias_seleccionadas_deja_un_registro_por_materia(self):
         self.client.force_login(self.directivo)
         self.client.post('/materias/eliminar_seleccionadas/', {'materia_ids': [self.materia.pk]})
         registro = self.ultimo()
-        self.assertIn('Eliminó 1 materia(s): Base de Datos', registro.accion)
-        self.assertIn('usuarios_materia', registro.valor_anterior)
+        self.assertIn('Dio de baja la materia Base de Datos', registro.accion)
+        self.assertEqual(registro.objeto_id, str(self.materia.pk))
 
-    def test_eliminar_mesas_seleccionadas_deja_registro(self):
+    def test_dar_de_baja_mesas_seleccionadas_deja_registro(self):
         self.client.force_login(self.preceptor)
-        self.client.post('/mesas/eliminar_seleccionadas/', {'mesa_ids': [self.mesa.pk]})
+        self.client.post('/mesas/eliminar_seleccionadas/', {'mesa_ids': [self.mesa_futura.pk]})
         registro = self.ultimo()
-        self.assertIn('Eliminó 1 mesa(s)', registro.accion)
-        self.assertIn('InscripcionFinal', registro.valor_anterior)
+        self.assertIn('Dio de baja la mesa de Base de Datos', registro.accion)
+        self.assertIn('1 inscripción', registro.valor_nuevo)
 
-    def test_eliminar_una_mesa_deja_registro(self):
+    def test_dar_de_baja_una_mesa_guarda_su_id(self):
+        """Antes el id quedaba vacío: se leía después del delete(), que lo pone en None."""
         self.client.force_login(self.preceptor)
-        self.client.post(f'/delete_mesa/{self.mesa.pk}')
-        self.assertFalse(MesaFinal.objects.filter(pk=self.mesa.pk).exists())
-        self.assertIn('Eliminó', self.ultimo().accion)
-        self.assertEqual(self.ultimo().modelo_afectado, 'MesaFinal')
-
-    def test_eliminar_una_inscripcion_a_final_guarda_el_resultado_que_tenia(self):
-        self.client.force_login(self.preceptor)
-        self.client.post(f'/eliminar_inscripcion_final/{self.inscripcion.pk}/')
+        self.client.post(f'/delete_mesa/{self.mesa_futura.pk}')
         registro = self.ultimo()
-        self.assertIn('Eliminó la inscripción de Estudiante Crit', registro.accion)
-        self.assertIn('nota 8', registro.valor_anterior)
+        self.assertEqual(registro.modelo_afectado, 'MesaFinal')
+        self.assertEqual(registro.objeto_id, str(self.mesa_futura.pk))
 
-    def test_eliminar_un_usuario_deja_registro(self):
+    def test_dar_de_baja_una_inscripcion_a_final_deja_registro(self):
+        self.client.force_login(self.preceptor)
+        self.client.post(f'/eliminar_inscripcion_final/{self.pendiente.pk}/')
+        registro = self.ultimo()
+        self.assertIn('Dio de baja la inscripción de Estudiante Crit', registro.accion)
+        self.assertEqual(registro.objeto_id, str(self.pendiente.pk))
+
+    def test_dar_de_baja_un_usuario_registra_lo_que_conserva(self):
         self.client.force_login(self.directivo)
         self.client.post(f'/delete_user/{self.estudiante.pk}')
-        self.assertFalse(Usuario.objects.filter(pk=self.estudiante.pk).exists())
         registro = self.ultimo()
         self.assertEqual(registro.modelo_afectado, 'Usuario')
-        self.assertIn('InscripcionFinal', registro.valor_anterior)
+        self.assertEqual(registro.objeto_id, str(self.estudiante.pk))
+        self.assertIn('DNI 30888999', registro.accion)
+        self.assertIn('2 inscripciones a final', registro.valor_nuevo)
+
+    def test_lo_que_no_se_puede_dar_de_baja_no_deja_registro(self):
+        antes = RegistroAuditoria.objects.count()
+        self.client.force_login(self.preceptor)
+        self.client.post(f'/delete_mesa/{self.mesa.pk}')
+        self.client.post(f'/eliminar_inscripcion_final/{self.inscripcion.pk}/')
+        self.assertEqual(RegistroAuditoria.objects.count(), antes)
 
     def test_editar_notas_guarda_valor_anterior_y_nuevo(self):
         self.client.force_login(self.preceptor)

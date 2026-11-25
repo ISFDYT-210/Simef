@@ -1,0 +1,40 @@
+{% comment %}
+  Confirmación de una baja (#270): nada se borra. Recibe:
+  - titulo, descripcion ("la materia X (id 5)"), volver (URL de Cancelar);
+  - conserva: lista de lo que queda intacto ("12 cursadas", ...);
+  - motivo_bloqueo: si no se puede dar de baja, por qué (y no hay botón);
+  - aviso (opcional): una línea más, por ejemplo que el usuario no va a poder entrar.
+{% endcomment %}
+<div class="grid min-h-[50vh] place-items-center px-4">
+  <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center">
+    <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-amber-50 text-amber-600">
+      <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16v3H4zM5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9M10 14h4"/></svg>
+    </div>
+    <h2 class="mt-4 text-lg font-bold text-tinta-900">{{ titulo }}</h2>
+
+    {% if motivo_bloqueo %}
+    <p class="mt-3 rounded-lg bg-red-50 px-4 py-3 text-left text-sm text-red-700">{{ motivo_bloqueo }}</p>
+    <a href="{{ volver }}" class="mt-6 inline-block rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver</a>
+    {% else %}
+    <p class="mt-2 text-sm text-slate-600">¿Dar de baja {{ descripcion }}?</p>
+    <p class="mt-3 text-left text-sm text-slate-600">
+      No se borra nada: deja de aparecer en los listados y en lo que se ofrece para inscribirse,
+      y se puede reactivar desde <a href="{% url 'lista_dados_de_baja' %}" class="font-medium text-celeste-600 underline">Dados de baja</a>.
+      {% if aviso %}{{ aviso }}{% endif %}
+    </p>
+    {% if conserva %}
+    <div class="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-left text-sm text-slate-600">
+      <p class="font-semibold text-slate-700">Se conserva intacto:</p>
+      <ul class="mt-1 list-disc pl-5">
+        {% for linea in conserva %}<li>{{ linea }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    <form method="post" class="mt-6 flex items-center justify-center gap-2">
+      {% csrf_token %}
+      <button type="submit" class="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700">Sí, dar de baja</button>
+      <a href="{{ volver }}" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</a>
+    </form>
+    {% endif %}
+  </div>
+</div>

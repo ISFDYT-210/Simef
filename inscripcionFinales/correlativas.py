@@ -44,7 +44,7 @@ def intentos_consumidos(usuario_id, materia_id, inscripcion_materia=None):
     if inscripcion_materia is None:
         inscripcion_materia = usuarios_materia.objects.filter(
             usuario_id=usuario_id, materia_id=materia_id).first()
-    qs = InscripcionFinal.objects.filter(usuario_id=usuario_id, llamado__materia_id=materia_id)
+    qs = InscripcionFinal.objects.de_alta().filter(usuario_id=usuario_id, llamado__materia_id=materia_id)
     if inscripcion_materia and inscripcion_materia.ciclo_actual_desde:
         qs = qs.filter(llamado__llamado__gte=inscripcion_materia.ciclo_actual_desde)
     return qs.filter(Q(ausente=True) | Q(nota__lt=4)).count()
@@ -215,7 +215,7 @@ def materias_con_requisitos(usuario):
     ingresante por carrera) para no repetir el N+1 que ya daba timeout contra
     Neon.
     """
-    materias = Materia.objects.filter(inscripcionAbierta=True, carrera__in=usuario.carrera.all())
+    materias = Materia.objects.de_alta().filter(inscripcionAbierta=True, carrera__in=usuario.carrera.all())
     materia_ids = [m.id for m in materias]
 
     inscripciones_usuario = {}  # materia_id -> mejor intento (para evaluar correlativas de otras materias)
@@ -312,9 +312,11 @@ def finales_con_requisitos(usuario):
     Todas las mesas vigentes de materias de las carreras del alumno, cada una
     con si puede inscribirse y el motivo puntual si no. Mismo espíritu que
     materias_con_requisitos: desglose para la UI en vez de ocultar sin explicar.
+    No ofrece mesas dadas de baja ni de materias dadas de baja (#270).
     """
     mesas = list(
-        MesaFinal.objects.filter(vigente=True, materia__carrera__in=usuario.carrera.all())
+        MesaFinal.objects.de_alta()
+        .filter(vigente=True, materia__activo=True, materia__carrera__in=usuario.carrera.all())
         .select_related('materia')
     )
     materia_ids = [m.materia_id for m in mesas]
@@ -327,7 +329,7 @@ def finales_con_requisitos(usuario):
     # resultado todavía. Una vez cargado el resultado (nota o ausente), ya no
     # cuenta acá: si quedan oportunidades, el alumno puede volver a anotarse.
     materias_con_mesa_inscripta = set(
-        InscripcionFinal.objects.filter(
+        InscripcionFinal.objects.de_alta().filter(
             usuario_id=usuario.id, llamado__materia_id__in=materia_ids, aprobada__isnull=True,
         ).values_list('llamado__materia_id', flat=True)
     )
@@ -335,7 +337,7 @@ def finales_con_requisitos(usuario):
     # Intentos ya gastados por materia, para el tope de MAX_OPORTUNIDADES_FINAL
     # (una sola query para todas las mesas de esta página, no una por mesa).
     intentos_por_materia = {}
-    for fila in InscripcionFinal.objects.filter(
+    for fila in InscripcionFinal.objects.de_alta().filter(
         usuario_id=usuario.id, llamado__materia_id__in=materia_ids,
     ).values('llamado__materia_id', 'ausente', 'nota', 'llamado__llamado'):
         intentos_por_materia.setdefault(fila['llamado__materia_id'], []).append(fila)

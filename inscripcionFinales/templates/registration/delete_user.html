@@ -1,28 +1,10 @@
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 {% extends 'base/base.html' %}
-{% block title %}Eliminar usuario{% endblock %}
+{% comment %}
+  Antes esta pantalla se confirmaba sola con JavaScript y borraba la cuenta con
+  todo su historial. Ahora pide confirmación y da de baja (#270): la cuenta no
+  puede entrar, pero sus cursadas, notas e inscripciones quedan intactas.
+{% endcomment %}
+{% block title %}Dar de baja usuario{% endblock %}
 {% block content %}
-
-{% load inscripcionfinales_extras %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.admin %}
-  {% if request.path != "/delete_user/"|concatenate:request.user.id %}
-    <form method="POST" class="" style="margin-bottom: 250px">
-    {% csrf_token %}
-    <!-- <if> -->
-    <button class="btn btn-danger" id="eliminar" type="submit">Eliminando<a href="/user_list/"></a></button>
-    <script>document.getElementById("eliminar").click()</script>
-  {% else %}
-    <div class="text-center">
-        <h3>No podés borrar tu propio usuario. Para volver, <a href="/user_list/">hace click acá</a></h3>
-    </div>
-    </form>
-  {% endif %}
-{% else %}
-  <div class="text-center">
-    <h3>No deberías estar acá. Para volver<a href="/" style="text-decoration: none">hace click acá</a></h3>
-  </div>
-  </form>
-{% endif %}
+{% include 'base/_confirmar_baja.html' with titulo='Dar de baja usuario' volver='/user_list/' aviso='Mientras esté dado de baja, no puede entrar al sistema.' %}
 {% endblock %}
-
-

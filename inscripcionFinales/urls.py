@@ -35,6 +35,8 @@ urlpatterns = [
     path("edit_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/edit_profile.html')), name='edit_profile'),
     path("delete_user/<int:pk>",login_required(deleteUser.as_view(template_name='registration/delete_user.html')),name='delete_user'),
     path('eliminar_usuarios_seleccionados/', eliminar_usuarios, name='eliminar_usuarios_seleccionados'),
+    path('dados_de_baja/', login_required(lista_dados_de_baja), name='lista_dados_de_baja'),
+    path('reactivar/<str:tipo>/<int:pk>/', login_required(reactivar), name='reactivar'),
     path('blanquear_password/<int:usuario_id>/', login_required(blanquear_password), name='blanquear_password'),
     path("show_user/<int:pk>",login_required(editUser.as_view(template_name = 'registration/show_user.html')), name='show_user'),
     path('password_reset/done/', CustomPasswordResetDoneView.as_view(), name='password_reset_done'),

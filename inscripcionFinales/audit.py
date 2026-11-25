@@ -37,13 +37,3 @@ def registrar_auditoria(request, accion, modelo='', objeto_id='',
         motivo=motivo or '',
     )
 
-
-def resumen_borrado(resultado_delete):
-    """El detalle de lo que arrastró un .delete() en cascada, para la auditoría.
-
-    `resultado_delete` es lo que devuelve QuerySet.delete() o Model.delete():
-    (total, {'app.Modelo': cantidad, ...}).
-    """
-    total, por_modelo = resultado_delete
-    partes = [f'{cantidad} {modelo.split(".")[-1]}' for modelo, cantidad in sorted(por_modelo.items()) if cantidad]
-    return f'{total} registro(s) borrado(s): ' + ', '.join(partes) if partes else '0 registros borrados'
