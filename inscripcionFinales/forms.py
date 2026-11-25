@@ -501,12 +501,17 @@ class InscripcionFinalForm(forms.ModelForm):
         self.fields['usuario'].queryset = Usuario.obtener_estudiantes()
         self.fields['usuario'].empty_label = "Seleccione un estudiante"
 
-        # Filtrar solo mesas con inscripción abierta y vigentes, de alta y de materias de alta
-        self.fields['llamado'].queryset = MesaFinal.objects.de_alta().filter(
-            inscripcionAbierta=True,
-            vigente=True,
-            materia__activo=True,
-        ).select_related('materia').order_by('materia__nombre_materia', 'llamado')
+        # Mesas con inscripción abierta y vigentes, de alta y de materias de alta
+        mesas = Q(activo=True, inscripcionAbierta=True, vigente=True, materia__activo=True)
+        if self.instance.pk:
+            # Editar es pasar la inscripción a otra mesa de la misma materia
+            # (#278): el estudiante no cambia, y se ofrecen la mesa actual y
+            # las otras de esa materia.
+            self.fields['usuario'].disabled = True
+            self.fields['usuario'].queryset = Usuario.objects.filter(pk=self.instance.usuario_id)
+            mesas = Q(pk=self.instance.llamado_id) | (mesas & Q(materia_id=self.instance.llamado.materia_id))
+        self.fields['llamado'].queryset = MesaFinal.objects.filter(mesas).select_related('materia') \
+            .order_by('materia__nombre_materia', 'llamado')
         self.fields['llamado'].empty_label = "Seleccione una mesa final"
         # "Materia - dd/mm/aaaa HH:MM" en vez del __str__ crudo de MesaFinal.
         self.fields['llamado'].label_from_instance = (

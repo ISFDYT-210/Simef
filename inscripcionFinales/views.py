@@ -235,18 +235,46 @@ def editMesa(request, pk):
     return render(request, 'registration/edit_mesa.html', {'form': form})
 
 class editInscr(CapacidadRequeridaMixin, UpdateView):
-    # Mismas reglas que el resto de la gestión de mesas (#278)
+    """Pasar una inscripción a final a otra mesa de la misma materia (#278).
+
+    Mismas reglas que el resto de la gestión de mesas: la usa quien gestiona
+    mesas, sobre inscripciones de alta y sin resultado. El estudiante no se
+    cambia: para eso se da de baja la inscripción y se inscribe al otro. Un
+    resultado se corrige desde "Cargar nota", con el motivo. El cambio de mesa
+    queda en la auditoría.
+    """
     capacidades_requeridas = ('gestionar_mesas',)
-    model = InscripcionFinal
+    queryset = InscripcionFinal.objects.de_alta().select_related('usuario', 'llamado__materia')
     form_class = InscripcionFinalForm
     template_name = 'registration/edit_inscr.html'
-    success_url = '/'
+    success_url = '/inscripcion_finales_lista/'
+    MOTIVO_CON_RESULTADO = ('La inscripción ya tiene el resultado cargado y es parte del acta, así que no se puede '
+                            'cambiar de mesa. Si el resultado está mal, corregilo desde "Cargar nota", con el motivo.')
 
-class cargarNotaFinal(UpdateView):
-    model = InscripcionFinal
-    form_class = InscripcionFinalForm
-    template_name = 'finales/cargar_nota.html'
-    success_url = '/'   
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.object.tiene_resultado():
+            context['motivo_bloqueo'] = self.MOTIVO_CON_RESULTADO
+        return context
+
+    def post(self, request, *args, **kwargs):
+        inscripcion = self.get_object()
+        if inscripcion.tiene_resultado():
+            return HttpResponseRedirect(request.path)  # la pantalla muestra el motivo
+        self.mesa_anterior = inscripcion.llamado
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        respuesta = super().form_valid(form)
+        mesa = self.object.llamado
+        if mesa.pk != self.mesa_anterior.pk:
+            registrar_auditoria(
+                self.request, f'Pasó a {self.object.usuario} a otra mesa de {mesa.materia}',
+                'InscripcionFinal', self.object.pk,
+                valor_anterior=bajas.describir(self.mesa_anterior), valor_nuevo=bajas.describir(mesa),
+            )
+            messages.success(self.request, f'{self.object.usuario} pasó a {bajas.describir(mesa)}.')
+        return respuesta
      
 class profileviews(TemplateView):
     model = Usuario 
