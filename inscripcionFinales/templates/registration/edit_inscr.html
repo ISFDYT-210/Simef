@@ -1,39 +1,59 @@
 {% extends 'base/base.html' %}
+{% comment %}
+  Pasar una inscripción a final a otra mesa de la misma materia (#278). El
+  estudiante no se cambia; una inscripción con resultado no se edita (ver editInscr).
+{% endcomment %}
 {% block title %}Editar inscripción{% endblock %}
 {% block encabezado %}Editar inscripción{% endblock %}
 {% block content %}
-{% if request.user.is_staff or request.user.is_superuser or request.user.is_admin %}
+{% if request.user.puede_gestionar_mesas %}
 <div class="mx-auto max-w-md">
-  <form method="POST" id="editInscrForm" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-    {% csrf_token %}
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <div class="border-b border-slate-200 px-6 py-4">
-      <h2 class="text-sm font-semibold text-tinta-900">Editar inscripción</h2>
+      <h2 class="text-sm font-semibold text-tinta-900">Cambiar de mesa</h2>
     </div>
-    <div class="space-y-4 px-6 py-6">
+    <div class="space-y-4 px-6 pt-6">
       <div>
         <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Estudiante</p>
-        <p class="mt-1 text-sm font-medium text-tinta-900" id="nombreUsuario">—</p>
-        <span class="hidden">{{ form.usuario }}</span>
+        <p class="mt-1 text-sm font-medium text-tinta-900">{{ object.usuario }}</p>
       </div>
       <div>
-        <label for="id_llamado" class="mb-1 block text-sm font-medium text-slate-700">Mesa</label>
-        {{ form.llamado }}
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Materia</p>
+        <p class="mt-1 text-sm font-medium text-tinta-900">{{ object.llamado.materia }}</p>
       </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
-      <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Guardar</button>
+
+    {% if motivo_bloqueo %}
+    <p class="mx-6 mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ motivo_bloqueo }}</p>
+    <div class="mt-6 border-t border-slate-200 px-6 py-4">
       <a href="/inscripcion_finales_lista/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver a inscripciones</a>
     </div>
-  </form>
+    {% else %}
+    <form method="POST" id="editInscrForm">
+      {% csrf_token %}
+      <div class="space-y-2 px-6 py-4">
+        <label for="id_llamado" class="block text-sm font-medium text-slate-700">Mesa</label>
+        {{ form.llamado }}
+        {% for error in form.llamado.errors %}<p class="text-sm text-red-600">{{ error }}</p>{% endfor %}
+        {% for error in form.non_field_errors %}<p class="text-sm text-red-600">{{ error }}</p>{% endfor %}
+        <p class="text-xs text-slate-500">
+          Se ofrecen las mesas de esta materia con la inscripción abierta. Para inscribir a otro
+          estudiante, dar de baja esta inscripción e inscribirlo desde "Inscripción a finales".
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-6 py-4">
+        <button type="submit" class="rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Guardar</button>
+        <a href="/inscripcion_finales_lista/" class="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Volver a inscripciones</a>
+      </div>
+    </form>
+    {% endif %}
+  </div>
 </div>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var c = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100'.split(' ');
     var ll = document.getElementById('id_llamado');
     if (ll) ll.classList.add.apply(ll.classList, c);
-    // muestra el nombre del estudiante desde el select oculto
-    var du = document.getElementById('id_usuario');
-    if (du && du.selectedIndex >= 0) document.getElementById('nombreUsuario').textContent = du.options[du.selectedIndex].innerHTML;
   });
 </script>
 {% else %}
