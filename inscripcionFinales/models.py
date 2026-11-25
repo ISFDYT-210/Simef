@@ -617,22 +617,56 @@ class Preceptor(Usuario):
     area = models.CharField(max_length=100)
 
 
+class RegistroAuditoriaInmodificable(Exception):
+    """Un registro de auditoría no se cambia ni se borra una vez guardado (#271)."""
+
+
+class RegistroAuditoriaQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise RegistroAuditoriaInmodificable('Los registros de auditoría no se modifican.')
+
+    def delete(self):
+        raise RegistroAuditoriaInmodificable('Los registros de auditoría no se borran.')
+
+
 class RegistroAuditoria(models.Model):
-    """Registro de acciones importantes: quién hizo qué y cuándo."""
+    """Registro de acciones importantes: quién hizo qué, cuándo y qué cambió.
+
+    Una vez guardado no se modifica ni se borra (#271). Lo impide el modelo y,
+    en PostgreSQL, un trigger de la base (migración 0024). La única excepción
+    es `usuario`, que queda en NULL si se borra la cuenta: por eso el autor se
+    guarda también en autor_dni, autor_nombre y autor_rol, y no se pierde.
+    """
     usuario = models.ForeignKey('Usuario', on_delete=models.SET_NULL,
                                 null=True, blank=True, related_name='acciones_auditoria')
+    autor_dni = models.CharField('DNI del autor', max_length=20, blank=True)
+    autor_nombre = models.CharField('Autor', max_length=255, blank=True)
+    autor_rol = models.CharField('Rol del autor', max_length=20, blank=True)
     accion = models.CharField('Acción', max_length=255)
     modelo_afectado = models.CharField('Modelo', max_length=100, blank=True)
     objeto_id = models.CharField('ID del objeto', max_length=100, blank=True)
+    valor_anterior = models.TextField('Valor anterior', blank=True)
+    valor_nuevo = models.TextField('Valor nuevo', blank=True)
+    motivo = models.TextField('Motivo', blank=True)
     fecha = models.DateTimeField('Fecha', auto_now_add=True)
+
+    objects = RegistroAuditoriaQuerySet.as_manager()
 
     class Meta:
         ordering = ['-fecha']
         verbose_name = 'Registro de auditoría'
         verbose_name_plural = 'Registros de auditoría'
 
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise RegistroAuditoriaInmodificable('Los registros de auditoría no se modifican.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise RegistroAuditoriaInmodificable('Los registros de auditoría no se borran.')
+
     def __str__(self):
-        quien = (self.usuario.nombre_completo or self.usuario.dni) if self.usuario else 'Sistema'
+        quien = self.autor_nombre or self.autor_dni or 'Sistema'
         return f"[{self.fecha:%Y-%m-%d %H:%M}] {quien}: {self.accion}"
 
 
