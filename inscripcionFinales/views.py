@@ -15,12 +15,12 @@ from django.contrib import messages
 from django.db.models import Q,Prefetch,OuterRef,F,Count
 from django import forms
 from datetime import datetime   
-from django.http import HttpResponse,JsonResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, JsonResponse, HttpResponseRedirect
 import csv
 from django.contrib.auth.models import User
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.core.paginator import *
-from django.db import IntegrityError,models
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.contrib.auth.views import PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from django.views.decorators.csrf import csrf_protect
@@ -71,7 +71,8 @@ from reportlab.pdfgen import canvas
 import io
 from django.utils.timezone import now
 from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
-from .audit import registrar_auditoria, resumen_borrado
+from .audit import registrar_auditoria
+from . import bajas
 
 logger = logging.getLogger(__name__)
 
@@ -249,37 +250,104 @@ class profileviews(TemplateView):
     model = Usuario 
   
 
-class AuditarBorradoMixin:
-    """Una DeleteView que deja en la auditoría qué borró y qué arrastró en cascada (#271)."""
+def _dar_de_baja_y_avisar(request, objeto):
+    """Da de baja y deja el mensaje para la próxima pantalla. True si se pudo."""
+    try:
+        bajas.dar_de_baja(request, objeto)
+    except bajas.BajaNoPermitida as error:
+        messages.error(request, str(error))
+        return False
+    messages.success(request, f'Se dio de baja {bajas.describir(objeto)}. No se borró nada: '
+                              'se puede reactivar desde "Dados de baja".')
+    return True
+
+
+class DarDeBajaMixin:
+    """Las confirmaciones de "Eliminar" ahora dan de baja: no se borra nada (#270).
+
+    La pantalla muestra lo que se conserva y, si no se puede dar de baja (por
+    ejemplo, una mesa con resultados en el acta), el motivo.
+    """
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['descripcion'] = bajas.describir(self.object)
+        context['conserva'] = bajas.lo_que_conserva(self.object)
+        context['motivo_bloqueo'] = bajas.motivo_para_no_dar_de_baja(self.object, self.request)
+        return context
 
     def form_valid(self, form):
-        objeto = self.get_object()
-        descripcion = f'{objeto._meta.verbose_name} {objeto} (id {objeto.pk})'
-        resultado = objeto.delete()
-        registrar_auditoria(
-            self.request, f'Eliminó {descripcion}', objeto.__class__.__name__, objeto.pk,
-            valor_anterior=resumen_borrado(resultado),
-        )
-        return HttpResponseRedirect(self.get_success_url())
+        # Si no se puede, vuelve a la confirmación, que muestra el motivo
+        if (bajas.motivo_para_no_dar_de_baja(self.object, self.request) is None
+                and _dar_de_baja_y_avisar(self.request, self.object)):
+            return HttpResponseRedirect(self.get_success_url())
+        return HttpResponseRedirect(self.request.path)
 
 
-class deleteUser(CapacidadRequeridaMixin, AuditarBorradoMixin, DeleteView):
+class deleteUser(CapacidadRequeridaMixin, DarDeBajaMixin, DeleteView):
     capacidades_requeridas = ('gestionar_usuarios',)
-    model = Usuario
+    queryset = Usuario.objects.filter(is_active=True)
     template_name ='registration/delete_user.html'
     success_url = '/user_list'
     
-class deleteInscripcion(CapacidadRequeridaMixin, AuditarBorradoMixin, DeleteView):
+class deleteInscripcion(CapacidadRequeridaMixin, DarDeBajaMixin, DeleteView):
     capacidades_requeridas = ('gestionar_mesas',)
-    model = InscripcionFinal
+    queryset = InscripcionFinal.objects.de_alta()
     template_name ='registration/delete_inscripcion.html'
     success_url = '/inscripcion_finales_lista'
 
-class deleteMesa(CapacidadRequeridaMixin, AuditarBorradoMixin, DeleteView):
+class deleteMesa(CapacidadRequeridaMixin, DarDeBajaMixin, DeleteView):
     capacidades_requeridas = ('gestionar_mesas',)
-    model = MesaFinal
+    queryset = MesaFinal.objects.de_alta()
     template_name ='registration/delete_mesa.html'
     success_url = '/mesas_lista'
+
+
+# Lo que se puede reactivar desde "Dados de baja" (#270): tipo de la URL ->
+# (capacidad que hace falta, lo dado de baja de ese tipo).
+DADOS_DE_BAJA = {
+    'materia': ('gestionar_materias', lambda: Materia.objects.de_baja().select_related('carrera')
+                .order_by('nombre_materia')),
+    'mesa': ('gestionar_mesas', lambda: MesaFinal.objects.de_baja().select_related('materia')
+             .order_by('-llamado')),
+    'inscripcion': ('gestionar_mesas', lambda: InscripcionFinal.objects.de_baja()
+                    .select_related('usuario', 'llamado__materia').order_by('-llamado__llamado')),
+    'usuario': ('gestionar_usuarios', lambda: Usuario.objects.filter(is_active=False)
+                .order_by('nombre_completo')),
+}
+MAXIMO_POR_SECCION = 200
+
+
+def lista_dados_de_baja(request):
+    """Lo dado de baja, con el botón para reactivarlo. Cada sección se ve solo
+    con la capacidad que hace falta para gestionar eso (#270)."""
+    secciones = {}
+    for tipo, (capacidad, dados_de_baja) in DADOS_DE_BAJA.items():
+        if request.user.tiene_capacidad(capacidad):
+            qs = dados_de_baja()
+            secciones[tipo] = {'filas': qs[:MAXIMO_POR_SECCION], 'total': qs.count()}
+    if not secciones:
+        return render(request, '403_forbidden.html', status=403)
+    return render(request, 'registration/dados_de_baja.html', {
+        'secciones': secciones, 'maximo': MAXIMO_POR_SECCION,
+    })
+
+
+@require_http_methods(['POST'])
+def reactivar(request, tipo, pk):
+    if tipo not in DADOS_DE_BAJA:
+        raise Http404
+    capacidad, dados_de_baja = DADOS_DE_BAJA[tipo]
+    if not request.user.tiene_capacidad(capacidad):
+        return render(request, '403_forbidden.html', status=403)
+    objeto = get_object_or_404(dados_de_baja(), pk=pk)
+    try:
+        bajas.reactivar(request, objeto)
+    except bajas.BajaNoPermitida as error:
+        messages.error(request, f'No se reactivó {bajas.describir(objeto)}: {error}')
+    else:
+        messages.success(request, f'Se reactivó {bajas.describir(objeto)}.')
+    return redirect(f"{reverse('lista_dados_de_baja')}#{tipo}")
          
 
 class institutoView(CreateView):
@@ -335,7 +403,8 @@ def api_lista_usuarios(request):
     if not request.user.puede_gestionar_usuarios():
         return JsonResponse({'error': 'No autorizado'}, status=403)
 
-    qs = Usuario.objects.all().order_by('rol', 'nombre_completo')
+    # Los dados de baja (#270) están en la pantalla "Dados de baja".
+    qs = Usuario.objects.filter(is_active=True).order_by('rol', 'nombre_completo')
 
     busqueda = _sin_acentos(request.GET.get('q', ''))
     if busqueda:
@@ -427,7 +496,7 @@ def api_lista_inscripciones(request):
     if not request.user.puede_administrar():
         return JsonResponse({'error': 'No autorizado'}, status=403)
 
-    qs = InscripcionFinal.objects.select_related('usuario', 'llamado__materia').order_by('usuario__nombre_completo')
+    qs = InscripcionFinal.objects.de_alta().select_related('usuario', 'llamado__materia').order_by('usuario__nombre_completo')
 
     return _pagina_json(qs, request, lambda insc: {
         'id': insc.id,
@@ -446,7 +515,7 @@ def api_lista_mesas(request):
     if not (request.user.puede_gestionar_mesas() or es_profesor):
         return JsonResponse({'error': 'No autorizado'}, status=403)
 
-    qs = MesaFinal.objects.select_related('materia').order_by('-llamado')
+    qs = MesaFinal.objects.de_alta().select_related('materia').order_by('-llamado')
     if es_profesor:
         # El profesor solo ve las mesas de las materias que dicta
         qs = qs.filter(materia__profesor=request.user)
@@ -508,7 +577,7 @@ def lista_materias_inscriptas_adm(request):
 @capacidad_requerida('ver_materias')
 def lista_materias_admin(request):
     carreras = Carrera.objects.all()
-    materias_all = Materia.objects.all().order_by('anio')  
+    materias_all = Materia.objects.de_alta().order_by('anio')
     query_carrera = request.GET.get('carrera')
     query_anio = request.GET.get('anio')
     filters = Q()
@@ -585,7 +654,7 @@ def lista_finales_user(request):
 
 def lista_finales_inscriptos_user(request):
     usuario = request.user.id
-    finales_inscriptos = InscripcionFinal.objects.filter(
+    finales_inscriptos = InscripcionFinal.objects.de_alta().filter(
         usuario_id=usuario,
         aprobada=None
     )
@@ -599,7 +668,7 @@ def _finales_inscriptos_visibles(usuario):
     listado sin dejar forma de volver a encontrarla. Ahora trae todas; el
     estado (pendiente/aprobada/desaprobada/ausente) se ve con el badge.
     """
-    qs = InscripcionFinal.objects.select_related('llamado__materia', 'usuario')
+    qs = InscripcionFinal.objects.de_alta().select_related('llamado__materia', 'usuario')
     if usuario.es_profesor() and not usuario.is_superuser:
         # El profesor solo ve a sus propios alumnos, no los de toda la escuela
         qs = qs.filter(llamado__materia__profesor=usuario)
@@ -699,7 +768,7 @@ def inscripcionFinal(request):
         anios_por_estudiante[usuario_id].add(str(anio))
 
     estudiantes = list(
-        Usuario.objects.filter(rol='Estudiante').prefetch_related('carrera').order_by('nombre_completo')
+        Usuario.obtener_estudiantes().prefetch_related('carrera')
     )
     for estudiante in estudiantes:
         estudiante.anios_csv = ','.join(sorted(anios_por_estudiante.get(estudiante.id, [])))
@@ -726,11 +795,11 @@ def _motivo_rechazo_final(usuario, mesa):
 @require_http_methods(['POST'])
 @capacidad_requerida('inscribirse')
 def inscripcionFinalEst(request, final_id):
-    final = get_object_or_404(MesaFinal, id=final_id)
+    final = get_object_or_404(MesaFinal.objects.de_alta(), id=final_id)
     inscripcion_usuario = request.user
 
     # Verificar si ya existe la inscripción
-    if InscripcionFinal.objects.filter(usuario=inscripcion_usuario, llamado=final).exists():
+    if InscripcionFinal.objects.de_alta().filter(usuario=inscripcion_usuario, llamado=final).exists():
         messages.warning(request, 'Ya estás inscrito en este final.')
         return redirect('/inscripcionFinalEst/')
 
@@ -760,7 +829,7 @@ def obtener_materias_estudiante(request):
         return JsonResponse({'status': 'error', 'message': 'ID de estudiante requerido'})
 
     estudiante = get_object_or_404(Usuario, id=estudiante_id)
-    materias = Materia.objects.filter(
+    materias = Materia.objects.de_alta().filter(
         inscripcionAbierta=True,
         carrera__in=estudiante.carrera.all()
     ).order_by('nombre_materia')
@@ -866,7 +935,8 @@ def _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores, reque
     materias_candidatas = Materia.objects.filter(nombre_materia__iexact=nombre_materia)
     if carrera_obj:
         materias_candidatas = materias_candidatas.filter(carrera=carrera_obj)
-    materia = materias_candidatas.first()
+    # Si hay una de alta y otra dada de baja con el mismo nombre, va la de alta (#270)
+    materia = materias_candidatas.order_by('-activo', 'pk').first()
     if not materia:
         errores.append(f'Fila {numero_fila}: Materia no encontrada ({nombre_materia})')
         return False
@@ -1443,53 +1513,47 @@ def editar_materia(request, id):
     
 @capacidad_requerida('gestionar_materias')
 def eliminar_materia(request, id):
-    materia = get_object_or_404(Materia, pk=id)
+    """Da de baja la materia (#270): sus cursadas, mesas y notas quedan intactas."""
+    materia = get_object_or_404(Materia.objects.de_alta(), pk=id)
     if request.method == 'POST':
-        descripcion = f'la materia {materia} (id {materia.pk})'
-        resultado = materia.delete()
-        registrar_auditoria(request, f'Eliminó {descripcion}', 'Materia', id,
-                            valor_anterior=resumen_borrado(resultado))
-        return redirect('exito_materia_eliminada_adm')
-    return render(request, 'materias/eliminar_materia.html', {'materia': materia})
-
-def eliminar_mesa(request, id):
-    mesa = get_object_or_404(MesaFinal, pk=id)
-    if request.method == 'POST':
-        mesa.delete()
-        return redirect('exito_mesa_eliminada')
-    return render(request, 'mesas/eliminar_mesa.html', {'mesa': mesa})
+        _dar_de_baja_y_avisar(request, materia)
+        return redirect('lista_materias_admin')
+    return render(request, 'materias/eliminar_materia.html', {
+        'materia': materia, 'descripcion': bajas.describir(materia), 'conserva': bajas.lo_que_conserva(materia),
+    })
 
 def eliminar_inscripcion_final(request, id):
     """Solo el personal que gestiona mesas puede dar de baja una inscripción a
     final. El estudiante no puede: una vez inscripto en una mesa, la baja
-    queda a criterio de la institución."""
-    final = get_object_or_404(InscripcionFinal, pk=id)
+    queda a criterio de la institución. Con resultado cargado no se puede: es
+    parte del acta (#270)."""
+    final = get_object_or_404(InscripcionFinal.objects.de_alta(), pk=id)
     if not request.user.tiene_capacidad('gestionar_mesas'):
         return render(request, '403_forbidden.html', status=403)
-    if request.method == 'POST':
-        descripcion = (f'la inscripción de {final.usuario.nombre_completo} a la mesa de {final.llamado.materia} '
-                       f'del {final.llamado.llamado:%d/%m/%Y} (id {final.pk})')
-        resultado_previo = 'ausente' if final.ausente else f'nota {final.nota}' if final.nota is not None else 'sin resultado'
-        resultado = final.delete()
-        registrar_auditoria(request, f'Eliminó {descripcion}', 'InscripcionFinal', id,
-                            valor_anterior=f'{resultado_previo}. {resumen_borrado(resultado)}')
+    motivo_bloqueo = bajas.motivo_para_no_dar_de_baja(final, request)
+    if request.method == 'POST' and not motivo_bloqueo and _dar_de_baja_y_avisar(request, final):
         return redirect('exito_final_eliminado_adm')
-    return render(request, 'finales/eliminar_final_est.html', {'final': final})
+    return render(request, 'finales/eliminar_final_est.html', {
+        'final': final, 'descripcion': bajas.describir(final), 'motivo_bloqueo': motivo_bloqueo,
+    })
+
+
+def _avisar_bajas(request, dados_de_baja, rechazados, singular, plural):
+    """Mensajes de una baja de varios seleccionados."""
+    if dados_de_baja:
+        cantidad = len(dados_de_baja)
+        messages.success(request, f'Se dio de baja {cantidad} {singular if cantidad == 1 else plural}. '
+                                  'No se borró nada: se puede reactivar desde "Dados de baja".')
+    for objeto, motivo in rechazados:
+        messages.error(request, f'No se dio de baja {bajas.describir(objeto)}: {motivo}')
+
 
 @capacidad_requerida('gestionar_materias')
 def eliminar_materias_seleccionadas(request):
+    """Da de baja las materias seleccionadas (#270)."""
     if request.method == 'POST':
-        materia_ids = request.POST.getlist('materia_ids')
-        cantidad_eliminadas = len(materia_ids)
-        if cantidad_eliminadas > 0:
-            materias_a_borrar = Materia.objects.filter(id__in=materia_ids)
-            nombres = ', '.join(str(m) for m in materias_a_borrar)
-            resultado = materias_a_borrar.delete()
-            registrar_auditoria(request, f'Eliminó {cantidad_eliminadas} materia(s): {nombres}', 'Materia',
-                                ','.join(materia_ids), valor_anterior=resumen_borrado(resultado))
-        materias = Materia.objects.all()
-        return render(request, 'materias/lista_materias_admin.html',
-                      {'materias': materias, 'cantidad_eliminadas': cantidad_eliminadas})
+        materias = Materia.objects.de_alta().filter(id__in=request.POST.getlist('materia_ids'))
+        _avisar_bajas(request, *bajas.dar_de_baja_varios(request, materias), 'materia', 'materias')
     return redirect("lista_materias_admin")
 
 
@@ -1513,14 +1577,11 @@ def cerrar_materias_seleccionadas(request):
 
 @capacidad_requerida('gestionar_mesas')
 def eliminar_mesas_seleccionadas(request):
+    """Da de baja las mesas seleccionadas (#270), salvo las que ya tienen
+    resultados en el acta: esas quedan como están, con el motivo."""
     if request.method == 'POST':
-        mesa_ids = request.POST.getlist('mesa_ids')
-        if len(mesa_ids) > 0:
-            mesas_a_borrar = MesaFinal.objects.filter(id__in=mesa_ids).select_related('materia')
-            nombres = ', '.join(f'{m.materia} {m.llamado:%d/%m/%Y}' for m in mesas_a_borrar)
-            resultado = mesas_a_borrar.delete()
-            registrar_auditoria(request, f'Eliminó {len(mesa_ids)} mesa(s): {nombres}', 'MesaFinal',
-                                ','.join(mesa_ids), valor_anterior=resumen_borrado(resultado))
+        mesas = MesaFinal.objects.de_alta().filter(id__in=request.POST.getlist('mesa_ids')).select_related('materia')
+        _avisar_bajas(request, *bajas.dar_de_baja_varios(request, mesas), 'mesa', 'mesas')
     return redirect('/mesas_lista')
 
 
@@ -1562,20 +1623,27 @@ def eliminar_inscripcion_materia(request, id):
     alumno no puede autogestionarla, solo Preceptor, Directivo, Secretario o
     superuser (ver Usuario.puede_administrar). No se borra el registro: se
     marca estado=ABANDONO para que el historial académico quede intacto.
+
+    Las inscripciones a final de esa materia que todavía no tienen resultado
+    se dan de baja. Las que ya lo tienen quedan como están: antes se borraban
+    todas, con las notas de final de intentos anteriores (#270).
     """
     materia = get_object_or_404(usuarios_materia, pk=id)
     if not request.user.puede_administrar():
         return render(request, '403_forbidden.html', status=403)
     if request.method == 'POST':
-        InscripcionFinal.objects.filter(
-            Q(usuario=materia.usuario) & Q(llamado__materia=materia.materia)
-        ).delete()
-        materia.estado = EstadoCursada.ABANDONO
-        materia.save()
-        registrar_auditoria(
-            request, f'Dio de baja (abandono) a {materia.usuario.nombre_completo} de {materia.materia}',
-            'usuarios_materia', materia.pk
-        )
+        with transaction.atomic():
+            anuladas = InscripcionFinal.objects.de_alta().sin_resultado().filter(
+                usuario=materia.usuario, llamado__materia=materia.materia,
+            ).update(activo=False)
+            estado_anterior = materia.get_estado_display()
+            materia.estado = EstadoCursada.ABANDONO
+            materia.save()
+            registrar_auditoria(
+                request, f'Dio de baja (abandono) a {materia.usuario.nombre_completo} de {materia.materia}',
+                'usuarios_materia', materia.pk, valor_anterior=estado_anterior,
+                valor_nuevo=f'{materia.get_estado_display()}. Inscripciones a final sin resultado dadas de baja: {anuladas}.',
+            )
         return redirect('exito_materia_eliminada_adm')
     return render(request, 'materias/eliminar_materia_est.html', {'materia': materia})
 
@@ -1652,7 +1720,7 @@ def tribunal_mesa(request, mesa_id):
     vocales = list(tribunal_activo.filter(rol=TribunalMesa.VOCAL))
 
     if request.method == 'POST':
-        docente = get_object_or_404(Usuario, id=request.POST.get('docente'), rol='Profesor')
+        docente = get_object_or_404(Usuario, id=request.POST.get('docente'), rol='Profesor', is_active=True)
         rol = request.POST.get('rol')
 
         if rol == TribunalMesa.PRESIDENTE and presidente:
@@ -1685,7 +1753,7 @@ def reemplazar_tribunal(request, tribunal_id):
     """Reemplazo urgente de un integrante del tribunal: no toca el acta, solo cambia quién figura activo."""
     actual = get_object_or_404(TribunalMesa, id=tribunal_id, activo=True)
     if request.method == 'POST':
-        nuevo_docente = get_object_or_404(Usuario, id=request.POST.get('docente'), rol='Profesor')
+        nuevo_docente = get_object_or_404(Usuario, id=request.POST.get('docente'), rol='Profesor', is_active=True)
         actual.activo = False
         actual.save()
         nuevo = TribunalMesa.objects.create(
@@ -1726,7 +1794,7 @@ def acta_volante(request, final_id):
     if not request.user.is_authenticated or not request.user.puede_ver_acta_de(final):
         return render(request, '403_forbidden.html', status=403)
     pages = []
-    finales_inscriptos = InscripcionFinal.objects.filter(llamado=final_id).order_by('usuario__nombre_completo')
+    finales_inscriptos = InscripcionFinal.objects.de_alta().filter(llamado=final_id).order_by('usuario__nombre_completo')
     tribunal_activo = final.tribunal.filter(activo=True).select_related('docente')
     presidente = tribunal_activo.filter(rol=TribunalMesa.PRESIDENTE).first()
     vocales = list(tribunal_activo.filter(rol=TribunalMesa.VOCAL))
@@ -1824,7 +1892,7 @@ def cargar_nota_final(request, inscripcion_id):
     porque esta vista sirve tanto para la carga original como para
     corregirla después (issue #204); el permiso exacto según cuál de las
     dos cosas sea se resuelve abajo, por `es_correccion`."""
-    inscripcion = get_object_or_404(InscripcionFinal, id=inscripcion_id)
+    inscripcion = get_object_or_404(InscripcionFinal.objects.de_alta(), id=inscripcion_id)
     usuario_materia = get_object_or_404(usuarios_materia, usuario=inscripcion.usuario, materia=inscripcion.llamado.materia)
     mesa = inscripcion.llamado
 
@@ -1997,20 +2065,12 @@ def eliminar_usuarios(request):
         
         # Verificar que se hayan seleccionado usuarios
         if len(usuarios_ids) > 0:
-            try:
-                # Eliminar los usuarios seleccionados
-                dnis = list(Usuario.objects.filter(id__in=usuarios_ids).values_list('dni', flat=True))
-                usuarios_eliminados = Usuario.objects.filter(id__in=usuarios_ids)
-                cantidad_eliminadas = usuarios_eliminados.count()
-                resultado = usuarios_eliminados.delete()
-                registrar_auditoria(request, f'Eliminó usuarios (DNI): {", ".join(dnis)}', 'Usuario',
-                                    ",".join(usuarios_ids), valor_anterior=resumen_borrado(resultado))
-                
-                messages.success(request, f'Se eliminaron {cantidad_eliminadas} usuarios correctamente.')
-            except Exception as e:
-                messages.error(request, f'Error al eliminar usuarios: {str(e)}')
+            # Se dan de baja, no se borran (#270): no pueden entrar, pero sus
+            # cursadas, notas e inscripciones quedan intactas.
+            usuarios = Usuario.objects.filter(id__in=usuarios_ids, is_active=True)
+            _avisar_bajas(request, *bajas.dar_de_baja_varios(request, usuarios), 'usuario', 'usuarios')
         else:
-            messages.warning(request, 'No se seleccionaron usuarios para eliminar.')
+            messages.warning(request, 'No se seleccionaron usuarios para dar de baja.')
 
     return redirect('list_user')
 
@@ -2046,8 +2106,8 @@ def inscribir_final(request):
         })
 
     try:
-        usuario = get_object_or_404(Usuario, id=usuario_id)
-        mesa_final = get_object_or_404(MesaFinal, id=llamado_id)
+        usuario = get_object_or_404(Usuario, id=usuario_id, is_active=True)
+        mesa_final = get_object_or_404(MesaFinal.objects.de_alta(), id=llamado_id, materia__activo=True)
 
         # Verificar que el usuario sea estudiante
         if usuario.rol != 'Estudiante':
@@ -2074,7 +2134,7 @@ def inscribir_final(request):
         # todavía) a otra mesa de esta materia. Una vez cargado el resultado
         # (nota o ausente) deja de contar acá: si le quedan oportunidades,
         # puede volver a anotarse (ver validar_inscripcion_final más abajo).
-        if InscripcionFinal.objects.filter(
+        if InscripcionFinal.objects.de_alta().filter(
             usuario=usuario,
             llamado__materia=mesa_final.materia,
             aprobada__isnull=True,
@@ -2252,7 +2312,7 @@ def imprimir_mesas_finales_pdf(request):
             'materia', 
             'materia__carrera',
             'materia__profesor'
-        ).filter(vigente=True).order_by('llamado', 'materia__nombre_materia')
+        ).de_alta().filter(vigente=True, materia__activo=True).order_by('llamado', 'materia__nombre_materia')
         
         if not mesas.exists():
             # Si no hay mesas, mostrar mensaje
@@ -2483,7 +2543,11 @@ def obtener_contexto_reporte(usuario):
     eran las suyas.
     """
     carreras = list(usuario.carrera.all())
-    materias = Materia.objects.filter(carrera__in=carreras).order_by('anio', 'nombre_materia')
+    # Una materia dada de baja (#270) solo figura si el alumno la cursó: es
+    # parte de su historial, pero no cuenta para el avance si nunca la tuvo.
+    materias = Materia.objects.filter(carrera__in=carreras).filter(
+        Q(activo=True) | Q(usuarios_materia__usuario=usuario)
+    ).distinct().order_by('anio', 'nombre_materia')
     inscripciones = {
         um.materia_id: um
         for um in usuarios_materia.objects.filter(usuario=usuario, materia__in=materias)
