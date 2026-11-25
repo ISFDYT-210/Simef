@@ -702,15 +702,18 @@ class RegistroAuditoria(models.Model):
     """
     usuario = models.ForeignKey('Usuario', on_delete=models.SET_NULL,
                                 null=True, blank=True, related_name='acciones_auditoria')
-    autor_dni = models.CharField('DNI del autor', max_length=20, blank=True)
-    autor_nombre = models.CharField('Autor', max_length=255, blank=True)
-    autor_rol = models.CharField('Rol del autor', max_length=20, blank=True)
+    # db_default: las columnas de la 0024 quedan con DEFAULT '' en la base, para
+    # que la versión anterior de la app (que no las conoce) pueda seguir
+    # registrando mientras se publica esta, o si hubiera que volver atrás.
+    autor_dni = models.CharField('DNI del autor', max_length=20, blank=True, default='', db_default='')
+    autor_nombre = models.CharField('Autor', max_length=255, blank=True, default='', db_default='')
+    autor_rol = models.CharField('Rol del autor', max_length=20, blank=True, default='', db_default='')
     accion = models.CharField('Acción', max_length=255)
     modelo_afectado = models.CharField('Modelo', max_length=100, blank=True)
     objeto_id = models.CharField('ID del objeto', max_length=100, blank=True)
-    valor_anterior = models.TextField('Valor anterior', blank=True)
-    valor_nuevo = models.TextField('Valor nuevo', blank=True)
-    motivo = models.TextField('Motivo', blank=True)
+    valor_anterior = models.TextField('Valor anterior', blank=True, default='', db_default='')
+    valor_nuevo = models.TextField('Valor nuevo', blank=True, default='', db_default='')
+    motivo = models.TextField('Motivo', blank=True, default='', db_default='')
     fecha = models.DateTimeField('Fecha', auto_now_add=True)
 
     objects = RegistroAuditoriaQuerySet.as_manager()

@@ -407,3 +407,8 @@ class VersionAnteriorPuedeSeguirInsertandoTest(TestCase):
                       ['Insertada por la versión anterior', False, '12:00', 1, 'Lunes'])
         self.assertTrue(Materia.objects.get(nombre_materia='Insertada por la versión anterior').activo)
 
+    def test_la_auditoria_acepta_filas_sin_las_columnas_nuevas(self):
+        self.insertar(RegistroAuditoria._meta.db_table, ['accion', 'modelo_afectado', 'objeto_id', 'fecha'],
+                      ['Acción de la versión anterior', '', '', timezone.now()])
+        registro = RegistroAuditoria.objects.get(accion='Acción de la versión anterior')
+        self.assertEqual((registro.autor_dni, registro.valor_anterior, registro.motivo), ('', '', ''))
