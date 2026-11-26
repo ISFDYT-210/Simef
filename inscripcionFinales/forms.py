@@ -693,6 +693,13 @@ class ArchivoForm(forms.Form):
             'accept': '.csv'
         })
     )
+    # Las filas sin columna Rol se crean con este rol. Así la planilla de
+    # docentes de la institución, que no trae Rol, se carga eligiendo
+    # Profesor, en vez de crearlos como estudiantes sin aviso (#285).
+    rol_por_defecto = forms.ChoiceField(
+        label='Si una fila no trae la columna Rol, crear el usuario como',
+        choices=Usuario.ROL_CHOICES, initial=Usuario.ESTUDIANTE, required=False,
+    )
     
     def clean_csv_file(self):
         file = self.cleaned_data['csv_file']
