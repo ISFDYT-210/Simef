@@ -10,7 +10,9 @@
         <li>Usuarios creados: {{ usuarios_creados|default:0 }}</li>
         <li>Ya existían: {{ usuarios_duplicados|default:0 }}</li>
         <li>Notas cargadas: {{ notas_cargadas|default:0 }}</li>
+        {% if resumen_docentes.hay_docentes %}<li>Materias asignadas a docentes: {{ materias_asignadas|default:0 }}</li>{% endif %}
     </ul>
+    {% include 'registration/_resumen_docentes.html' %}
     {% if errores %}
     <div class="alert alert-warning">
         <strong>Filas con problemas:</strong>

@@ -1,0 +1,39 @@
+{% comment %}
+  Qué hizo la carga masiva con los docentes (#285): materias asignadas, docentes
+  sin materias y lo que no se encontró. Recibe resumen_docentes (carga_masiva.ResumenDocentes).
+{% endcomment %}
+{% if resumen_docentes.hay_docentes %}
+<div class="my-4 space-y-3 text-left text-sm">
+  <div class="rounded-xl border border-slate-200 bg-white p-4">
+    <p class="font-semibold text-tinta-900">Docentes de esta carga: {{ resumen_docentes.materias_por_docente|length }} · materias asignadas ahora: {{ resumen_docentes.asignadas }}</p>
+    <ul class="mt-1 list-inside list-disc space-y-0.5 text-slate-600">
+      {% for dni, docente in resumen_docentes.materias_por_docente.items %}
+      <li>{{ docente.0 }} (DNI {{ dni }}): {% if docente.1 %}{{ docente.1|join:", " }}{% else %}<span class="font-semibold text-red-700">sin materias asignadas</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {% if resumen_docentes.no_encontradas %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+    <p class="font-semibold">Materias que no se encontraron. No se asignó nada; hay que crearlas o corregir el nombre, la carrera o el año en el archivo, y volver a cargarlo:</p>
+    <ul class="mt-1 list-inside list-disc space-y-0.5">{% for texto in resumen_docentes.no_encontradas %}<li>{{ texto }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if resumen_docentes.carreras_no_encontradas %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+    <p class="font-semibold">Carreras que no existen en el sistema:</p>
+    <ul class="mt-1 list-inside list-disc space-y-0.5">{% for texto in resumen_docentes.carreras_no_encontradas %}<li>{{ texto }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if resumen_docentes.con_otro_profesor %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+    <p class="font-semibold">Materias que ya tenían otro profesor:</p>
+    <ul class="mt-1 list-inside list-disc space-y-0.5">{% for texto in resumen_docentes.con_otro_profesor %}<li>{{ texto }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <p class="text-xs text-slate-500">Volver a cargar el mismo archivo no duplica nada: los docentes que ya existen no se recrean y las materias que ya dictan no se vuelven a asignar.</p>
+</div>
+{% endif %}

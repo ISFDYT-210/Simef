@@ -74,6 +74,7 @@ from django.utils.timezone import now
 from .permissions import capacidad_requerida, rol_requerido, CapacidadRequeridaMixin
 from .audit import registrar_auditoria
 from . import bajas
+from . import carga_masiva
 
 logger = logging.getLogger(__name__)
 
@@ -1044,10 +1045,15 @@ def cargar_usuarios(request):
                     messages.error(request, 'No se pudo leer el archivo. Verifique la codificación.')
                     return render(request, 'registration/cargar_usuarios.html', {'formulario': formulario})
                 
-                # Procesar CSV
-                lineas = contenido.splitlines()
-                reader = csv.DictReader(lineas, delimiter=',')
-                
+                # Procesar CSV. Acepta comas o punto y coma (Excel en castellano),
+                # y los encabezados de la planilla de la institución (#285).
+                lineas = contenido.lstrip('\ufeff').splitlines()
+                delimitador = carga_masiva.detectar_delimitador(lineas[0] if lineas else '')
+                reader = csv.DictReader(lineas, delimiter=delimitador)
+                reader.fieldnames = carga_masiva.normalizar_encabezados(reader.fieldnames)
+                # Rol de las filas que no traen la columna Rol: lo elige quien sube el archivo
+                rol_por_defecto = formulario.cleaned_data.get('rol_por_defecto') or Usuario.ESTUDIANTE
+
                 usuarios_creados = 0
                 usuarios_duplicados = 0
                 notas_cargadas = 0
@@ -1055,20 +1061,52 @@ def cargar_usuarios(request):
                 # DNI -> contraseña generada, para mostrarla una sola vez en
                 # la pantalla de resultado (no queda guardada en ningún lado).
                 credenciales_generadas = []
+                resumen_docentes = carga_masiva.ResumenDocentes()
+                # DNIs ya vistos en este archivo: un docente ocupa una fila por
+                # materia, y no cuenta como "ya existía" en cada una.
+                dnis_vistos = set()
+                docente_anterior = None
 
                 # Validar encabezados requeridos. El email quedó opcional (el
                 # login es por DNI), por eso no está en esta lista.
                 campos_requeridos = ['Nombre estudiante', 'Documento estudiante']
                 if not all(campo in reader.fieldnames for campo in campos_requeridos):
-                    messages.error(request, f'El archivo debe contener las columnas: {", ".join(campos_requeridos)}')
+                    messages.error(request, 'El archivo debe tener una columna con el nombre (Nombre, Nombre y '
+                                            'Apellido o Nombre estudiante) y otra con el DNI (DNI, Documento o '
+                                            'Documento estudiante).')
                     return render(request, 'registration/cargar_usuarios.html', {'formulario': formulario})
 
                 for numero_fila, fila in enumerate(reader, start=2):
                     try:
                         # Campos obligatorios
-                        email = fila.get('Correo electrónico', '').strip()
-                        nombre_completo = fila.get('Nombre estudiante', '').strip()
-                        dni_str = fila.get('Documento estudiante', '').strip()
+                        email = (fila.get('Correo electrónico') or '').strip()
+                        nombre_completo = (fila.get('Nombre estudiante') or '').strip()
+                        apellido = (fila.get('Apellido') or '').strip()
+                        if nombre_completo and apellido:
+                            nombre_completo = f'{nombre_completo} {apellido}'
+                        dni_str = re.sub(r'[\s.]', '', fila.get('Documento estudiante') or '')
+
+                        # El rol va primero: de él depende qué es la columna Materia.
+                        # Sin columna Rol, el que se eligió al subir el archivo.
+                        texto_rol = (fila.get('Rol') or '').strip()
+                        rol = carga_masiva.rol_canonico(texto_rol or rol_por_defecto)
+                        if rol is None:
+                            roles_validos = [valor for valor, _ in Usuario.ROL_CHOICES]
+                            errores.append(f'Fila {numero_fila}: Rol inválido ({texto_rol}). '
+                                           f'Opciones: {", ".join(roles_validos)}')
+                            docente_anterior = None
+                            continue
+
+                        # Planilla de docentes de la institución: una fila por
+                        # materia, con el nombre (y a veces el DNI y el mail)
+                        # vacíos en las filas siguientes del mismo docente.
+                        if rol == Usuario.PROFESOR and docente_anterior and (
+                                (not nombre_completo and dni_str in ('', docente_anterior['dni']))
+                                or (nombre_completo == docente_anterior['nombre'] and not dni_str)):
+                            nombre_completo = docente_anterior['nombre']
+                            dni_str = docente_anterior['dni']
+                            email = email or docente_anterior['email']
+                        docente_anterior = None
 
                         # Validaciones básicas
                         if not nombre_completo or not dni_str:
@@ -1106,12 +1144,32 @@ def cargar_usuarios(request):
                             duplicado_query |= Q(email=email)
                         usuario_existente = Usuario.objects.filter(duplicado_query).first()
                         if usuario_existente:
-                            usuarios_duplicados += 1
+                            if usuario_existente.dni not in dnis_vistos:
+                                usuarios_duplicados += 1
+                                dnis_vistos.add(usuario_existente.dni)
+                            tiene_materia = bool((fila.get('Materia') or '').strip())
+                            if rol == Usuario.PROFESOR or usuario_existente.es_profesor():
+                                # Un docente nunca se inscribe como estudiante (#285)
+                                if rol == Usuario.PROFESOR and usuario_existente.es_profesor():
+                                    carga_masiva.asignar_materia(request, usuario_existente, fila, numero_fila,
+                                                                 resumen_docentes)
+                                    docente_anterior = {'nombre': nombre_completo, 'dni': dni_str, 'email': email or ''}
+                                elif rol == Usuario.PROFESOR or tiene_materia:
+                                    errores.append(
+                                        f'Fila {numero_fila}: el DNI {dni} ya está cargado como '
+                                        f'{usuario_existente.get_rol_display()} y la fila es de '
+                                        f'{dict(Usuario.ROL_CHOICES)[rol]}. No se cambió nada.')
+                                continue
+                            if not usuario_existente.es_estudiante():
+                                if tiene_materia:
+                                    errores.append(
+                                        f'Fila {numero_fila}: el DNI {dni} es de '
+                                        f'{usuario_existente.get_rol_display()}: '
+                                        'solo a estudiantes se les cargan materias y notas.')
+                                continue
                             carrera_para_notas = None
-                            if fila.get('Carrera', '').strip():
-                                carrera_para_notas = Carrera.objects.filter(
-                                    nombre_carrera__iexact=fila['Carrera'].strip()
-                                ).first()
+                            if (fila.get('Carrera') or '').strip():
+                                carrera_para_notas = carga_masiva.buscar_carrera(fila['Carrera'])
                                 if carrera_para_notas and not usuario_existente.carrera.filter(id=carrera_para_notas.id).exists():
                                     usuario_existente.carrera.add(carrera_para_notas)
                             if _cargar_nota_de_fila(usuario_existente, fila, carrera_para_notas, numero_fila, errores,
@@ -1174,22 +1232,13 @@ def cargar_usuarios(request):
                         elif sexo in ['FEMENINO']:
                             sexo = 'F'
                         
-                        # Rol (por defecto Estudiante)
-                        # Se valida contra los roles reales del modelo, sin
-                        # importar mayúsculas: 'PRECEPTOR' se guarda como 'Preceptor'.
-                        rol = fila.get('Rol', '').strip() or 'Estudiante'
-                        roles_validos = [valor for valor, _ in Usuario.ROL_CHOICES]
-                        rol = next((r for r in roles_validos if r.lower() == rol.lower()), None)
-                        if rol is None:
-                            errores.append(f'Fila {numero_fila}: Rol inválido. Opciones: {", ".join(roles_validos)}')
-                            continue
-                        
-                        # Buscar carrera si se especifica
+                        # Buscar carrera si se especifica. A un docente no se lo
+                        # rechaza por eso: la carrera solo sirve para ubicar la
+                        # materia que dicta, y el resumen avisa que no está (#285).
                         carrera_obj = None
-                        if fila.get('Carrera', '').strip():
-                            try:
-                                carrera_obj = Carrera.objects.get(nombre_carrera__iexact=fila['Carrera'].strip())
-                            except Carrera.DoesNotExist:
+                        if (fila.get('Carrera') or '').strip():
+                            carrera_obj = carga_masiva.buscar_carrera(fila['Carrera'])
+                            if carrera_obj is None and rol != Usuario.PROFESOR:
                                 errores.append(f'Fila {numero_fila}: Carrera no encontrada ({fila["Carrera"].strip()})')
                                 continue
                         
@@ -1308,11 +1357,21 @@ def cargar_usuarios(request):
                         if carrera_obj:
                             usuario.carrera.add(carrera_obj)
 
-                        if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores, request=request):
-                            notas_cargadas += 1
+                        # Materia: para un estudiante, la inscripción con sus notas;
+                        # para un docente, la materia que dicta (#285).
+                        if rol == Usuario.PROFESOR:
+                            carga_masiva.asignar_materia(request, usuario, fila, numero_fila, resumen_docentes)
+                            docente_anterior = {'nombre': nombre_completo, 'dni': dni_str, 'email': email or ''}
+                        elif rol == Usuario.ESTUDIANTE:
+                            if _cargar_nota_de_fila(usuario, fila, carrera_obj, numero_fila, errores, request=request):
+                                notas_cargadas += 1
+                        elif (fila.get('Materia') or '').strip():
+                            errores.append(f'Fila {numero_fila}: se creó a {nombre_completo}, pero se ignoró la '
+                                           'Materia: solo a estudiantes se les cargan materias y notas.')
 
                         credenciales_generadas.append({'dni': dni, 'email': email, 'password': password})
                         usuarios_creados += 1
+                        dnis_vistos.add(str(dni))
                         
                     except IntegrityError as e:
                         if 'UNIQUE constraint' in str(e):
@@ -1322,40 +1381,48 @@ def cargar_usuarios(request):
                     except Exception as e:
                         errores.append(f'Fila {numero_fila}: Error inesperado - {str(e)}')
                 
-                if usuarios_creados or notas_cargadas:
+                materias_asignadas = resumen_docentes.asignadas
+                if usuarios_creados or notas_cargadas or materias_asignadas:
                     registrar_auditoria(
                         request,
                         f'Carga masiva de usuarios ({archivo_csv.name}): {usuarios_creados} creado(s), '
-                        f'{usuarios_duplicados} ya existían, {notas_cargadas} fila(s) con notas, {len(errores)} error(es)',
+                        f'{usuarios_duplicados} ya existían, {notas_cargadas} fila(s) con notas, '
+                        f'{materias_asignadas} materia(s) asignada(s) a docentes, {len(errores)} error(es)',
                         'Usuario',
                     )
 
                 # Mostrar resultados
-                if errores:
+                resultado = {
+                    'usuarios_creados': usuarios_creados,
+                    'usuarios_duplicados': usuarios_duplicados,
+                    'notas_cargadas': notas_cargadas,
+                    'materias_asignadas': materias_asignadas,
+                    'resumen_docentes': resumen_docentes,
+                    'credenciales_generadas': credenciales_generadas,
+                }
+                if errores or resumen_docentes.hay_avisos:
                     partes = [f'{usuarios_creados} usuario(s) creado(s)']
                     if notas_cargadas:
                         partes.append(f'{notas_cargadas} nota(s) cargada(s)')
+                    if materias_asignadas:
+                        partes.append(f'{materias_asignadas} materia(s) asignada(s) a docentes')
                     messages.warning(request, ', '.join(partes) + ', con algunas advertencias.')
                     return render(request, 'registration/warning_carga_masiva.html', {
-                        'usuarios_creados': usuarios_creados,
-                        'usuarios_duplicados': usuarios_duplicados,
-                        'notas_cargadas': notas_cargadas,
+                        **resultado,
                         'errores': errores[:20],  # Mostrar máximo 20 errores
-                        'credenciales_generadas': credenciales_generadas,
                     })
-                elif usuarios_creados > 0 or notas_cargadas > 0:
+                elif usuarios_creados > 0 or notas_cargadas > 0 or materias_asignadas or resumen_docentes.hay_docentes:
                     partes = []
                     if usuarios_creados:
                         partes.append(f'{usuarios_creados} usuario(s) creado(s)')
                     if notas_cargadas:
                         partes.append(f'{notas_cargadas} nota(s) cargada(s)')
+                    if materias_asignadas:
+                        partes.append(f'{materias_asignadas} materia(s) asignada(s) a docentes')
+                    if not partes:
+                        partes.append('Los docentes ya tenían cargadas esas materias')
                     messages.success(request, ', '.join(partes) + ' correctamente.')
-                    return render(request, 'registration/exito_carga_masiva.html', {
-                        'usuarios_creados': usuarios_creados,
-                        'usuarios_duplicados': usuarios_duplicados,
-                        'notas_cargadas': notas_cargadas,
-                        'credenciales_generadas': credenciales_generadas,
-                    })
+                    return render(request, 'registration/exito_carga_masiva.html', resultado)
                 elif usuarios_duplicados > 0:
                     messages.warning(request, f'{usuarios_duplicados} usuario(s) ya existían en el sistema; no había notas para cargarles.')
                     return render(request, 'registration/warning_carga_masiva.html', {
