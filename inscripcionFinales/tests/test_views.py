@@ -1615,8 +1615,9 @@ class LogoutTest(TestCase):
 class RecuperarPasswordPorDniTest(TestCase):
     """
     El login es por DNI, no por email (ver CustomLoginView), así que acá
-    también se pide el DNI. La respuesta tiene que ser idéntica exista o no
-    la cuenta, y tenga o no email cargado, para no revelar esos datos.
+    también se pide el DNI. Desde la #283 el campo avisa qué pasó: no hay
+    cuenta, no tiene email, está dada de baja o falló el envío. Si salió, la
+    pantalla siguiente dice a qué email, parcialmente oculto.
     """
 
     @classmethod
@@ -1625,6 +1626,8 @@ class RecuperarPasswordPorDniTest(TestCase):
         cls.sin_email = Usuario.objects.create(
             username='recuperar_sin_mail', nombre_completo='Sin Email', rol='Estudiante', dni=71,
         )
+        cls.con_puntos = crear_usuario('dni_largo@test.com', 'Estudiante', 'DNI Largo', 30111222)
+        cls.de_baja = crear_usuario('de_baja@test.com', 'Estudiante', 'De Baja', 72, is_active=False)
 
     def test_get_muestra_el_formulario_pidiendo_dni(self):
         respuesta = self.client.get('/recuperar_pass/')
@@ -1633,7 +1636,7 @@ class RecuperarPasswordPorDniTest(TestCase):
 
     def test_dni_con_email_manda_el_correo_de_reseteo(self):
         respuesta = self.client.post('/recuperar_pass/', {'dni': '70'})
-        self.assertRedirects(respuesta, '/password_reset/done/')
+        self.assertRedirects(respuesta, '/password_reset/done/', fetch_redirect_response=False)
         self.assertEqual(len(mail.outbox), 1)
         enviado = mail.outbox[0]
         self.assertEqual(enviado.to, ['recuperar_con_mail@test.com'])
@@ -1645,15 +1648,40 @@ class RecuperarPasswordPorDniTest(TestCase):
         self.assertEqual(mimetype, 'text/html')
         self.assertIn('Elegir nueva contraseña', html)
 
-    def test_dni_sin_email_no_manda_nada_pero_misma_respuesta(self):
-        respuesta = self.client.post('/recuperar_pass/', {'dni': '71'})
-        self.assertRedirects(respuesta, '/password_reset/done/')
+    def test_la_pantalla_final_dice_a_que_email_se_mando(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '70'}, follow=True)
+        self.assertContains(respuesta, 're•••@test.com')
+        self.assertNotContains(respuesta, 'recuperar_con_mail@test.com')
+        self.assertContains(respuesta, 'vence en 3 días')
+        # Se muestra una sola vez: si se vuelve a abrir, no queda el email
+        self.assertNotContains(self.client.get('/password_reset/done/'), 're•••@test.com')
+
+    def test_acepta_el_dni_con_puntos_y_espacios(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': ' 30.111.222 '})
+        self.assertRedirects(respuesta, '/password_reset/done/', fetch_redirect_response=False)
+        self.assertEqual(mail.outbox[0].to, ['dni_largo@test.com'])
+
+    def test_dni_inexistente_avisa_en_el_campo(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '000000'})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'No hay ninguna cuenta con ese DNI')
+        self.assertContains(respuesta, 'value="000000"')
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_dni_inexistente_no_manda_nada_pero_misma_respuesta(self):
-        respuesta = self.client.post('/recuperar_pass/', {'dni': '000000'})
-        self.assertRedirects(respuesta, '/password_reset/done/')
+    def test_dni_sin_email_avisa_que_vaya_a_preceptoria(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '71'})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Tu cuenta no tiene un email cargado')
+        self.assertContains(respuesta, 'Preceptoría o Secretaría')
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_cuenta_dada_de_baja_avisa_y_no_manda_nada(self):
+        respuesta = self.client.post('/recuperar_pass/', {'dni': '72'})
+        self.assertContains(respuesta, 'está dada de baja')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_dni_vacio_pide_el_dni(self):
+        self.assertContains(self.client.post('/recuperar_pass/', {'dni': '  '}), 'Ingresá tu DNI.')
 
     def test_el_link_del_correo_usa_el_token_de_django(self):
         self.client.post('/recuperar_pass/', {'dni': '70'})
@@ -1661,17 +1689,23 @@ class RecuperarPasswordPorDniTest(TestCase):
         self.assertIn('/reset/', cuerpo)
 
     @override_settings(EMAIL_BACKEND='inscripcionFinales.tests.test_views.CorreoQueFalla')
-    def test_si_el_envio_falla_se_ve_igual_pero_queda_en_el_log(self):
+    def test_si_el_envio_falla_lo_avisa_y_queda_en_el_log(self):
         """
-        Django 5.2 atrapa el error de envío para no revelar qué cuentas existen:
-        quien pide la recuperación ve la misma pantalla, y el error solo va al
-        log de django.contrib.auth. Por eso settings.LOGGING lo saca a la
-        consola también con DEBUG apagado (#274).
+        Django atrapa el error de envío para no revelar qué cuentas existen.
+        Como ahora el campo ya dice si el DNI tiene cuenta, se avisa que el
+        correo no salió en vez de decir que sí. El error sigue yendo al log de
+        django.contrib.auth, que settings.LOGGING saca a Vercel → Logs (#274).
         """
         with self.assertLogs('django.contrib.auth', level='ERROR') as registro:
             respuesta = self.client.post('/recuperar_pass/', {'dni': '70'})
-        self.assertRedirects(respuesta, '/password_reset/done/')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'No pudimos mandar el correo en este momento')
         self.assertIn('Failed to send password reset email', registro.output[0])
+
+    def test_enmascarar_email(self):
+        from inscripcionFinales.views import enmascarar_email
+        self.assertEqual(enmascarar_email('prueba@gmail.com'), 'pr•••@gmail.com')
+        self.assertEqual(enmascarar_email('ab@x.com'), 'a•••@x.com')
 
 
 class CorreoQueFalla:
