@@ -1,0 +1,185 @@
+{% extends 'base/base.html' %}
+{% comment %}
+  Lo dado de baja (#270), con el botón para reactivarlo. Cada sección aparece
+  solo si quien entra puede gestionar eso (ver lista_dados_de_baja). Nada de
+  esto se borró: sus cursadas, notas, actas e inscripciones están intactas.
+{% endcomment %}
+{% block title %}Dados de baja{% endblock %}
+{% block encabezado %}Dados de baja{% endblock %}
+{% block subtitulo %}Nada de esto se borró: se puede reactivar{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <p class="max-w-3xl text-sm text-slate-600">
+    Lo que se da de baja deja de aparecer en los listados y en lo que se ofrece para inscribirse,
+    pero no se borra: sus cursadas, notas, actas e inscripciones quedan intactas. Al reactivarlo
+    vuelve a aparecer. Cada baja y cada reactivación queda en la auditoría.
+  </p>
+
+  {% with s=secciones.materia %}{% if s %}
+  <section id="materia" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Materias</h2>
+      <p class="text-xs text-slate-500">{{ s.total }} dada{{ s.total|pluralize }} de baja</p>
+    </div>
+    {% if s.filas %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-5 py-3 font-semibold">Materia</th>
+            <th class="px-5 py-3 font-semibold">Carrera</th>
+            <th class="px-5 py-3 font-semibold">Año</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for materia in s.filas %}
+          <tr>
+            <td class="px-5 py-3 font-medium text-tinta-900">{{ materia.nombre_materia }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ materia.carrera|default:"—" }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ materia.anio }}°</td>
+            <td class="px-5 py-3 text-right">
+              <form method="post" action="{% url 'reactivar' 'materia' materia.pk %}">{% csrf_token %}
+                <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Reactivar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if s.total > maximo %}<p class="px-5 py-3 text-xs text-slate-500">Se muestran las primeras {{ maximo }}.</p>{% endif %}
+    {% else %}
+    <p class="px-5 py-6 text-sm text-slate-500">No hay materias dadas de baja.</p>
+    {% endif %}
+  </section>
+  {% endif %}{% endwith %}
+
+  {% with s=secciones.mesa %}{% if s %}
+  <section id="mesa" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div>
+        <h2 class="text-sm font-semibold text-tinta-900">Mesas de final</h2>
+        <p class="text-xs text-slate-500">Al reactivar una mesa vuelven con ella sus inscripciones.</p>
+      </div>
+      <p class="text-xs text-slate-500">{{ s.total }} dada{{ s.total|pluralize }} de baja</p>
+    </div>
+    {% if s.filas %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-5 py-3 font-semibold">Materia</th>
+            <th class="px-5 py-3 font-semibold">Llamado</th>
+            <th class="px-5 py-3 font-semibold">Aula</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for mesa in s.filas %}
+          <tr>
+            <td class="px-5 py-3 font-medium text-tinta-900">{{ mesa.materia }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ mesa.llamado|date:"d/m/Y H:i" }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ mesa.aula|default:"—" }}{% if mesa.sede %} · {{ mesa.sede }}{% endif %}</td>
+            <td class="px-5 py-3 text-right">
+              <form method="post" action="{% url 'reactivar' 'mesa' mesa.pk %}">{% csrf_token %}
+                <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Reactivar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if s.total > maximo %}<p class="px-5 py-3 text-xs text-slate-500">Se muestran las primeras {{ maximo }}.</p>{% endif %}
+    {% else %}
+    <p class="px-5 py-6 text-sm text-slate-500">No hay mesas dadas de baja.</p>
+    {% endif %}
+  </section>
+  {% endif %}{% endwith %}
+
+  {% with s=secciones.inscripcion %}{% if s %}
+  <section id="inscripcion" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <h2 class="text-sm font-semibold text-tinta-900">Inscripciones a final</h2>
+      <p class="text-xs text-slate-500">{{ s.total }} dada{{ s.total|pluralize }} de baja</p>
+    </div>
+    {% if s.filas %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-5 py-3 font-semibold">Estudiante</th>
+            <th class="px-5 py-3 font-semibold">Mesa</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for inscripcion in s.filas %}
+          <tr>
+            <td class="px-5 py-3 font-medium text-tinta-900">{{ inscripcion.usuario }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ inscripcion.llamado.materia }} · {{ inscripcion.llamado.llamado|date:"d/m/Y H:i" }}</td>
+            <td class="px-5 py-3 text-right">
+              <form method="post" action="{% url 'reactivar' 'inscripcion' inscripcion.pk %}">{% csrf_token %}
+                <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Reactivar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if s.total > maximo %}<p class="px-5 py-3 text-xs text-slate-500">Se muestran las primeras {{ maximo }}.</p>{% endif %}
+    {% else %}
+    <p class="px-5 py-6 text-sm text-slate-500">No hay inscripciones a final dadas de baja.</p>
+    {% endif %}
+  </section>
+  {% endif %}{% endwith %}
+
+  {% with s=secciones.usuario %}{% if s %}
+  <section id="usuario" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div>
+        <h2 class="text-sm font-semibold text-tinta-900">Usuarios</h2>
+        <p class="text-xs text-slate-500">Mientras están dados de baja no pueden entrar al sistema.</p>
+      </div>
+      <p class="text-xs text-slate-500">{{ s.total }} dado{{ s.total|pluralize }} de baja</p>
+    </div>
+    {% if s.filas %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+            <th class="px-5 py-3 font-semibold">Nombre</th>
+            <th class="px-5 py-3 font-semibold">DNI</th>
+            <th class="px-5 py-3 font-semibold">Rol</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for usuario in s.filas %}
+          <tr>
+            <td class="px-5 py-3 font-medium text-tinta-900">{{ usuario.nombre_completo|default:usuario.email }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ usuario.dni }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ usuario.get_rol_display }}</td>
+            <td class="px-5 py-3 text-right">
+              <form method="post" action="{% url 'reactivar' 'usuario' usuario.pk %}">{% csrf_token %}
+                <button type="submit" class="rounded-lg bg-tinta-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-tinta-800">Reactivar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if s.total > maximo %}<p class="px-5 py-3 text-xs text-slate-500">Se muestran los primeros {{ maximo }}.</p>{% endif %}
+    {% else %}
+    <p class="px-5 py-6 text-sm text-slate-500">No hay usuarios dados de baja.</p>
+    {% endif %}
+  </section>
+  {% endif %}{% endwith %}
+
+</div>
+{% endblock %}

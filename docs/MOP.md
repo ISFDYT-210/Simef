@@ -261,6 +261,11 @@ punto en "bien" o con el problema, y la hora.
 **Decide:** responsable de publicación, con el referente funcional si hay datos de
 estudiantes en juego. **Ejecuta:** responsable de la base. **Valida:** QA.
 
+**Antes, descartar una baja:** desde la #270 el sistema no borra materias, mesas,
+inscripciones a final ni usuarios: los da de baja. Si "desapareció" algo de eso, se
+busca en la pantalla **Dados de baja** y se reactiva, sin restaurar nada. La auditoría
+dice quién lo dio de baja y cuándo.
+
 1. **Frenar el daño:** si el problema sigue ocurriendo, volver atrás el código
    (OP-05).
 2. **Elegir el punto de restauración:**

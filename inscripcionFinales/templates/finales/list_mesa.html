@@ -59,11 +59,13 @@
           Cerrar
         </button>
 
+        <a href="{% url 'lista_dados_de_baja' %}#mesa" title="Ver lo dado de baja y reactivarlo"
+           class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Dados de baja</a>
         <button @click="pedirConfirmacion('eliminar')"
-                title="Eliminar mesas seleccionadas"
+                title="Dar de baja las mesas seleccionadas"
                 class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg>
-          Eliminar
+          Dar de baja
         </button>
         {% endif %}
       </div>
@@ -196,7 +198,7 @@
         <button @click="confirmar()"
                 class="rounded-lg px-4 py-2 text-sm font-semibold text-white"
                 :class="modal.tipo === 'eliminar' ? 'bg-red-600 hover:bg-red-700' : 'bg-tinta-900 hover:bg-tinta-800'"
-                x-text="modal.tipo === 'eliminar' ? 'Eliminar' : 'Confirmar'"></button>
+                x-text="modal.tipo === 'eliminar' ? 'Dar de baja' : 'Confirmar'"></button>
       </div>
     </div>
   </div>
@@ -213,21 +215,6 @@
     </div>
   </div>
 
-  <!-- ══ Modal de éxito (tras eliminar) ══ -->
-  {% if cantidad_eliminadas %}
-  <div x-data="{ show: true }" x-show="show" x-cloak
-       class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" x-transition.opacity>
-    <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
-      <h3 class="text-sm font-semibold text-tinta-900">Notificación</h3>
-      <p class="mt-2 text-sm text-slate-600">
-        {% if cantidad_eliminadas == 1 %}¡La mesa fue eliminada correctamente!
-        {% else %}¡Las {{ cantidad_eliminadas }} mesas fueron eliminadas correctamente!{% endif %}
-      </p>
-      <a href="{% url 'list_mesa' %}"
-         class="mt-4 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver</a>
-    </div>
-  </div>
-  {% endif %}
 
 </div>
 
@@ -310,9 +297,10 @@
         const uno = sel.length === 1;
         const nombre = uno ? sel[0].closest('tr').children[1].textContent.trim() : '';
         const textos = {
-          eliminar: { t: 'Advertencia',
-            m: uno ? `¿Está seguro que desea eliminar la mesa "${nombre}"?`
-                   : `¿Está seguro que desea eliminar las ${sel.length} mesas seleccionadas?` },
+          eliminar: { t: 'Dar de baja',
+            m: (uno ? `¿Dar de baja la mesa "${nombre}"?`
+                    : `¿Dar de baja las ${sel.length} mesas seleccionadas?`)
+               + ' No se borra nada y se puede reactivar desde "Dados de baja". Las mesas con resultados en el acta no se pueden dar de baja.' },
           abrir: { t: 'Abrir inscripciones',
             m: uno ? `¿Está seguro que desea abrir las inscripciones para la mesa "${nombre}"?`
                    : `¿Está seguro que desea abrir las inscripciones para las ${sel.length} mesas seleccionadas?` },

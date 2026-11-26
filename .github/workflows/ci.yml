@@ -3,14 +3,17 @@ name: CI - SIMEF
 
 on:
   push:
-    branches: [main, develop, testing]
+    branches: [main, develop]
   pull_request:
     branches: [main, develop]
 
-# Cancela runs viejos del mismo branch/PR para no gastar minutos en builds obsoletos
+# En un PR, un push nuevo cancela el run viejo: no tiene sentido terminar de
+# probar un commit que ya se reemplazó. En develop y main no se cancela nada: al
+# mergear varios PRs seguidos, cada merge cancelaba el CI del anterior, y el
+# badge del README muestra "failing" para un run cancelado.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

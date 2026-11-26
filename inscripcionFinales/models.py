@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from .choices import ESTADO_CIVIL_CHOICES, SEXO_CHOICES, MODALIDAD_CHOICES
 
@@ -176,6 +177,10 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def puede_ver_auditoria(self):
         return self.tiene_capacidad('ver_auditoria')
 
+    def puede_ver_dados_de_baja(self):
+        """Ve la pantalla "Dados de baja" quien puede dar de baja algo (#270)."""
+        return any(self.tiene_capacidad(c) for c in ('gestionar_usuarios', 'gestionar_materias', 'gestionar_mesas'))
+
     def puede_administrar(self):
         """Atajo: ¿es personal administrativo (no estudiante ni profesor)?"""
         return self.is_superuser or self.rol in (self.DIRECTIVO, self.SECRETARIO, self.PRECEPTOR)
@@ -221,17 +226,19 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
             ).exists()
         return False
 
+    # Para elegir a quién asignar algo: solo cuentas de alta. Un usuario dado
+    # de baja (is_active=False, #270) conserva su historial pero no se ofrece.
     @classmethod
     def obtener_profesores(cls):
-        return cls.objects.filter(rol=cls.PROFESOR).order_by('nombre_completo')
+        return cls.objects.filter(rol=cls.PROFESOR, is_active=True).order_by('nombre_completo')
 
     @classmethod
     def obtener_estudiantes(cls):
-        return cls.objects.filter(rol=cls.ESTUDIANTE).order_by('nombre_completo')
+        return cls.objects.filter(rol=cls.ESTUDIANTE, is_active=True).order_by('nombre_completo')
 
     @classmethod
     def obtener_por_rol(cls, rol):
-        return cls.objects.filter(rol=rol).order_by('nombre_completo')
+        return cls.objects.filter(rol=rol, is_active=True).order_by('nombre_completo')
 
 
 # Minutos que dura el primer bloqueo de login y cuánto suma cada bloqueo
@@ -279,11 +286,37 @@ def duracion_bloqueo_login(request):
     return duracion
 
 
+# === Baja lógica (#270) ======================================================
+# Las materias, las mesas de final y las inscripciones a final no se borran:
+# se dan de baja (activo=False). Dejan de aparecer en los listados y en lo que
+# se ofrece para inscribirse, y sus cursadas, notas y actas quedan intactas. Los
+# usuarios se dan de baja con is_active=False, que además les impide entrar.
+# Ver inscripcionFinales/bajas.py.
+#
+# Además, ninguna relación que lleve a resultados académicos borra en cascada:
+# son on_delete=PROTECT, así que ni el admin ni la consola pueden borrar una
+# materia, una mesa o un usuario que tenga cursadas, inscripciones o actas.
+
+class BajaLogicaQuerySet(models.QuerySet):
+    def de_alta(self):
+        return self.filter(activo=True)
+
+    def de_baja(self):
+        return self.filter(activo=False)
+
+
+def campo_de_alta():
+    # db_default: la columna queda con DEFAULT true en la base, así una versión
+    # anterior de la app (que no conoce el campo) puede seguir dando de alta
+    # filas mientras se publica la nueva.
+    return models.BooleanField('De alta', default=True, db_default=True)
+
+
 class Carrera(models.Model):
     nombre_carrera = models.CharField('nombre_carrera',unique = True, max_length=100)
     num_resolucion = models.CharField('num_resolucion', max_length=100, blank = True, null = True)
     duracion_carrera = models.PositiveBigIntegerField(default=3)
-    instituto = models.ForeignKey('Instituto',on_delete=models.CASCADE,null=True)
+    instituto = models.ForeignKey('Instituto', on_delete=models.PROTECT, null=True)
     
     def __str__(self):
         return self.nombre_carrera
@@ -315,9 +348,12 @@ class Instituto(models.Model):
 
 class Materia(models.Model):
     nombre_materia = models.CharField('nombre_materia', max_length=200)
-    carrera = models.ForeignKey('Carrera', on_delete=models.CASCADE, null=True)
-    profesor = models.ForeignKey('Usuario', on_delete=models.CASCADE, null=True)
+    carrera = models.ForeignKey('Carrera', on_delete=models.PROTECT, null=True)
+    profesor = models.ForeignKey('Usuario', on_delete=models.PROTECT, null=True)
     inscripcionAbierta = models.BooleanField(default=False)
+    activo = campo_de_alta()
+
+    objects = BajaLogicaQuerySet.as_manager()
 
     Inicio = '12:00'
     Inicio1 = '14:00'
@@ -395,8 +431,8 @@ VENCIMIENTO_REGULARIDAD_DIAS = None
 
 
 class usuarios_materia(models.Model):
-    materia = models.ForeignKey('Materia', on_delete=models.CASCADE, null=False, blank=False)
-    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, null=False, blank=False)  # 'Usuario' con mayúscula
+    materia = models.ForeignKey('Materia', on_delete=models.PROTECT, null=False, blank=False)
+    usuario = models.ForeignKey('Usuario', on_delete=models.PROTECT, null=False, blank=False)  # 'Usuario' con mayúscula
     nota_cursada = models.FloatField('Nota de Cursada', null=True, blank=True)
     nota_final = models.FloatField('Nota de Final', null=True, blank=True)
     aprobada = models.BooleanField(default=False)
@@ -513,10 +549,15 @@ class MesaFinal(models.Model):
         ('SEDE ABASTO', 'SEDE ABASTO'),
     )
 
-    materia = models.ForeignKey('Materia', on_delete=models.CASCADE, blank=False, null=False)
+    materia = models.ForeignKey('Materia', on_delete=models.PROTECT, blank=False, null=False)
     llamado= models.DateTimeField('Llamado', null=False, blank=False)
     vigente= models.BooleanField(default=True)
     inscripcionAbierta = models.BooleanField(default=False)
+    # No confundir con `vigente`: una mesa vencida sigue de alta (es historia,
+    # tiene su acta). Dada de baja es una mesa anulada (ver BajaLogicaQuerySet).
+    activo = campo_de_alta()
+
+    objects = BajaLogicaQuerySet.as_manager()
 
     # Dónde se rinde. Aula es texto libre (no hay catálogo de aulas); sede es
     # una de las dos del instituto.
@@ -573,7 +614,7 @@ class TribunalMesa(models.Model):
     MAX_VOCALES_POR_MESA = 2
 
     mesa = models.ForeignKey('MesaFinal', on_delete=models.CASCADE, related_name='tribunal')
-    docente = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='tribunales')
+    docente = models.ForeignKey('Usuario', on_delete=models.PROTECT, related_name='tribunales')
     rol = models.CharField(max_length=20, choices=ROL_CHOICES)
     activo = models.BooleanField(default=True)
     reemplaza_a = models.ForeignKey(
@@ -590,9 +631,23 @@ class TribunalMesa(models.Model):
         return f"{self.get_rol_display()}: {self.docente} ({self.mesa})"
 
 
+class InscripcionFinalQuerySet(BajaLogicaQuerySet):
+    def de_alta(self):
+        # Cuentan las que están de alta y en una mesa de alta: dar de baja una
+        # mesa no toca sus inscripciones, y si se reactiva vuelven con ella.
+        return self.filter(activo=True, llamado__activo=True)
+
+    def con_resultado(self):
+        """Las que ya tienen nota, aprobado/desaprobado o ausente: son parte del acta."""
+        return self.filter(Q(nota__isnull=False) | Q(aprobada__isnull=False) | Q(ausente=True))
+
+    def sin_resultado(self):
+        return self.filter(nota__isnull=True, aprobada__isnull=True, ausente=False)
+
+
 class InscripcionFinal(models.Model):
-    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, blank=False, null=False)  # 'Usuario' con mayúscula
-    llamado = models.ForeignKey('MesaFinal', on_delete=models.CASCADE, blank=False, null=False)
+    usuario = models.ForeignKey('Usuario', on_delete=models.PROTECT, blank=False, null=False)  # 'Usuario' con mayúscula
+    llamado = models.ForeignKey('MesaFinal', on_delete=models.PROTECT, blank=False, null=False)
     aprobada= models.BooleanField(null=True)
     # El alumno se inscribio pero no se presento a rendir.
     ausente = models.BooleanField(default=False)
@@ -603,6 +658,14 @@ class InscripcionFinal(models.Model):
     # campo es la fuente de verdad por intento, para no mostrarle a un
     # llamado la nota de otro (ver api_finales_inscriptos_adm).
     nota = models.FloatField('Nota', null=True, blank=True)
+    # Una inscripción sin resultado se puede dar de baja (anular); con
+    # resultado no, porque es parte del acta (ver bajas.py).
+    activo = campo_de_alta()
+
+    objects = InscripcionFinalQuerySet.as_manager()
+
+    def tiene_resultado(self):
+        return self.nota is not None or self.aprobada is not None or self.ausente
 
 class Estudiante(Usuario):
     matricula= models.CharField(max_length=10,unique=True)
@@ -617,22 +680,59 @@ class Preceptor(Usuario):
     area = models.CharField(max_length=100)
 
 
+class RegistroAuditoriaInmodificable(Exception):
+    """Un registro de auditoría no se cambia ni se borra una vez guardado (#271)."""
+
+
+class RegistroAuditoriaQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise RegistroAuditoriaInmodificable('Los registros de auditoría no se modifican.')
+
+    def delete(self):
+        raise RegistroAuditoriaInmodificable('Los registros de auditoría no se borran.')
+
+
 class RegistroAuditoria(models.Model):
-    """Registro de acciones importantes: quién hizo qué y cuándo."""
+    """Registro de acciones importantes: quién hizo qué, cuándo y qué cambió.
+
+    Una vez guardado no se modifica ni se borra (#271). Lo impide el modelo y,
+    en PostgreSQL, un trigger de la base (migración 0024). La única excepción
+    es `usuario`, que queda en NULL si se borra la cuenta: por eso el autor se
+    guarda también en autor_dni, autor_nombre y autor_rol, y no se pierde.
+    """
     usuario = models.ForeignKey('Usuario', on_delete=models.SET_NULL,
                                 null=True, blank=True, related_name='acciones_auditoria')
+    # db_default: las columnas de la 0024 quedan con DEFAULT '' en la base, para
+    # que la versión anterior de la app (que no las conoce) pueda seguir
+    # registrando mientras se publica esta, o si hubiera que volver atrás.
+    autor_dni = models.CharField('DNI del autor', max_length=20, blank=True, default='', db_default='')
+    autor_nombre = models.CharField('Autor', max_length=255, blank=True, default='', db_default='')
+    autor_rol = models.CharField('Rol del autor', max_length=20, blank=True, default='', db_default='')
     accion = models.CharField('Acción', max_length=255)
     modelo_afectado = models.CharField('Modelo', max_length=100, blank=True)
     objeto_id = models.CharField('ID del objeto', max_length=100, blank=True)
+    valor_anterior = models.TextField('Valor anterior', blank=True, default='', db_default='')
+    valor_nuevo = models.TextField('Valor nuevo', blank=True, default='', db_default='')
+    motivo = models.TextField('Motivo', blank=True, default='', db_default='')
     fecha = models.DateTimeField('Fecha', auto_now_add=True)
+
+    objects = RegistroAuditoriaQuerySet.as_manager()
 
     class Meta:
         ordering = ['-fecha']
         verbose_name = 'Registro de auditoría'
         verbose_name_plural = 'Registros de auditoría'
 
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise RegistroAuditoriaInmodificable('Los registros de auditoría no se modifican.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise RegistroAuditoriaInmodificable('Los registros de auditoría no se borran.')
+
     def __str__(self):
-        quien = (self.usuario.nombre_completo or self.usuario.dni) if self.usuario else 'Sistema'
+        quien = self.autor_nombre or self.autor_dni or 'Sistema'
         return f"[{self.fecha:%Y-%m-%d %H:%M}] {quien}: {self.accion}"
 
 
@@ -653,5 +753,5 @@ def inscribir_en_primer_anio(sender, instance, action, pk_set, **kwargs):
     if not instance.es_estudiante():
         return
     for carrera_id in (pk_set or []):
-        for materia in Materia.objects.filter(carrera_id=carrera_id, anio=1):
+        for materia in Materia.objects.de_alta().filter(carrera_id=carrera_id, anio=1):
             usuarios_materia.objects.get_or_create(usuario=instance, materia=materia)

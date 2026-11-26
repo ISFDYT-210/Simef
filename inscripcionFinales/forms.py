@@ -5,6 +5,7 @@ from . import correlativas
 from django.shortcuts import render
 from django.http import HttpResponse
 from django import forms
+from django.db.models import Q
 from django.forms import DateInput
 from django.contrib.auth.forms import UserCreationForm
 from django.core.validators import RegexValidator
@@ -347,8 +348,13 @@ class MateriaForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filtrar solo usuarios con rol 'Profesor'
-        self.fields['profesor'].queryset = Usuario.objects.filter(rol='Profesor')
+        # Solo profesores de alta (#270). Si el profesor actual está dado de
+        # baja, se lo sigue ofreciendo para que editar otro dato de la materia
+        # no obligue a cambiarlo.
+        profesores = Q(rol='Profesor', is_active=True)
+        if self.instance.profesor_id:
+            profesores |= Q(pk=self.instance.profesor_id)
+        self.fields['profesor'].queryset = Usuario.objects.filter(profesores).order_by('nombre_completo')
     
     class Meta:
         model = Materia
@@ -433,6 +439,12 @@ class MesaFinalForm(forms.ModelForm):
         # Configurar el campo llamado para usar datetime-local
         self.fields['llamado'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
 
+        # Solo materias de alta (#270); al editar, también la de esta mesa
+        materias = Q(activo=True)
+        if self.instance.materia_id:
+            materias |= Q(pk=self.instance.materia_id)
+        self.fields['materia'].queryset = Materia.objects.filter(materias)
+
         # Una sola query para poblar el data-carrera/data-anio de cada <option> (evita N+1)
         self.fields['materia'].widget.materias_info = {
             id_: (carrera_id, anio)
@@ -450,7 +462,7 @@ class MesaFinalForm(forms.ModelForm):
         aula = cleaned_data.get('aula')
 
         if materia and llamado:
-            ya_existe = MesaFinal.objects.filter(materia=materia, llamado=llamado) \
+            ya_existe = MesaFinal.objects.de_alta().filter(materia=materia, llamado=llamado) \
                 .exclude(pk=self.instance.pk).exists()
             if ya_existe:
                 self.add_error('llamado', 'Ya existe una mesa de esta materia en ese mismo día y horario.')
@@ -460,7 +472,7 @@ class MesaFinalForm(forms.ModelForm):
             # de fin en la base): dos mesas de `aula` se superponen si sus
             # llamados quedan a menos de esa duración de distancia uno del
             # otro, sea cual sea la materia.
-            ocupada = MesaFinal.objects.filter(
+            ocupada = MesaFinal.objects.de_alta().filter(
                 aula=aula, vigente=True,
                 llamado__gt=llamado - MesaFinal.DURACION,
                 llamado__lt=llamado + MesaFinal.DURACION,
@@ -485,15 +497,21 @@ class InscripcionFinalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filtrar solo usuarios con rol 'Estudiante'
-        self.fields['usuario'].queryset = Usuario.objects.filter(rol='Estudiante').order_by('nombre_completo')
+        # Solo estudiantes de alta (#270)
+        self.fields['usuario'].queryset = Usuario.obtener_estudiantes()
         self.fields['usuario'].empty_label = "Seleccione un estudiante"
 
-        # Filtrar solo mesas con inscripción abierta y vigentes
-        self.fields['llamado'].queryset = MesaFinal.objects.filter(
-            inscripcionAbierta=True,
-            vigente=True
-        ).select_related('materia').order_by('materia__nombre_materia', 'llamado')
+        # Mesas con inscripción abierta y vigentes, de alta y de materias de alta
+        mesas = Q(activo=True, inscripcionAbierta=True, vigente=True, materia__activo=True)
+        if self.instance.pk:
+            # Editar es pasar la inscripción a otra mesa de la misma materia
+            # (#278): el estudiante no cambia, y se ofrecen la mesa actual y
+            # las otras de esa materia.
+            self.fields['usuario'].disabled = True
+            self.fields['usuario'].queryset = Usuario.objects.filter(pk=self.instance.usuario_id)
+            mesas = Q(pk=self.instance.llamado_id) | (mesas & Q(materia_id=self.instance.llamado.materia_id))
+        self.fields['llamado'].queryset = MesaFinal.objects.filter(mesas).select_related('materia') \
+            .order_by('materia__nombre_materia', 'llamado')
         self.fields['llamado'].empty_label = "Seleccione una mesa final"
         # "Materia - dd/mm/aaaa HH:MM" en vez del __str__ crudo de MesaFinal.
         self.fields['llamado'].label_from_instance = (
@@ -525,7 +543,7 @@ class InscripcionFinalForm(forms.ModelForm):
 class InscripcionMateriaForm(forms.ModelForm):
     # CORREGIDO: Filtrar SOLO usuarios con rol 'Estudiante' (no superuser)
     usuario = forms.ModelChoiceField(
-        queryset=Usuario.objects.filter(rol='Estudiante', is_superuser=False).order_by('nombre_completo'),
+        queryset=Usuario.objects.filter(rol='Estudiante', is_superuser=False, is_active=True).order_by('nombre_completo'),
         empty_label="Seleccione un estudiante",
         widget=forms.Select(attrs={'class': 'form-control'}),
         label='Estudiante'
@@ -533,7 +551,7 @@ class InscripcionMateriaForm(forms.ModelForm):
     
     # Filtrar solo materias que tengan inscripción abierta
     materia = forms.ModelChoiceField(
-        queryset=Materia.objects.filter(inscripcionAbierta=True).order_by('nombre_materia'),
+        queryset=Materia.objects.de_alta().filter(inscripcionAbierta=True).order_by('nombre_materia'),
         empty_label="Seleccione una materia",
         widget=forms.Select(attrs={'class': 'form-control'}),
         label='Materia'

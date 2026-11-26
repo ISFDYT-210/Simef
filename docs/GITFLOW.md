@@ -182,3 +182,39 @@ Lo que **no** arregla sola es que las dos migraciones hayan hecho cambios
 contradictorios sobre el mismo campo. Ahí hay que mirar qué tiene la base de
 verdad y dejar el modelo de acuerdo con eso, antes de inventar una migración
 nueva contra la base compartida.
+
+---
+
+## 9. Arreglos de seguridad urgentes
+
+Es la única excepción a «a `main` solo se entra desde `develop`».
+
+El repo tiene activadas las *Dependabot security updates*: cuando se publica una
+vulnerabilidad en una dependencia que usa SIMEF, dependabot abre solo un PR con
+la versión corregida. A diferencia de las actualizaciones semanales, que van a
+`develop` (`target-branch` en `.github/dependabot.yml`), **estos PRs van siempre
+contra `main`**, la rama por defecto: GitHub no deja cambiarlo. Se los reconoce
+porque apuntan a `main` y enlazan la alerta de seguridad que resuelven.
+
+Se tratan como un arreglo urgente, sin esperar el próximo pasaje de `develop`:
+
+1. **Esperar el CI.** El PR tiene que pasar los mismos controles obligatorios
+   que cualquier otro para entrar a `main`. Si falla, el arreglo no se fuerza:
+   se corrige en una rama `fix/...` contra `main` y se cierra el de dependabot.
+2. **Mergear a `main` y publicar una versión de corrección.** Vercel lo pone en
+   producción; después se crea la release con el número siguiente (`v1.0.1`,
+   `v1.0.2`, …) y en las notas se nombra la alerta que cierra.
+3. **Pasar `main` a `develop` en seguida.** Si no, `develop` sigue con la versión
+   vulnerable y el próximo pasaje a producción la vuelve a traer:
+
+   ```bash
+   gh pr create --base develop --head main --title "Arreglo de seguridad de main a develop"
+   ```
+
+   Si `develop` ya tenía una versión más nueva de ese paquete, el conflicto se
+   resuelve quedándose con la más nueva.
+
+Lo mismo vale para un arreglo de seguridad que no viene de dependabot (por
+ejemplo, uno reportado según el [`SECURITY.md`](../SECURITY.md)): rama
+`fix/...` desde `main`, PR contra `main`, versión de corrección y `main` a
+`develop`.

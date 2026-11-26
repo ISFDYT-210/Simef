@@ -26,10 +26,12 @@
         <input type="text" x-model="busqueda" placeholder="Buscar por nombre, DNI o email…"
                class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
 
-        <button @click="pedirEliminar()" title="Eliminar seleccionados"
+        <a href="{% url 'lista_dados_de_baja' %}#usuario" title="Ver lo dado de baja y reactivarlo"
+           class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Dados de baja</a>
+        <button @click="pedirEliminar()" title="Dar de baja los seleccionados"
                 class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7"/></svg>
-          Eliminar
+          Dar de baja
         </button>
       </div>
     </div>
@@ -152,7 +154,7 @@
       <p class="px-5 py-6 text-center text-sm text-slate-700" x-text="mensajeEliminar"></p>
       <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
         <button @click="modalEliminar = false" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-        <button @click="$refs.formEliminar.submit()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Eliminar</button>
+        <button @click="$refs.formEliminar.submit()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Dar de baja</button>
       </div>
     </div>
   </div>
@@ -162,7 +164,7 @@
        @click.self="modalVacio = false" x-transition.opacity>
     <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
       <h3 class="text-sm font-semibold text-tinta-900">Advertencia</h3>
-      <p class="mt-2 text-sm text-slate-600">Debés seleccionar al menos un usuario para eliminar.</p>
+      <p class="mt-2 text-sm text-slate-600">Debés seleccionar al menos un usuario para dar de baja.</p>
       <button @click="modalVacio = false" class="mt-4 rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Cerrar</button>
     </div>
   </div>
@@ -251,9 +253,9 @@
         if (sel.length === 0) { this.modalVacio = true; return; }
         if (sel.length === 1) {
           const nombre = sel[0].closest('tr').children[2].textContent.trim();
-          this.mensajeEliminar = `¿Está seguro que desea eliminar al usuario "${nombre}"?`;
+          this.mensajeEliminar = `¿Dar de baja al usuario "${nombre}"? No se borra nada: no va a poder entrar, y se puede reactivar desde "Dados de baja".`;
         } else {
-          this.mensajeEliminar = `¿Está seguro que desea eliminar a los ${sel.length} usuarios seleccionados?`;
+          this.mensajeEliminar = `¿Dar de baja a los ${sel.length} usuarios seleccionados? No se borra nada: no van a poder entrar, y se pueden reactivar desde "Dados de baja".`;
         }
         this.modalEliminar = true;
       },

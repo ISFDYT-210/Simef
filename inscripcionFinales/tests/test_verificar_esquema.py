@@ -9,6 +9,7 @@ from io import StringIO
 
 from django.core.management import CommandError, call_command
 from django.db import connection
+from django.db.migrations.loader import MigrationLoader
 from django.test import TestCase
 from django.utils import timezone
 
@@ -66,10 +67,10 @@ class VerificarEsquemaTest(TestCase):
         self.assertIn('coincide con el código', salida)
 
     def test_con_sin_pendientes_una_migracion_sin_aplicar_es_error(self):
-        self.ejecutar(
-            "DELETE FROM django_migrations WHERE app = %s AND name = %s",
-            ['inscripcionFinales', '0023_alter_usuarios_materia_ciclo_actual_desde'],
-        )
+        # La última de la app: si fuera una intermedia, el historial quedaría
+        # inconsistente (aplicada una migración cuya dependencia no lo está).
+        ultima = max(MigrationLoader(connection).graph.leaf_nodes('inscripcionFinales'))
+        self.ejecutar("DELETE FROM django_migrations WHERE app = %s AND name = %s", list(ultima))
         self.assertIn('sin aplicar', verificar())
         with self.assertRaises(CommandError):
             verificar('--sin-pendientes')

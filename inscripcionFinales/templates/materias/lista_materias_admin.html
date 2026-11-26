@@ -62,7 +62,11 @@
 
         <button @click="pedir('abrir')" title="Abrir inscripciones" class="inline-flex items-center gap-1.5 rounded-lg bg-celeste-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-celeste-500">Abrir</button>
         <button @click="pedir('cerrar')" title="Cerrar inscripciones" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700">Cerrar</button>
-        <button @click="pedir('eliminar')" title="Eliminar" class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">Eliminar</button>
+        {% if request.user.puede_gestionar_materias %}
+        <button @click="pedir('eliminar')" title="Dar de baja" class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">Dar de baja</button>
+        <a href="{% url 'lista_dados_de_baja' %}#materia" title="Ver lo dado de baja y reactivarlo"
+           class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Dados de baja</a>
+        {% endif %}
       </div>
     </div>
 
@@ -131,7 +135,7 @@
       <p class="px-5 py-6 text-center text-sm text-slate-700" x-text="modal.mensaje"></p>
       <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
         <button @click="modal.abierto=false" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-        <button @click="$refs.formMaterias.submit()" class="rounded-lg px-4 py-2 text-sm font-semibold text-white" :class="modal.tipo==='eliminar'?'bg-red-600 hover:bg-red-700':'bg-tinta-900 hover:bg-tinta-800'" x-text="modal.tipo==='eliminar'?'Eliminar':'Confirmar'"></button>
+        <button @click="$refs.formMaterias.submit()" class="rounded-lg px-4 py-2 text-sm font-semibold text-white" :class="modal.tipo==='eliminar'?'bg-red-600 hover:bg-red-700':'bg-tinta-900 hover:bg-tinta-800'" x-text="modal.tipo==='eliminar'?'Dar de baja':'Confirmar'"></button>
       </div>
     </div>
   </div>
@@ -145,15 +149,6 @@
     </div>
   </div>
 
-  {% if cantidad_eliminadas %}
-  <div x-data="{ show: true }" x-show="show" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" x-transition.opacity>
-    <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
-      <h3 class="text-sm font-semibold text-tinta-900">Notificación</h3>
-      <p class="mt-2 text-sm text-slate-600">{% if cantidad_eliminadas == 1 %}¡La materia fue eliminada correctamente!{% else %}¡Las {{ cantidad_eliminadas }} materias fueron eliminadas correctamente!{% endif %}</p>
-      <a href="/lista_materias_admin" class="mt-4 inline-block rounded-lg bg-tinta-900 px-5 py-2 text-sm font-semibold text-white hover:bg-tinta-800">Volver</a>
-    </div>
-  </div>
-  {% endif %}
 
 </div>
 
@@ -199,7 +194,7 @@
         var uno=sel.length===1;
         var nombre=uno?sel[0].closest('tr').children[1].textContent.trim():'';
         var txt={
-          eliminar:{t:'Advertencia', m:uno?`¿Está seguro que desea eliminar la materia "${nombre}"?`:`¿Está seguro que desea eliminar las ${sel.length} materias seleccionadas?`},
+          eliminar:{t:'Dar de baja', m:(uno?`¿Dar de baja la materia "${nombre}"?`:`¿Dar de baja las ${sel.length} materias seleccionadas?`)+' No se borra nada: sus cursadas, mesas y notas quedan intactas, y se puede reactivar desde "Dados de baja".'},
           abrir:{t:'Abrir inscripciones', m:uno?`¿Está seguro que desea abrir las inscripciones para la materia "${nombre}"?`:`¿Está seguro que desea abrir las inscripciones para las ${sel.length} materias seleccionadas?`},
           cerrar:{t:'Cerrar inscripciones', m:uno?`¿Está seguro que desea cerrar las inscripciones para la materia "${nombre}"?`:`¿Está seguro que desea cerrar las inscripciones para las ${sel.length} materias seleccionadas?`},
         };

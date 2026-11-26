@@ -9,7 +9,7 @@
 Inscripciones a cursadas y finales, actas, notas y constancias, con las reglas
 académicas del instituto aplicadas en el servidor.
 
-[![CI](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml)
+[![CI - SIMEF](https://img.shields.io/github/check-runs/ISFDYT-210/Simef/develop?label=CI%20-%20SIMEF&logo=github)](https://github.com/ISFDYT-210/Simef/actions/workflows/ci.yml?query=branch%3Adevelop)
 ![Django 5.2 LTS](https://img.shields.io/badge/Django-5.2_LTS-0C4B33?logo=django&logoColor=white)
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
@@ -147,8 +147,10 @@ Protección de Datos Personales. Por eso:
   incluyan.
 - **No se usan datos reales fuera de producción,** salvo en la copia local de
   desarrollo, que no se comparte.
-- **Si encontrás una vulnerabilidad, no abras un issue público:** avisale en privado
-  a un integrante del equipo, para que se corrija antes de que se conozca.
+- **Si encontrás una vulnerabilidad, no abras un issue público:** reportala en
+  privado desde [Security → Report a vulnerability](https://github.com/ISFDYT-210/Simef/security/advisories/new),
+  para que se corrija antes de que se conozca. La [política de seguridad](SECURITY.md)
+  explica qué incluir, qué esperar y cómo probar sin tocar datos de otras personas.
 
 ---
 
