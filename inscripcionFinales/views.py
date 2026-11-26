@@ -9,7 +9,6 @@ from .forms import *
 from . import correlativas
 from .constancia_pdf import generar_constancia_pdf
 from django.views.generic import CreateView,TemplateView,ListView,UpdateView,DeleteView,FormView
-from django.core.mail import send_mail
 from django.contrib.auth import *
 from django.contrib import messages
 from django.db.models import Q,Prefetch,OuterRef,F,Count
@@ -27,6 +26,8 @@ from django.views.decorators.csrf import csrf_protect
 from math import *
 from json import *
 from django.template import loader
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.http import HttpResponse
 from io import BytesIO
@@ -2634,36 +2635,96 @@ def obtener_contexto_reporte(usuario):
 
 
 # ========== RECUPERACIÓN DE CONTRASEÑA ==========
+class PasswordResetQueAvisa(PasswordResetForm):
+    """Como el de Django, pero deja saber si el envío falló (#283).
+
+    Django atrapa el error para no revelar qué cuentas existen. Acá ya se le
+    dice a quien pide la recuperación si su DNI tiene cuenta, así que no hay
+    nada que ocultar, y es mejor avisarle que decirle que el correo salió. El
+    error se sigue anotando igual, para que quede en Vercel → Logs.
+    """
+    envio_fallo = False
+
+    def send_mail(self, subject_template_name, email_template_name, context, from_email, to_email,
+                  html_email_template_name=None):
+        asunto = ''.join(loader.render_to_string(subject_template_name, context).splitlines())
+        mensaje = EmailMultiAlternatives(asunto, loader.render_to_string(email_template_name, context),
+                                         from_email, [to_email])
+        if html_email_template_name is not None:
+            mensaje.attach_alternative(loader.render_to_string(html_email_template_name, context), 'text/html')
+        try:
+            mensaje.send()
+        except Exception:
+            self.envio_fallo = True
+            logging.getLogger('django.contrib.auth').exception(
+                'Failed to send password reset email to %s', context['user'].pk)
+
+
+def enmascarar_email(email):
+    """'prueba@gmail.com' -> 'pr•••@gmail.com': alcanza para reconocerlo sin mostrarlo entero."""
+    usuario, _, dominio = email.partition('@')
+    return f'{usuario[:2] if len(usuario) > 2 else usuario[:1]}•••@{dominio}'
+
+
+MOTIVO_PRECEPTORIA = 'Pedí el blanqueo de la contraseña en Preceptoría o Secretaría.'
+
+
 def recuperar_password(request):
     """
     El login es por DNI (no por email, ver CustomLoginView), así que acá
-    también se pide el DNI en vez de un email. Si esa cuenta tiene un email
-    cargado, se dispara el mismo flujo de siempre (link con token de un solo
-    uso, vía PasswordResetForm). Si no tiene email, o el DNI no existe, no se
-    manda nada - pero se muestra exactamente la misma pantalla de éxito en
-    los tres casos, para no revelar qué DNIs están registrados ni cuáles
-    tienen email. Quien no tenga email cargado tiene que pedirle a
-    Preceptoría/Secretaría que le blanquee la contraseña (ver
-    blanquear_password).
+    también se pide el DNI. Si esa cuenta tiene un email cargado, se manda el
+    link de siempre (token de un solo uso, vía PasswordResetForm) y la
+    pantalla siguiente dice a qué email, parcialmente oculto.
+
+    Desde la #283 el campo avisa si no hay cuenta con ese DNI, si no tiene
+    email o si está dada de baja: antes se mostraba la misma pantalla en todos
+    los casos para no revelar qué DNIs están registrados, y quien la usaba no
+    sabía si el correo había salido. Sin email, el camino es que Preceptoría o
+    Secretaría blanquee la contraseña (ver blanquear_password).
     """
-    if request.method == 'POST':
-        dni = (request.POST.get('dni') or '').strip()
-        usuario = Usuario.objects.filter(dni=dni).exclude(email__isnull=True).exclude(email='').first()
-        if usuario:
-            form = PasswordResetForm(data={'email': usuario.email})
-            if form.is_valid():
-                form.save(
-                    request=request,
-                    use_https=request.is_secure(),
-                    email_template_name='registration/password_reset_email.html',
-                    html_email_template_name='registration/password_reset_email_html.html',
-                    extra_email_context={'nombre_completo': usuario.nombre_completo},
-                )
-        return redirect('password_reset_done')
-    return render(request, 'registration/recuperar_pass.html')
+    if request.method != 'POST':
+        return render(request, 'registration/recuperar_pass.html')
+
+    # Se acepta con puntos o espacios: "30.111.222" es el mismo DNI
+    dni = re.sub(r'[\s.]', '', request.POST.get('dni') or '')
+    usuario = Usuario.objects.filter(dni=dni).first() if dni else None
+    if not dni:
+        error = 'Ingresá tu DNI.'
+    elif usuario is None:
+        error = 'No hay ninguna cuenta con ese DNI. Revisá que esté bien escrito.'
+    elif not usuario.is_active:
+        error = f'La cuenta con ese DNI está dada de baja. {MOTIVO_PRECEPTORIA}'
+    elif not usuario.email:
+        error = f'Tu cuenta no tiene un email cargado. {MOTIVO_PRECEPTORIA}'
+    elif not usuario.has_usable_password():
+        error = f'Tu cuenta no puede recuperar la contraseña por correo. {MOTIVO_PRECEPTORIA}'
+    else:
+        form = PasswordResetQueAvisa(data={'email': usuario.email})
+        form.is_valid()
+        form.save(
+            request=request,
+            use_https=request.is_secure(),
+            email_template_name='registration/password_reset_email.html',
+            html_email_template_name='registration/password_reset_email_html.html',
+            extra_email_context={'nombre_completo': usuario.nombre_completo},
+        )
+        if not form.envio_fallo:
+            request.session['recuperar_email'] = enmascarar_email(usuario.email)
+            return redirect('password_reset_done')
+        error = ('No pudimos mandar el correo en este momento. Probá de nuevo en un rato o pedí el blanqueo '
+                 'de la contraseña en Preceptoría o Secretaría.')
+    return render(request, 'registration/recuperar_pass.html', {'error': error, 'dni': dni})
+
 
 class CustomPasswordResetDoneView(PasswordResetDoneView):
     template_name = 'registration/password_reset_done.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # A qué email se mandó: lo deja recuperar_password, y se muestra una sola vez
+        context['email'] = self.request.session.pop('recuperar_email', None)
+        context['dias_link'] = max(1, settings.PASSWORD_RESET_TIMEOUT // 86400)
+        return context
 
 class CustomPasswordResetConfirmView(PasswordResetConfirmView):
     template_name = 'registration/password_reset_confirm.html'

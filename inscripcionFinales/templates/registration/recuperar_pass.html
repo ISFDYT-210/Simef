@@ -10,7 +10,7 @@
 </div>
 
 <p class="mb-4 text-center text-sm text-slate-500">
-  Ingresá tu DNI: si tenés un email cargado, te vamos a mandar un link para elegir una contraseña nueva.
+  Ingresá tu DNI y te mandamos un link al email de tu cuenta para elegir una contraseña nueva.
 </p>
 
 <form method="post" class="space-y-4">
@@ -19,8 +19,10 @@
   <div>
     <label for="id_dni" class="mb-1 block text-sm font-medium text-slate-700">DNI</label>
     <input type="text" name="dni" id="id_dni" inputmode="numeric" autocomplete="username"
-           placeholder="Sin puntos ni espacios" autofocus required
-           class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-celeste-500 focus:outline-none focus:ring-2 focus:ring-celeste-100">
+           placeholder="Sin puntos ni espacios" autofocus required value="{{ dni|default:'' }}"
+           {% if error %}aria-invalid="true" aria-describedby="error_dni"{% endif %}
+           class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-celeste-500 focus:ring-celeste-100 {% if error %}border-red-500{% else %}border-slate-300{% endif %}">
+    {% if error %}<p id="error_dni" class="mt-1 text-sm text-red-600">{{ error }}</p>{% endif %}
   </div>
 
   <button type="submit" class="w-full rounded-lg bg-tinta-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-tinta-800">Enviar</button>
