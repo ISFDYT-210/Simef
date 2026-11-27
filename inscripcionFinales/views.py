@@ -583,6 +583,9 @@ class showUser(ListView):
 
 def lista_materias_user(request):
     materias_con_requisitos = correlativas.materias_con_requisitos(request.user)
+    for item in materias_con_requisitos:
+        # La regla de las prácticas la decide el servidor (#288)
+        item['practica'] = correlativas.es_practica(item['materia'])
     return render(request, 'materias/lista_materias_disponibles_user.html', {
         'materias_con_requisitos': materias_con_requisitos,
     })
@@ -909,20 +912,17 @@ def inscripcionMateriaEst(request, materia_id, modalidad):
         messages.warning(request, 'Ya estás inscrito en esta materia.')
         return redirect('/inscripcionMateriaEst')
 
-    # Validar la inscripción
-    if validar_inscripcion_materias(inscripcion_usuario.id, materia_id):
-        nueva_inscripcion = usuarios_materia(
-            usuario=inscripcion_usuario,
-            materia=materia,
-            modalidad=modalidad
-        )
-        nueva_inscripcion.save()
+    # Las mismas reglas que ofrece la pantalla: materia de su carrera, de alta,
+    # con la inscripción abierta y las correlativas cumplidas, y una modalidad
+    # permitida (#288). Antes solo las aplicaba la pantalla.
+    motivo = correlativas.motivo_para_no_inscribir(inscripcion_usuario, materia, modalidad)
+    if motivo:
+        messages.error(request, f'No podés inscribirte en {materia}: {motivo}.')
+        return redirect('/inscripcionMateriaEst')
 
-        messages.success(request, 'Te has inscrito exitosamente en la materia.')
-        return redirect('/inscripcionMateriaEst')
-    else:
-        messages.error(request, 'No cumples con los requisitos para inscribirte en esta materia.')
-        return redirect('/inscripcionMateriaEst')
+    usuarios_materia.objects.create(usuario=inscripcion_usuario, materia=materia, modalidad=modalidad)
+    messages.success(request, 'Te has inscrito exitosamente en la materia.')
+    return redirect('/inscripcionMateriaEst')
 
 def exito_inscripcion_mesa(request):
     return render(request, 'finales/exito_inscripcion_mesa.html')
@@ -1955,11 +1955,6 @@ def listar_usuarios_materia(request):
 # nombre que Python descartaba (gana la última), y que además se comportaba
 # distinto: ignoraba la modalidad Libre y bloqueaba a quien tuviera cualquier
 # nota de final, incluso desaprobada. Se eliminó para que no se edite por error.
-
-def validar_inscripcion_materias(usuario_id, materia_id):
-    """Para cursar: cursada aprobada de cada correlativa (ver inscripcionFinales/correlativas.py)."""
-    puede, _motivo = correlativas.puede_cursar(usuario_id, materia_id)
-    return puede
 
 
 
