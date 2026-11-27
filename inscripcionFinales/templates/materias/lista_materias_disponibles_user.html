@@ -45,7 +45,7 @@
           <tr class="hover:bg-slate-50"
               x-data="{ abierto: false, disponible: {% if item.disponible %}true{% else %}false{% endif %}, mostrarCorrelativas: false }"
               x-show="(!soloDisponibles || disponible) && (!carreraSeleccionada || carreraSeleccionada === '{{ materia.carrera.nombre_carrera|default:""|escapejs }}') && (busqueda === '' || '{{ materia.nombre_materia|lower|escapejs }}'.includes(busqueda.toLowerCase()))"
-              data-practica="{% if materia.nombre_materia|lower|slice:':5' == 'pract' or materia.nombre_materia|lower|slice:':5' == 'práct' %}1{% else %}0{% endif %}">
+              data-practica="{% if item.practica %}1{% else %}0{% endif %}">
             <td class="px-5 py-3 font-medium text-tinta-900">
               <span class="mr-2 inline-block h-3 w-3 shrink-0 rounded-full align-middle {% if item.disponible %}bg-celeste-500{% else %}bg-amber-500{% endif %}"></span>{{ materia.nombre_materia }}
             </td>

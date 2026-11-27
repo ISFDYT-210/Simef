@@ -14,6 +14,8 @@ Lógica centralizada de correlativas. Reglas confirmadas con el instituto:
 Tanto la vista de inscripción a materias como la de finales deben pasar por
 `puede_cursar` / `puede_rendir` en vez de reimplementar la validación.
 """
+import unicodedata
+
 from django.db.models import Q
 
 from .models import (
@@ -293,6 +295,34 @@ def materias_con_requisitos(usuario):
             })
 
     return resultado
+
+
+# Modalidades con que el alumno se inscribe solo (#288). Itinerante y Oyente las
+# asigna el personal desde la inscripción manual.
+MODALIDADES_ALUMNO = ('Regular', 'Libre')
+
+
+def es_practica(materia):
+    """Las prácticas no se cursan libres. 'Práctica Docente III' -> True."""
+    nombre = unicodedata.normalize('NFD', materia.nombre_materia or '')
+    nombre = ''.join(c for c in nombre if unicodedata.category(c) != 'Mn')
+    return nombre.strip().lower().startswith('pract')
+
+
+def motivo_para_no_inscribir(usuario, materia, modalidad):
+    """None si el alumno puede inscribirse solo a esta materia con esta modalidad;
+    si no, el motivo. Aplica en el servidor las mismas reglas que ofrece la
+    pantalla "Inscripción a materias" (#288)."""
+    if modalidad not in MODALIDADES_ALUMNO:
+        return 'Esa modalidad no está disponible para inscribirse desde acá'
+    if modalidad == 'Libre' and es_practica(materia):
+        return 'Las prácticas no se pueden cursar libres'
+    item = next((i for i in materias_con_requisitos(usuario) if i['materia'].id == materia.id), None)
+    if item is None:
+        return 'Esa materia no tiene la inscripción abierta para tu carrera'
+    if not item['disponible']:
+        return item['motivo']
+    return None
 
 
 def materias_disponibles_para_cursar(usuario):
